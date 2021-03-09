@@ -4,13 +4,13 @@ use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::AccountId;
 use near_sdk_sim::{call, deploy, init_simulator, to_yocto, view, ContractAccount, UserAccount};
 
-use multiswap::{ContractContract as Multiswap, PoolInfo, SwapAction};
+use ref_exchange::{ContractContract as Multiswap, PoolInfo, SwapAction};
 use std::collections::HashMap;
 use test_token::ContractContract as TestToken;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    TEST_TOKEN_WASM_BYTES => "../test-token/res/test_token.wasm",
-    MUTLISWAP_WASM_BYTES => "res/multiswap.wasm",
+    TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
+    EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
 }
 
 fn test_token(root: &UserAccount, token_id: AccountId) -> ContractAccount<TestToken> {
@@ -53,7 +53,7 @@ fn test_swap() {
     let pool = deploy!(
         contract: Multiswap,
         contract_id: swap(),
-        bytes: &MUTLISWAP_WASM_BYTES,
+        bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root
     );
     call!(root, pool.new());
