@@ -2,6 +2,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, Balance};
 
 use crate::simple_pool::SimplePool;
+use crate::utils::SwapVolume;
 
 /// Generic Pool, providing wrapper around different implementations of swap pools.
 /// Allows to add new types of pools just by adding extra item in the enum without needing to migrate the storage.
@@ -56,6 +57,20 @@ impl Pool {
         }
     }
 
+    /// Returns given pool's total fee.
+    pub fn get_fee(&self) -> u32 {
+        match self {
+            Pool::SimplePool(pool) => pool.get_fee(),
+        }
+    }
+
+    /// Returns volumes of the given pool.
+    pub fn get_volumes(&self) -> Vec<SwapVolume> {
+        match self {
+            Pool::SimplePool(pool) => pool.get_volumes(),
+        }
+    }
+
     /// Swaps given number of token_in for token_out and returns received amount.
     pub fn swap(
         &mut self,
@@ -63,9 +78,11 @@ impl Pool {
         amount_in: Balance,
         token_out: &AccountId,
         min_amount_out: Balance,
+        exchange_id: &AccountId,
+        referral_id: Option<AccountId>,
     ) -> Balance {
         match self {
-            Pool::SimplePool(pool) => pool.swap(token_in, amount_in, token_out, min_amount_out),
+            Pool::SimplePool(pool) => pool.swap(token_in, amount_in, token_out, min_amount_out, exchange_id, referral_id),
         }
     }
 

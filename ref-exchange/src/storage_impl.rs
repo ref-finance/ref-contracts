@@ -4,7 +4,6 @@ use crate::*;
 /// TODO: This can be improve by keeping track NEAR balances per user, allowing to keep more than fixed number of tokens.
 #[near_bindgen]
 impl StorageManagement for Contract {
-    #[allow(unused_variables)]
     #[payable]
     fn storage_deposit(
         &mut self,
@@ -15,22 +14,27 @@ impl StorageManagement for Contract {
         let account_id = account_id
             .map(|a| a.into())
             .unwrap_or_else(|| env::predecessor_account_id());
-        if self.deposited_amounts.contains_key(&account_id) {
-            log!("The account is already registered, refunding the deposit");
-            if amount > 0 {
-                Promise::new(env::predecessor_account_id()).transfer(amount);
+        let registration_only = registration_only.unwrap_or(false);
+        let min_balance = self.storage_balance_bounds().min.0;
+        if amount < min_balance {
+            env::panic(b"ERR_DEPSOIT_LESS_THAN_MIN_STORAGE");
+        }
+        if registration_only {
+            // Registration only setups the account but doesn't leave space for tokens.
+            if self.deposited_amounts.contains_key(&account_id) {
+                log!("ERR_ACC_REGISTERED");
+                if amount > 0 {
+                    Promise::new(env::predecessor_account_id()).transfer(amount);
+                }
+            } else {
+                self.internal_register_account(&account_id, min_balance);
+                let refund = amount - min_balance;
+                if refund > 0 {
+                    Promise::new(env::predecessor_account_id()).transfer(refund);
+                }
             }
         } else {
-            let min_balance = self.storage_balance_bounds().min.0;
-            if amount < min_balance {
-                env::panic(b"The attached deposit is less than the mimimum storage balance");
-            }
-
-            self.internal_register_account(&account_id);
-            let refund = amount - min_balance;
-            if refund > 0 {
-                Promise::new(env::predecessor_account_id()).transfer(refund);
-            }
+            self.internal_register_account(&account_id, amount);
         }
         self.storage_balance_of(account_id.try_into().unwrap())
             .unwrap()
@@ -50,7 +54,7 @@ impl StorageManagement for Contract {
 
     fn storage_balance_bounds(&self) -> StorageBalanceBounds {
         StorageBalanceBounds {
-            min: (BYTES_PER_DEPOSIT_RECORD * env::storage_byte_cost()).into(),
+            min: (MIN_ACCOUNT_DEPOSIT_LENGTH * env::storage_byte_cost()).into(),
             max: None,
         }
     }

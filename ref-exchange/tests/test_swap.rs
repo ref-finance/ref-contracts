@@ -56,10 +56,10 @@ fn test_swap() {
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root
     );
-    call!(root, pool.new());
+    call!(root, pool.new(to_va("owner".to_string()), 4, 1));
     call!(
         root,
-        pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 30),
+        pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 25),
         deposit = to_yocto("1")
     )
     .assert_success();
@@ -105,7 +105,7 @@ fn test_swap() {
         PoolInfo {
             token_account_ids: vec![dai(), eth()],
             amounts: vec![to_yocto("5").into(), to_yocto("10").into()],
-            fee: 30,
+            total_fee: 30,
             shares_total_supply: to_yocto("1").into(),
         }
     );
@@ -116,13 +116,16 @@ fn test_swap() {
 
     call!(
         root,
-        pool.swap(vec![SwapAction {
-            pool_id: 0,
-            token_in: to_va(dai()),
-            amount_in: Some(U128(to_yocto("1"))),
-            token_out: to_va(eth()),
-            min_amount_out: U128(1)
-        }])
+        pool.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in: to_va(dai()),
+                amount_in: Some(U128(to_yocto("1"))),
+                token_out: to_va(eth()),
+                min_amount_out: U128(1)
+            }],
+            None
+        )
     )
     .assert_success();
 

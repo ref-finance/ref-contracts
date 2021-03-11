@@ -5,14 +5,13 @@ use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance};
 
-use crate::utils::{add_to_collection, U256};
+use crate::utils::{add_to_collection, integer_sqrt, SwapVolume, FEE_DIVISOR, U256};
 
-const FEE_DIVISOR: u32 = 10_000;
-const MAX_NUM_TOKENS: usize = 10;
+const MAX_NUM_TOKENS: usize = 2;
 const INIT_SHARES_SUPPLY: u128 = 1_000_000_000_000_000_000_000_000;
 
 /// Implementation of simple pool, that maintains constant product between balances of all the tokens.
-/// Similar to "Uniswap", but allows up to MAX_NUM_TOKENS of tokens.
+/// Similar in design to "Uniswap".
 /// Liquidity providers when depositing receive shares, that can be later burnt to withdraw pool's tokens in proportion.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct SimplePool {
@@ -20,8 +19,14 @@ pub struct SimplePool {
     pub token_account_ids: Vec<AccountId>,
     /// How much NEAR this contract has.
     pub amounts: Vec<Balance>,
+    /// Volumes accumulated by this pool.
+    pub volumes: Vec<SwapVolume>,
     /// Fee charged for swap (gets divided by FEE_DIVISOR).
-    pub fee: u32,
+    pub total_fee: u32,
+    /// Portion of the fee going to exchange.
+    pub exchange_fee: u32,
+    /// Portion of the fee going to referral.
+    pub referral_fee: u32,
     /// Shares of the pool by liquidity providers.
     pub shares: LookupMap<AccountId, Balance>,
     /// Total number of shares.
@@ -29,19 +34,31 @@ pub struct SimplePool {
 }
 
 impl SimplePool {
-    pub fn new(id: u32, token_account_ids: Vec<ValidAccountId>, fee: u32) -> Self {
-        assert!(fee < FEE_DIVISOR, "ERR_FEE_TOO_LARGE");
+    pub fn new(
+        id: u32,
+        token_account_ids: Vec<ValidAccountId>,
+        total_fee: u32,
+        exchange_fee: u32,
+        referral_fee: u32,
+    ) -> Self {
         assert!(
-            token_account_ids.len() < MAX_NUM_TOKENS,
+            total_fee < FEE_DIVISOR && (exchange_fee + referral_fee) <= total_fee,
+            "ERR_FEE_TOO_LARGE"
+        );
+        assert_ne!(token_account_ids.len(), 1, "ERR_NOT_ENOUGH_TOKENS");
+        assert!(
+            token_account_ids.len() <= MAX_NUM_TOKENS,
             "ERR_TOO_MANY_TOKENS"
         );
         Self {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
             amounts: vec![0u128; token_account_ids.len()],
-            fee,
+            volumes: vec![SwapVolume::default(); token_account_ids.len()],
+            total_fee,
+            exchange_fee,
+            referral_fee,
             shares: LookupMap::new(format!("s{}", id).into_bytes()),
             shares_total_supply: 0,
-            // liquidity_amounts: LookupMap::new(format!("l{}", id).into_bytes()),
         }
     }
 
@@ -88,9 +105,17 @@ impl SimplePool {
             }
             INIT_SHARES_SUPPLY
         };
-        self.shares_total_supply += shares;
-        add_to_collection(&mut self.shares, &sender_id, shares);
+        self.mint_shares(&sender_id, shares);
         shares
+    }
+
+    /// Mint new shares for given user.
+    fn mint_shares(&mut self, account_id: &AccountId, shares: Balance) {
+        if shares == 0 {
+            return;
+        }
+        self.shares_total_supply += shares;
+        add_to_collection(&mut self.shares, &account_id, shares);
     }
 
     /// Removes given number of shares from the pool and returns amounts to the parent.
@@ -146,7 +171,7 @@ impl SimplePool {
                 && amount_in > 0,
             "ERR_INVALID"
         );
-        let amount_with_fee = U256::from(amount_in) * U256::from(FEE_DIVISOR - self.fee);
+        let amount_with_fee = U256::from(amount_in) * U256::from(FEE_DIVISOR - self.total_fee);
         (amount_with_fee * out_balance / (U256::from(FEE_DIVISOR) * in_balance + amount_with_fee))
             .as_u128()
     }
@@ -165,6 +190,16 @@ impl SimplePool {
         )
     }
 
+    /// Returns given pool's total fee.
+    pub fn get_fee(&self) -> u32 {
+        self.total_fee
+    }
+
+    /// Returns volumes of the given pool.
+    pub fn get_volumes(&self) -> Vec<SwapVolume> {
+        self.volumes.clone()
+    }
+
     /// Swap `token_amount_in` of `token_in` token into `token_out` and return how much was received.
     /// Assuming that `token_amount_in` was already received from `sender_id`.
     pub fn swap(
@@ -173,6 +208,8 @@ impl SimplePool {
         amount_in: Balance,
         token_out: &AccountId,
         min_amount_out: Balance,
+        exchange_id: &AccountId,
+        referral_id: Option<AccountId>,
     ) -> Balance {
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
@@ -186,8 +223,35 @@ impl SimplePool {
         );
         assert!(amount_out >= min_amount_out, "ERR_MIN_AMOUNT");
 
+        let prev_invariant =
+            integer_sqrt(U256::from(self.amounts[in_idx]) * U256::from(self.amounts[out_idx]));
+
         self.amounts[in_idx] += amount_in;
         self.amounts[out_idx] -= amount_out;
+
+        let new_invariant =
+            integer_sqrt(U256::from(self.amounts[in_idx]) * U256::from(self.amounts[out_idx]));
+
+        // Invariant can not reduce.
+        assert!(new_invariant >= prev_invariant, "ERR_INVARIANT");
+        let numerator = (new_invariant - prev_invariant) * U256::from(self.shares_total_supply);
+
+        if self.exchange_fee > 0 && numerator > U256::zero() {
+            let denominator = new_invariant * self.total_fee / self.exchange_fee;
+            self.mint_shares(&exchange_id, (numerator / denominator).as_u128());
+        }
+
+        // If there is referral, allocate it % of LP rewards.
+        if let Some(referral_id) = referral_id {
+            if self.referral_fee > 0 && numerator > U256::zero() {
+                let denominator = new_invariant * self.total_fee / self.referral_fee;
+                self.mint_shares(&referral_id, (numerator / denominator).as_u128());
+            }
+        }
+
+        // Update volumes.
+        self.volumes[in_idx].input.0 += amount_in;
+        self.volumes[in_idx].output.0 += amount_out;
 
         amount_out
     }
@@ -206,10 +270,60 @@ mod tests {
         let mut context = VMContextBuilder::new();
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
-        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 30);
+        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 30, 0, 0);
         let num_shares =
             pool.add_liquidity(accounts(0).as_ref(), vec![5 * one_near, 10 * one_near]);
-        pool.swap(accounts(1).as_ref(), one_near, accounts(2).as_ref(), 1);
-        pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1]);
+        assert_eq!(
+            pool.share_balances(accounts(0).as_ref()),
+            INIT_SHARES_SUPPLY
+        );
+        let out = pool.swap(
+            accounts(1).as_ref(),
+            one_near,
+            accounts(2).as_ref(),
+            1,
+            accounts(3).as_ref(),
+            Some(accounts(4).as_ref().clone()),
+        );
+        assert_eq!(
+            pool.share_balances(accounts(0).as_ref()),
+            INIT_SHARES_SUPPLY
+        );
+        assert_eq!(
+            pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1]),
+            [6 * one_near, 10 * one_near - out]
+        );
+    }
+
+    #[test]
+    fn test_pool_swap_with_fees() {
+        let one_near = 10u128.pow(24);
+        let mut context = VMContextBuilder::new();
+        context.predecessor_account_id(accounts(0));
+        testing_env!(context.build());
+        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 100, 100, 0);
+        let num_shares =
+            pool.add_liquidity(accounts(0).as_ref(), vec![5 * one_near, 10 * one_near]);
+        assert_eq!(
+            pool.share_balances(accounts(0).as_ref()),
+            INIT_SHARES_SUPPLY
+        );
+        let out = pool.swap(
+            accounts(1).as_ref(),
+            one_near,
+            accounts(2).as_ref(),
+            1,
+            accounts(3).as_ref(),
+            Some(accounts(4).as_ref().clone()),
+        );
+        assert_eq!(
+            pool.share_balances(accounts(0).as_ref()),
+            INIT_SHARES_SUPPLY
+        );
+        let liq1 = pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1]);
+        let num_shares2 = pool.share_balances(accounts(3).as_ref());
+        let liq2 = pool.remove_liquidity(accounts(3).as_ref(), num_shares2, vec![1, 1]);
+        assert_eq!(liq1[0] + liq2[0], 6 * one_near);
+        assert_eq!(liq1[1] + liq2[1], 10 * one_near - out);
     }
 }

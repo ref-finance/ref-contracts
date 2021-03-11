@@ -6,6 +6,7 @@ use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
 
+use crate::utils::SwapVolume;
 use crate::*;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -16,7 +17,7 @@ pub struct PoolInfo {
     /// How much NEAR this contract has.
     pub amounts: Vec<U128>,
     /// Fee charged for swap.
-    pub fee: u32,
+    pub total_fee: u32,
     /// Total number of shares.
     pub shares_total_supply: U128,
 }
@@ -27,7 +28,7 @@ impl From<Pool> for PoolInfo {
             Pool::SimplePool(pool) => Self {
                 token_account_ids: pool.token_account_ids,
                 amounts: pool.amounts.into_iter().map(|a| U128(a)).collect(),
-                fee: pool.fee,
+                total_fee: pool.total_fee,
                 shares_total_supply: U128(pool.shares_total_supply),
             },
         }
@@ -53,6 +54,16 @@ impl Contract {
         self.pools.get(pool_id).expect("ERR_NO_POOL").into()
     }
 
+    /// Return total fee of the given pool.
+    pub fn get_pool_fee(&self, pool_id: u64) -> u32 {
+        self.pools.get(pool_id).expect("ERR_NO_POOL").get_fee()
+    }
+
+    /// Return volumes of the given pool.
+    pub fn get_pool_volumes(&self, pool_id: u64) -> Vec<SwapVolume> {
+        self.pools.get(pool_id).expect("ERR_NO_POOL").get_volumes()
+    }
+
     /// Returns number of shares given account has in given pool.
     pub fn get_pool_shares(&self, pool_id: u64, account_id: ValidAccountId) -> U128 {
         self.pools
@@ -74,6 +85,7 @@ impl Contract {
     /// Returns balances of the deposits for given user outside of any pools.
     pub fn get_deposits(&self, account_id: &AccountId) -> HashMap<AccountId, U128> {
         self.internal_get_deposits(account_id)
+            .tokens
             .into_iter()
             .map(|(acc, bal)| (acc, U128(bal)))
             .collect()

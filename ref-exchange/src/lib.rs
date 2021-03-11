@@ -27,9 +27,7 @@ mod views;
 near_sdk::setup_alloc!();
 
 const MAX_ACCOUNT_LENGTH: u128 = 64;
-const MAX_NUMBER_OF_TOKENS: u128 = 10;
-const BYTES_PER_DEPOSIT_RECORD: u128 =
-    MAX_NUMBER_OF_TOKENS * (MAX_ACCOUNT_LENGTH + 16) + 4 + MAX_ACCOUNT_LENGTH;
+const MIN_ACCOUNT_DEPOSIT_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4;
 
 /// Single swap action.
 #[derive(Serialize, Deserialize)]
@@ -49,23 +47,84 @@ pub struct SwapAction {
     pub min_amount_out: U128,
 }
 
+/// Account deposits information and storage cost.
+#[derive(BorshSerialize, BorshDeserialize, Clone)]
+pub struct AccountDeposit {
+    /// Native amount sent to the exchange.
+    /// Used for storage now, but in future can be used for trading as well.
+    pub amount: Balance,
+    /// Amounts of various tokens in this account.
+    pub tokens: HashMap<AccountId, Balance>,
+}
+
+impl AccountDeposit {
+    /// Adds amount to the balance of given token while checking that storage is covered.
+    fn add(&mut self, token: AccountId, amount: Balance) {
+        let prev_amount = *self.tokens.get(&token).unwrap_or(&0);
+        self.tokens.insert(token, prev_amount + amount);
+        let storage_cost = (MIN_ACCOUNT_DEPOSIT_LENGTH
+            + self.tokens.len() as u128 * (MAX_ACCOUNT_LENGTH + 16))
+            * env::storage_byte_cost();
+        assert!(storage_cost <= self.amount, "ERR_INSUFFICIENT_STORAGE");
+    }
+
+    /// Subtract from balance of given token, removes record if 0.
+    fn sub(&mut self, token: AccountId, amount: Balance) {
+        let value = *self
+            .tokens
+            .get(&token)
+            .expect(&format!("ERR_MISSING_TOKEN:{}", token));
+        assert!(value >= amount, format!("ERR_NOT_ENOUGH_TOKEN:{}", token));
+        if value == amount {
+            self.tokens.remove(&token);
+        } else {
+            self.tokens.insert(token, value - amount);
+        }
+    }
+}
+
 #[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 pub struct Contract {
+    /// Account of the owner.
+    owner_id: AccountId,
+    /// Exchange fee, that goes to exchange itself (managed by governance).
+    exchange_fee: u32,
+    /// Referral fee, that goes to referrer in the call.
+    referral_fee: u32,
+    /// List of all the pools.
     pools: Vector<Pool>,
     /// Balances of deposited tokens for each account.
-    deposited_amounts: LookupMap<AccountId, HashMap<AccountId, Balance>>,
+    deposited_amounts: LookupMap<AccountId, AccountDeposit>,
 }
 
 #[near_bindgen]
 impl Contract {
     #[init]
-    pub fn new() -> Self {
+    pub fn new(owner_id: ValidAccountId, exchange_fee: u32, referral_fee: u32) -> Self {
         assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
         Self {
+            owner_id: owner_id.as_ref().clone(),
+            exchange_fee,
+            referral_fee,
             pools: Vector::new(b"p".to_vec()),
             deposited_amounts: LookupMap::new(b"d".to_vec()),
         }
+    }
+
+    /// Change owner. Only can be called by owner.
+    pub fn set_owner(&mut self, owner_id: ValidAccountId) {
+        assert_eq!(
+            env::predecessor_account_id(),
+            self.owner_id,
+            "ERR_NOT_ALLOWED"
+        );
+        self.owner_id = owner_id.as_ref().clone();
+    }
+
+    /// Get the owner of this account.
+    pub fn get_owner(&self) -> AccountId {
+        self.owner_id.clone()
     }
 
     /// Adds new "Simple Pool" with given tokens and given fee.
@@ -76,7 +135,9 @@ impl Contract {
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
             tokens,
-            fee,
+            fee + self.exchange_fee + self.referral_fee,
+            self.exchange_fee,
+            self.referral_fee,
         )))
     }
 
@@ -90,27 +151,32 @@ impl Contract {
         amount_in: U128,
         token_out: ValidAccountId,
         min_amount_out: U128,
+        referral_id: Option<AccountId>,
     ) -> U128 {
-        let prev_amount_in = self.internal_get_deposit(&sender_id, token_in.as_ref());
-        let prev_amount_out = self.internal_get_deposit(&sender_id, token_out.as_ref());
+        let mut deposits = self.internal_get_deposits(&sender_id);
         let amount_in: u128 = amount_in.into();
-        assert!(amount_in <= prev_amount_in, "ERR_NOT_ENOUGH_DEPOSIT");
+        deposits.sub(token_in.as_ref().clone(), amount_in);
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         let amount_out = pool.swap(
             token_in.as_ref(),
             amount_in,
             token_out.as_ref(),
             min_amount_out.into(),
+            &self.owner_id,
+            referral_id,
         );
-        self.internal_deposit(&sender_id, token_in.as_ref(), prev_amount_in - amount_in);
-        self.internal_deposit(&sender_id, token_out.as_ref(), prev_amount_out + amount_out);
+        deposits.add(token_out.as_ref().clone(), amount_out);
+        self.deposited_amounts.insert(&sender_id, &deposits);
         self.pools.replace(pool_id, &pool);
         amount_out.into()
     }
 
-    pub fn swap(&mut self, actions: Vec<SwapAction>) -> U128 {
+    /// Execute set of swap actions between pools.
+    /// If referrer provided, pays referral_fee to it.
+    pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
         let sender_id = env::predecessor_account_id();
         let mut prev_amount = None;
+        let referral_id = referral_id.map(|r| r.as_ref().clone());
         for action in actions {
             let amount_in = action
                 .amount_in
@@ -122,6 +188,7 @@ impl Contract {
                 amount_in,
                 action.token_out,
                 action.min_amount_out,
+                referral_id.clone(),
             ));
         }
         prev_amount.unwrap()
@@ -135,18 +202,7 @@ impl Contract {
         let mut deposits = self.internal_get_deposits(&sender_id);
         let tokens = pool.tokens();
         for i in 0..tokens.len() {
-            let amount = *deposits
-                .get(&tokens[i])
-                .expect(&format!("ERR_MISSING_TOKEN:{}", tokens[i]));
-            assert!(
-                amounts[i] <= amount,
-                format!("ERR_NOT_ENOUGH_TOKEN:{}", tokens[i])
-            );
-            if amounts[i] == amount {
-                deposits.remove(&tokens[i]);
-            } else {
-                deposits.insert(tokens[i].clone(), amount - amounts[i]);
-            }
+            deposits.sub(tokens[i].clone(), amounts[i]);
         }
         pool.add_liquidity(&sender_id, amounts);
         self.deposited_amounts.insert(&sender_id, &deposits);
@@ -169,7 +225,7 @@ impl Contract {
         let tokens = pool.tokens();
         let mut deposits = self.internal_get_deposits(&sender_id);
         for i in 0..tokens.len() {
-            *deposits.entry(tokens[i].clone()).or_default() += amounts[i];
+            deposits.add(tokens[i].clone(), amounts[i]);
         }
         self.deposited_amounts.insert(&sender_id, &deposits);
     }
@@ -181,16 +237,8 @@ impl Contract {
         let amount: u128 = amount.into();
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.deposited_amounts.get(&sender_id).unwrap();
-        let available_amount = deposits
-            .get(token_id.as_ref())
-            .expect("ERR_NO_TOKEN")
-            .clone();
-        assert!(available_amount >= amount, "ERR_NOT_ENOUGH");
-        if available_amount == amount {
-            deposits.remove(token_id.as_ref());
-        } else {
-            deposits.insert(token_id.as_ref().clone(), available_amount - amount);
-        }
+        deposits.sub(token_id.as_ref().clone(), amount);
+        self.deposited_amounts.insert(&sender_id, &deposits);
         ext_fungible_token::ft_transfer(
             sender_id.try_into().unwrap(),
             amount.into(),
@@ -206,38 +254,52 @@ impl Contract {
 impl Contract {
     /// Adds given pool to the list and returns it's id.
     /// If there is not enough attached balance to cover storage, fails.
+    /// If too much attached - refunds it back.
     fn internal_add_pool(&mut self, pool: Pool) -> u32 {
         let prev_storage = env::storage_usage();
         let id = self.pools.len() as u32;
         self.pools.push(&pool);
+
+        // Check how much storage cost and refund the left over back.
+        let storage_cost = (env::storage_usage() - prev_storage) as u128 * env::storage_byte_cost();
         assert!(
-            (env::storage_usage() - prev_storage) as u128 * env::storage_byte_cost()
-                <= env::attached_deposit(),
+            storage_cost <= env::attached_deposit(),
             "ERR_STORAGE_DEPOSIT"
         );
+        let refund = env::attached_deposit() - storage_cost;
+        if refund > 0 {
+            Promise::new(env::predecessor_account_id()).transfer(refund);
+        }
         id
     }
 
-    /// Registers account in deposited amounts.
+    /// Registers account in deposited amounts with given amount of $NEAR.
+    /// If account already exists, adds amount to it.
     /// This should be used when it's known that storage is prepaid.
-    fn internal_register_account(&mut self, account_id: &AccountId) {
-        self.deposited_amounts
-            .insert(&account_id, &HashMap::default());
+    fn internal_register_account(&mut self, account_id: &AccountId, amount: Balance) {
+        let mut deposit_amount =
+            self.deposited_amounts
+                .get(&account_id)
+                .unwrap_or_else(|| AccountDeposit {
+                    amount: 0,
+                    tokens: HashMap::default(),
+                });
+        deposit_amount.amount += amount;
+        self.deposited_amounts.insert(&account_id, &deposit_amount);
     }
 
     /// Record deposit of some number of tokens to this contract.
     fn internal_deposit(&mut self, sender_id: &AccountId, token_id: &AccountId, amount: Balance) {
-        let mut amounts = self
+        let mut account_deposit = self
             .deposited_amounts
             .get(sender_id)
             .expect("ERR_NOT_REGISTERED");
-        assert!(amounts.len() <= 10, "ERR_TOO_MANY_TOKENS");
-        amounts.insert(token_id.clone(), amount);
-        self.deposited_amounts.insert(sender_id, &amounts);
+        account_deposit.add(token_id.clone(), amount);
+        self.deposited_amounts.insert(sender_id, &account_deposit);
     }
 
     /// Returns current balances across all tokens for given user.
-    fn internal_get_deposits(&self, sender_id: &AccountId) -> HashMap<AccountId, Balance> {
+    fn internal_get_deposits(&self, sender_id: &AccountId) -> AccountDeposit {
         self.deposited_amounts
             .get(sender_id)
             .expect("ERR_NO_DEPOSIT")
@@ -247,6 +309,7 @@ impl Contract {
     /// Returns current balance of given token for given user. If there is nothing recorded, returns 0.
     fn internal_get_deposit(&self, sender_id: &AccountId, token_id: &AccountId) -> Balance {
         self.internal_get_deposits(sender_id)
+            .tokens
             .get(token_id)
             .cloned()
             .unwrap_or_default()
@@ -258,6 +321,7 @@ mod tests {
     use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
     use near_sdk::test_utils::{accounts, VMContextBuilder};
     use near_sdk::{testing_env, MockedBlockchain};
+    use near_sdk_sim::to_yocto;
 
     use super::*;
 
@@ -267,19 +331,19 @@ mod tests {
         let mut context = VMContextBuilder::new();
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
-        let mut contract = Contract::new();
+        let mut contract = Contract::new(accounts(0), 4, 1);
 
         // create 1st pool (1, 2) with 0.3% fee.
         testing_env!(context
             .predecessor_account_id(accounts(3))
             .attached_deposit(env::storage_byte_cost() * 300)
             .build());
-        contract.add_simple_pool(vec![accounts(1), accounts(2)], 30);
+        contract.add_simple_pool(vec![accounts(1), accounts(2)], 25);
 
         // add liquidity of (1,2) tokens and create 1st pool.
         testing_env!(context
             .predecessor_account_id(accounts(3))
-            .attached_deposit(contract.storage_balance_bounds().min.0)
+            .attached_deposit(to_yocto("0.03"))
             .build());
         contract.storage_deposit(None, None);
         testing_env!(context
@@ -308,13 +372,16 @@ mod tests {
         let amount_out = contract.get_return(0, accounts(1), one_near.into(), accounts(2));
         assert_eq!(amount_out, 1662497915624478906119726.into());
 
-        let amount_out = contract.swap(vec![SwapAction {
-            pool_id: 0,
-            token_in: accounts(1),
-            amount_in: Some(one_near.into()),
-            token_out: accounts(2),
-            min_amount_out: U128(1),
-        }]);
+        let amount_out = contract.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in: accounts(1),
+                amount_in: Some(one_near.into()),
+                token_out: accounts(2),
+                min_amount_out: U128(1),
+            }],
+            None,
+        );
         assert_eq!(amount_out, 1662497915624478906119726.into());
         assert_eq!(
             contract.get_deposit(accounts(3).as_ref(), accounts(1).as_ref()),
@@ -331,11 +398,19 @@ mod tests {
             contract.get_pool_shares(0, accounts(3)),
             vec![1.into(), 2.into()],
         );
-        assert_eq!(contract.get_pool_total_shares(0), U128(0));
+        // Exchange fees left in the pool as liquidity.
+        assert_eq!(
+            contract.get_pool_total_shares(0),
+            U128(33337501041992301475)
+        );
 
         contract.withdraw(
             accounts(1),
             contract.get_deposit(accounts(3).as_ref(), accounts(1).as_ref()),
+        );
+        assert_eq!(
+            contract.get_deposit(accounts(3).as_ref(), accounts(1).as_ref()),
+            U128(0)
         );
     }
 
@@ -345,7 +420,7 @@ mod tests {
     fn test_deny_duplicate_tokens_pool() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.build());
-        let mut contract = Contract::new();
+        let mut contract = Contract::new(accounts(0), 0, 0);
         testing_env!(context
             .predecessor_account_id(accounts(3))
             .attached_deposit(env::storage_byte_cost() * 300)

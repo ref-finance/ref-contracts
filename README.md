@@ -7,7 +7,7 @@ This mono repo contains the source code for the smart contracts of Ref Finance o
 | Contract | Reference | Description |
 | - | - | - |
 | [test-token](test-token/src/lib.rs) | - | Test token contract |
-| [ref-exchange](ref-exchange/src/lib.rs) | TODO | Main exchange contract, that allows to deposit and withdraw tokens, exchange them via various pools |
+| [ref-exchange](ref-exchange/src/lib.rs) | [docs](https://ref-finance.gitbook.io/ref-finance/smart-contracts/ref-exchange) | Main exchange contract, that allows to deposit and withdraw tokens, exchange them via various pools |
 
 ## Development
 
@@ -24,6 +24,7 @@ rustup target add wasm32-unknown-unknown
 Contracts have unit tests and also integration tests using NEAR Simulation framework. All together can be run:
 
 ```
+cd ref-exchange
 cargo test --all
 ```
 
@@ -32,6 +33,7 @@ cargo test --all
 You can build release version by running next scripts inside each contract folder:
 
 ```
+cd ref-exchange
 ./build.sh
 ```
 
@@ -42,5 +44,4 @@ To deploy to TestNet, you can use next command:
 near dev-deploy
 ```
 
-This will output on the contract ID it deployed it.
-
+This will output on the contract ID it deployed.
