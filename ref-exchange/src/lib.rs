@@ -62,10 +62,10 @@ impl AccountDeposit {
     fn add(&mut self, token: AccountId, amount: Balance) {
         let prev_amount = *self.tokens.get(&token).unwrap_or(&0);
         self.tokens.insert(token, prev_amount + amount);
-        let storage_cost = (MIN_ACCOUNT_DEPOSIT_LENGTH
-            + self.tokens.len() as u128 * (MAX_ACCOUNT_LENGTH + 16))
-            * env::storage_byte_cost();
-        assert!(storage_cost <= self.amount, "ERR_INSUFFICIENT_STORAGE");
+        assert!(
+            self.storage_usage() <= self.amount,
+            "ERR_INSUFFICIENT_STORAGE"
+        );
     }
 
     /// Subtract from balance of given token, removes record if 0.
@@ -80,6 +80,11 @@ impl AccountDeposit {
         } else {
             self.tokens.insert(token, value - amount);
         }
+    }
+
+    fn storage_usage(&self) -> Balance {
+        (MIN_ACCOUNT_DEPOSIT_LENGTH + self.tokens.len() as u128 * (MAX_ACCOUNT_LENGTH + 16))
+            * env::storage_byte_cost()
     }
 }
 

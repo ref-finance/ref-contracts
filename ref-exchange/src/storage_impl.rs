@@ -60,13 +60,13 @@ impl StorageManagement for Contract {
     }
 
     fn storage_balance_of(&self, account_id: ValidAccountId) -> Option<StorageBalance> {
-        if self.deposited_amounts.contains_key(account_id.as_ref()) {
-            Some(StorageBalance {
-                total: self.storage_balance_bounds().min,
-                available: 0.into(),
-            })
-        } else {
-            None
-        }
+        let deposits = self
+            .deposited_amounts
+            .get(account_id.as_ref())
+            .expect("ERR_NO_ACCOUNT");
+        Some(StorageBalance {
+            total: U128(deposits.amount),
+            available: U128(deposits.amount - deposits.storage_usage()),
+        })
     }
 }
