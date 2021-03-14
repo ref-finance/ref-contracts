@@ -48,7 +48,7 @@ pub struct SwapAction {
 }
 
 /// Account deposits information and storage cost.
-#[derive(BorshSerialize, BorshDeserialize, Clone)]
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
 pub struct AccountDeposit {
     /// Native amount sent to the exchange.
     /// Used for storage now, but in future can be used for trading as well.
@@ -175,7 +175,7 @@ impl Contract {
         min_amount_out: U128,
         referral_id: Option<AccountId>,
     ) -> U128 {
-        let mut deposits = self.internal_get_deposits(&sender_id);
+        let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
         let amount_in: u128 = amount_in.into();
         deposits.sub(token_in.as_ref().clone(), amount_in);
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
@@ -221,7 +221,7 @@ impl Contract {
         let sender_id = env::predecessor_account_id();
         let amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
-        let mut deposits = self.internal_get_deposits(&sender_id);
+        let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
         let tokens = pool.tokens();
         for i in 0..tokens.len() {
             deposits.sub(tokens[i].clone(), amounts[i]);
@@ -245,7 +245,7 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        let mut deposits = self.internal_get_deposits(&sender_id);
+        let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
         for i in 0..tokens.len() {
             deposits.add(tokens[i].clone(), amounts[i]);
         }
@@ -302,10 +302,7 @@ impl Contract {
         let mut deposit_amount =
             self.deposited_amounts
                 .get(&account_id)
-                .unwrap_or_else(|| AccountDeposit {
-                    amount: 0,
-                    tokens: HashMap::default(),
-                });
+                .unwrap_or_default();
         deposit_amount.amount += amount;
         self.deposited_amounts.insert(&account_id, &deposit_amount);
     }
@@ -320,21 +317,11 @@ impl Contract {
         self.deposited_amounts.insert(sender_id, &account_deposit);
     }
 
-    /// Returns current balances across all tokens for given user.
-    fn internal_get_deposits(&self, sender_id: &AccountId) -> AccountDeposit {
-        self.deposited_amounts
-            .get(sender_id)
-            .expect("ERR_NO_DEPOSIT")
-            .clone()
-    }
-
     /// Returns current balance of given token for given user. If there is nothing recorded, returns 0.
     fn internal_get_deposit(&self, sender_id: &AccountId, token_id: &AccountId) -> Balance {
-        self.internal_get_deposits(sender_id)
-            .tokens
-            .get(token_id)
-            .cloned()
-            .unwrap_or_default()
+        self.deposited_amounts
+            .get(sender_id)
+            .and_then(|d| d.tokens.get(token_id).cloned()).unwrap_or_default()
     }
 }
 

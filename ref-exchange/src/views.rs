@@ -83,12 +83,17 @@ impl Contract {
     }
 
     /// Returns balances of the deposits for given user outside of any pools.
+    /// Returns empty list if no tokens deposited.
     pub fn get_deposits(&self, account_id: ValidAccountId) -> HashMap<AccountId, U128> {
-        self.internal_get_deposits(account_id.as_ref())
-            .tokens
-            .into_iter()
-            .map(|(acc, bal)| (acc, U128(bal)))
-            .collect()
+        self.deposited_amounts
+            .get(account_id.as_ref())
+            .map(|d| {
+                d.tokens
+                    .into_iter()
+                    .map(|(acc, bal)| (acc, U128(bal)))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// Returns balance of the deposit for given user outside of any pools.
