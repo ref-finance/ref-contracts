@@ -14,7 +14,7 @@ use near_sdk::{
 
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
-use crate::utils::{check_token_duplicates, ext_fungible_token, GAS_FOR_FT_TRANSFER};
+use crate::utils::{check_token_duplicates, ext_fungible_token, GAS_FOR_FT_TRANSFER, GAS_FOR_UPGRADE_CALL, GAS_FOR_DEPLOY_CALL};
 pub use crate::views::PoolInfo;
 
 mod pool;
@@ -130,6 +130,23 @@ impl Contract {
     /// Get the owner of this account.
     pub fn get_owner(&self) -> AccountId {
         self.owner_id.clone()
+    }
+
+    /// Upgrades given contract. Only can be called by owner.
+    /// if `migrate` is true, calls `migrate()` function right after deployment.
+    pub fn upgrade(&self, #[serializer(borsh)] code: Vec<u8>, #[serializer(borsh)] migrate: bool) -> Promise {
+        assert_eq!(env::predecessor_account_id(), self.owner_id, "ERR_NOT_ALLOWED");
+        let mut promise = Promise::new(env::current_account_id()).deploy_contract(code);
+        if migrate {
+            promise = promise.function_call("migrate".as_bytes().to_vec(), vec![], 0, env::prepaid_gas() - GAS_FOR_UPGRADE_CALL - GAS_FOR_DEPLOY_CALL);
+        }
+        promise
+    }
+
+    /// Placeholder for migration function.
+    #[init]
+    pub fn migrate() {
+        unimplemented!()
     }
 
     /// Adds new "Simple Pool" with given tokens and given fee.
@@ -330,20 +347,38 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_basics() {
-        let one_near = 10u128.pow(24);
+    /// Creates contract and a pool with tokens with 0.3% of total fee.
+    fn setup_contract(tokens: Vec<ValidAccountId>) -> (VMContextBuilder, Contract) {
         let mut context = VMContextBuilder::new();
-        context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
         let mut contract = Contract::new(accounts(0), 4, 1);
-
-        // create 1st pool (1, 2) with 0.3% fee.
         testing_env!(context
             .predecessor_account_id(accounts(3))
             .attached_deposit(env::storage_byte_cost() * 300)
             .build());
-        contract.add_simple_pool(vec![accounts(1), accounts(2)], 25);
+        contract.add_simple_pool(tokens, 25);
+        (context, contract)
+    }
+
+    fn deposit_tokens(
+        context: &mut VMContextBuilder,
+        contract: &mut Contract,
+        account_id: ValidAccountId,
+        token_amounts: Vec<(ValidAccountId, Balance)>,
+    ) {
+        for (token_id, amount) in token_amounts {
+            testing_env!(context
+                .predecessor_account_id(token_id)
+                .attached_deposit(1)
+                .build());
+            contract.ft_on_transfer(account_id.clone(), U128(amount), "".to_string());
+        }
+    }
+
+    #[test]
+    fn test_basics() {
+        let one_near = 10u128.pow(24);
+        let (mut context, mut contract) = setup_contract(vec![accounts(1), accounts(2)]);
 
         // add liquidity of (1,2) tokens and create 1st pool.
         testing_env!(context
@@ -351,31 +386,32 @@ mod tests {
             .attached_deposit(to_yocto("0.03"))
             .build());
         contract.storage_deposit(None, None);
-        testing_env!(context
-            .predecessor_account_id(accounts(1))
-            .attached_deposit(1)
-            .build());
-        contract.ft_on_transfer(accounts(3), (105 * one_near).into(), "".to_string());
-        testing_env!(context.predecessor_account_id(accounts(2)).build());
-        contract.ft_on_transfer(accounts(3), (110 * one_near).into(), "".to_string());
-        testing_env!(context.predecessor_account_id(accounts(3)).build());
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![(accounts(1), 105 * one_near), (accounts(2), 110 * one_near)],
+        );
+
         assert_eq!(
-            contract.get_deposit(accounts(3).as_ref(), accounts(1).as_ref()),
+            contract.get_deposit(accounts(3), accounts(1)),
             (105 * one_near).into()
         );
         assert_eq!(
-            contract.get_deposit(accounts(3).as_ref(), accounts(2).as_ref()),
+            contract.get_deposit(accounts(3), accounts(2)),
             (110 * one_near).into()
         );
+
+        testing_env!(context.predecessor_account_id(accounts(3)).build());
         contract.add_liquidity(0, vec![U128(5 * one_near), U128(10 * one_near)]);
         assert_eq!(
-            contract.get_pool_total_shares(0),
-            U128(1000000000000000000000000)
+            contract.get_pool_total_shares(0).0,
+            crate::utils::INIT_SHARES_SUPPLY
         );
 
         // Get price from pool #0 1 -> 2 tokens.
-        let amount_out = contract.get_return(0, accounts(1), one_near.into(), accounts(2));
-        assert_eq!(amount_out, 1662497915624478906119726.into());
+        let expected_out = contract.get_return(0, accounts(1), one_near.into(), accounts(2));
+        assert_eq!(expected_out.0, 1662497915624478906119726);
 
         let amount_out = contract.swap(
             vec![SwapAction {
@@ -387,14 +423,14 @@ mod tests {
             }],
             None,
         );
-        assert_eq!(amount_out, 1662497915624478906119726.into());
+        assert_eq!(amount_out, expected_out);
         assert_eq!(
-            contract.get_deposit(accounts(3).as_ref(), accounts(1).as_ref()),
-            (99 * one_near).into()
+            contract.get_deposit(accounts(3), accounts(1)).0,
+            99 * one_near
         );
         assert_eq!(
-            contract.get_deposit(accounts(3).as_ref(), accounts(2).as_ref()),
-            (100 * one_near + amount_out.0).into()
+            contract.get_deposit(accounts(3), accounts(2)).0,
+            100 * one_near + amount_out.0
         );
 
         testing_env!(context.predecessor_account_id(accounts(3)).build());
@@ -404,32 +440,30 @@ mod tests {
             vec![1.into(), 2.into()],
         );
         // Exchange fees left in the pool as liquidity.
-        assert_eq!(
-            contract.get_pool_total_shares(0),
-            U128(33337501041992301475)
-        );
+        assert_eq!(contract.get_pool_total_shares(0).0, 33337501041992301475);
 
-        contract.withdraw(
-            accounts(1),
-            contract.get_deposit(accounts(3).as_ref(), accounts(1).as_ref()),
-        );
-        assert_eq!(
-            contract.get_deposit(accounts(3).as_ref(), accounts(1).as_ref()),
-            U128(0)
-        );
+        contract.withdraw(accounts(1), contract.get_deposit(accounts(3), accounts(1)));
+        assert_eq!(contract.get_deposit(accounts(3), accounts(1)).0, 0);
     }
 
     /// Should deny creating a pool with duplicate tokens.
     #[test]
     #[should_panic(expected = "ERR_TOKEN_DUPLICATES")]
     fn test_deny_duplicate_tokens_pool() {
-        let mut context = VMContextBuilder::new();
-        testing_env!(context.build());
-        let mut contract = Contract::new(accounts(0), 0, 0);
-        testing_env!(context
-            .predecessor_account_id(accounts(3))
-            .attached_deposit(env::storage_byte_cost() * 300)
-            .build());
-        contract.add_simple_pool(vec![accounts(1), accounts(1)], 30);
+        setup_contract(vec![accounts(1), accounts(1)]);
+    }
+
+    /// Deny pool with a single token
+    #[test]
+    #[should_panic(expected = "ERR_NOT_ENOUGH_TOKENS")]
+    fn test_deny_single_token_pool() {
+        setup_contract(vec![accounts(1)]);
+    }
+
+    /// Deny pool with a single token
+    #[test]
+    #[should_panic(expected = "ERR_TOO_MANY_TOKENS")]
+    fn test_deny_too_many_tokens_pool() {
+        setup_contract(vec![accounts(1), accounts(2), accounts(3)]);
     }
 }

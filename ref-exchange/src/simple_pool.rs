@@ -5,10 +5,11 @@ use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance};
 
-use crate::utils::{add_to_collection, integer_sqrt, SwapVolume, FEE_DIVISOR, U256};
+use crate::utils::{
+    add_to_collection, integer_sqrt, SwapVolume, FEE_DIVISOR, INIT_SHARES_SUPPLY, U256,
+};
 
 const MAX_NUM_TOKENS: usize = 2;
-const INIT_SHARES_SUPPLY: u128 = 1_000_000_000_000_000_000_000_000;
 
 /// Implementation of simple pool, that maintains constant product between balances of all the tokens.
 /// Similar in design to "Uniswap".

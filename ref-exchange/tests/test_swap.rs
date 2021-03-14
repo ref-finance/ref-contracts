@@ -4,7 +4,7 @@ use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::AccountId;
 use near_sdk_sim::{call, deploy, init_simulator, to_yocto, view, ContractAccount, UserAccount};
 
-use ref_exchange::{ContractContract as Multiswap, PoolInfo, SwapAction};
+use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
 use std::collections::HashMap;
 use test_token::ContractContract as TestToken;
 
@@ -13,7 +13,11 @@ near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
 }
 
-fn test_token(root: &UserAccount, token_id: AccountId) -> ContractAccount<TestToken> {
+fn test_token(
+    root: &UserAccount,
+    token_id: AccountId,
+    accounts_to_register: Vec<AccountId>,
+) -> ContractAccount<TestToken> {
     let t = deploy!(
         contract: TestToken,
         contract_id: token_id,
@@ -26,6 +30,14 @@ fn test_token(root: &UserAccount, token_id: AccountId) -> ContractAccount<TestTo
         t.mint(to_va(root.account_id.clone()), to_yocto("1000").into())
     )
     .assert_success();
+    for account_id in accounts_to_register {
+        call!(
+            root,
+            t.storage_deposit(Some(to_va(account_id)), None),
+            deposit = to_yocto("1")
+        )
+        .assert_success();
+    }
     t
 }
 
@@ -48,15 +60,15 @@ fn to_va(a: AccountId) -> ValidAccountId {
 #[test]
 fn test_swap() {
     let root = init_simulator(None);
-    let token1 = test_token(&root, dai());
-    let token2 = test_token(&root, eth());
     let pool = deploy!(
-        contract: Multiswap,
+        contract: Exchange,
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
-        signer_account: root
+        signer_account: root,
+        init_method: new(to_va("owner".to_string()), 4, 1)
     );
-    call!(root, pool.new(to_va("owner".to_string()), 4, 1));
+    let token1 = test_token(&root, dai(), vec![swap()]);
+    let token2 = test_token(&root, eth(), vec![swap()]);
     call!(
         root,
         pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 25),
@@ -67,18 +79,6 @@ fn test_swap() {
     call!(
         root,
         pool.storage_deposit(None, None),
-        deposit = to_yocto("1")
-    )
-    .assert_success();
-    call!(
-        root,
-        token1.storage_deposit(Some(to_va(swap())), None),
-        deposit = to_yocto("1")
-    )
-    .assert_success();
-    call!(
-        root,
-        token2.storage_deposit(Some(to_va(swap())), None),
         deposit = to_yocto("1")
     )
     .assert_success();
@@ -109,8 +109,8 @@ fn test_swap() {
             shares_total_supply: to_yocto("1").into(),
         }
     );
-    let balances =
-        view!(pool.get_deposits(&root.account_id)).unwrap_json::<HashMap<AccountId, U128>>();
+    let balances = view!(pool.get_deposits(to_va(root.account_id.clone())))
+        .unwrap_json::<HashMap<AccountId, U128>>();
     let balances = balances.values().cloned().collect::<Vec<_>>();
     assert_eq!(balances, vec![U128(to_yocto("100")), U128(to_yocto("100"))]);
 
@@ -129,8 +129,8 @@ fn test_swap() {
     )
     .assert_success();
 
-    let balances =
-        view!(pool.get_deposits(&root.account_id)).unwrap_json::<HashMap<AccountId, U128>>();
+    let balances = view!(pool.get_deposits(to_va(root.account_id.clone())))
+        .unwrap_json::<HashMap<AccountId, U128>>();
     assert_eq!(
         balances.get(&eth()).unwrap(),
         &U128(to_yocto("100") + 1662497915624478906119726)

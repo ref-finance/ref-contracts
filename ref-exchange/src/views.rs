@@ -83,8 +83,8 @@ impl Contract {
     }
 
     /// Returns balances of the deposits for given user outside of any pools.
-    pub fn get_deposits(&self, account_id: &AccountId) -> HashMap<AccountId, U128> {
-        self.internal_get_deposits(account_id)
+    pub fn get_deposits(&self, account_id: ValidAccountId) -> HashMap<AccountId, U128> {
+        self.internal_get_deposits(account_id.as_ref())
             .tokens
             .into_iter()
             .map(|(acc, bal)| (acc, U128(bal)))
@@ -92,8 +92,9 @@ impl Contract {
     }
 
     /// Returns balance of the deposit for given user outside of any pools.
-    pub fn get_deposit(&self, account_id: &AccountId, token_id: &AccountId) -> U128 {
-        self.internal_get_deposit(account_id, token_id).into()
+    pub fn get_deposit(&self, account_id: ValidAccountId, token_id: ValidAccountId) -> U128 {
+        self.internal_get_deposit(account_id.as_ref(), token_id.as_ref())
+            .into()
     }
 
     /// Given specific pool, returns amount of token_out recevied swapping amount_in of token_in.

@@ -7,8 +7,20 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{ext_contract, AccountId, Balance, Gas};
 use uint::construct_uint;
 
+/// Amount of gas for fungible token transfers.
 pub const GAS_FOR_FT_TRANSFER: Gas = 10_000_000_000_000;
+
+/// Amount of gas used for upgrade function itself.
+pub const GAS_FOR_UPGRADE_CALL: Gas = 50_000_000_000_000;
+
+/// Amount of gas for deploy action.
+pub const GAS_FOR_DEPLOY_CALL: Gas = 5_000_000_000_000;
+
+/// Fee divisor, allowing to provide fee in bps.
 pub const FEE_DIVISOR: u32 = 10_000;
+
+/// Initial shares supply on deposit of liquidity.
+pub const INIT_SHARES_SUPPLY: u128 = 1_000_000_000_000_000_000_000_000;
 
 construct_uint! {
     /// 256-bit unsigned integer.
