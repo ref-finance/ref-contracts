@@ -8,6 +8,7 @@ use near_sdk_sim::{deploy, init_simulator, to_yocto};
 use ref_exchange::ContractContract as Exchange;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
+    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_v1.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
 }
 
@@ -24,33 +25,21 @@ fn test_upgrade() {
     let pool = deploy!(
         contract: Exchange,
         contract_id: "swap".to_string(),
-        bytes: &EXCHANGE_WASM_BYTES,
+        bytes: &PREV_EXCHANGE_WASM_BYTES,
         signer_account: root,
         init_method: new(ValidAccountId::try_from(root.account_id.clone()).unwrap(), 4, 1)
     );
-    let args = UpgradeArgs {
+    let args_nomigration = UpgradeArgs {
         code: EXCHANGE_WASM_BYTES.to_vec(),
         migrate: false,
     };
-    // Successful upgrade without migration.
-    root.call(
-        PendingContractTx {
-            receiver_id: pool.user_account.account_id.clone(),
-            method: "upgrade".to_string(),
-            args: args.try_to_vec().unwrap(),
-            is_view: false,
-        },
-        to_yocto("0"),
-        near_sdk_sim::DEFAULT_GAS,
-    )
-    .assert_success();
     // Failed upgrade with no permissions.
     let result = test_user
         .call(
             PendingContractTx {
                 receiver_id: pool.user_account.account_id.clone(),
                 method: "upgrade".to_string(),
-                args: args.try_to_vec().unwrap(),
+                args: args_nomigration.try_to_vec().unwrap(),
                 is_view: false,
             },
             to_yocto("0"),
@@ -64,7 +53,7 @@ fn test_upgrade() {
         code: EXCHANGE_WASM_BYTES.to_vec(),
         migrate: true,
     };
-    let result = root.call(
+    root.call(
         PendingContractTx {
             receiver_id: pool.user_account.account_id.clone(),
             method: "upgrade".to_string(),
@@ -73,6 +62,18 @@ fn test_upgrade() {
         },
         to_yocto("0"),
         near_sdk_sim::DEFAULT_GAS,
-    );
-    assert!(format!("{:?}", result).contains("not implemented"));
+    )
+    .assert_success();
+    // Upgrade to the same code without migration is successful.
+    root.call(
+        PendingContractTx {
+            receiver_id: pool.user_account.account_id.clone(),
+            method: "upgrade".to_string(),
+            args: args_nomigration.try_to_vec().unwrap(),
+            is_view: false,
+        },
+        to_yocto("0"),
+        near_sdk_sim::DEFAULT_GAS,
+    )
+    .assert_success();
 }

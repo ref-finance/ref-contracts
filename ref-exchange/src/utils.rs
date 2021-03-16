@@ -22,6 +22,8 @@ pub const FEE_DIVISOR: u32 = 10_000;
 /// Initial shares supply on deposit of liquidity.
 pub const INIT_SHARES_SUPPLY: u128 = 1_000_000_000_000_000_000_000_000;
 
+pub const ERR_NOT_REGISTERED: &str = "ERR_NOT_REGISTERED";
+
 construct_uint! {
     /// 256-bit unsigned integer.
     pub struct U256(4);

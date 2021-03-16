@@ -114,4 +114,17 @@ impl Contract {
         pool.get_return(token_in.as_ref(), amount_in.into(), token_out.as_ref())
             .into()
     }
+
+    /// Get contract level whitelisted tokens.
+    pub fn get_whitelisted_tokens(&self) -> Vec<AccountId> {
+        self.whitelisted_tokens.to_vec()
+    }
+
+    /// Get specific user whitelisted tokens.
+    pub fn get_user_whitelisted_tokens(&self, account_id: &AccountId) -> Vec<AccountId> {
+        self.deposited_amounts
+            .get(&account_id)
+            .map(|d| d.tokens.keys().cloned().collect())
+            .unwrap_or_default()
+    }
 }

@@ -60,6 +60,7 @@ fn to_va(a: AccountId) -> ValidAccountId {
 #[test]
 fn test_swap() {
     let root = init_simulator(None);
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
     let pool = deploy!(
         contract: Exchange,
         contract_id: swap(),
@@ -69,6 +70,10 @@ fn test_swap() {
     );
     let token1 = test_token(&root, dai(), vec![swap()]);
     let token2 = test_token(&root, eth(), vec![swap()]);
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth())])
+    );
     call!(
         root,
         pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 25),
@@ -97,7 +102,8 @@ fn test_swap() {
     .assert_success();
     call!(
         root,
-        pool.add_liquidity(0, vec![U128(to_yocto("5")), U128(to_yocto("10"))])
+        pool.add_liquidity(0, vec![U128(to_yocto("5")), U128(to_yocto("10"))]),
+        deposit = 1
     )
     .assert_success();
     assert_eq!(
@@ -125,7 +131,8 @@ fn test_swap() {
                 min_amount_out: U128(1)
             }],
             None
-        )
+        ),
+        deposit = 1
     )
     .assert_success();
 
@@ -139,12 +146,12 @@ fn test_swap() {
 
     call!(
         root,
-        pool.withdraw(to_va(eth()), U128(to_yocto("101"))),
+        pool.withdraw(to_va(eth()), U128(to_yocto("101")), None),
         deposit = 1
     );
     call!(
         root,
-        pool.withdraw(to_va(dai()), U128(to_yocto("99"))),
+        pool.withdraw(to_va(dai()), U128(to_yocto("99")), None),
         deposit = 1
     );
 
