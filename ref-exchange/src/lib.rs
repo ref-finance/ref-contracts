@@ -80,7 +80,7 @@ impl Contract {
     /// Adds new "Simple Pool" with given tokens and given fee.
     /// Attached NEAR should be enough to cover the added storage.
     #[payable]
-    pub fn add_simple_pool(&mut self, tokens: Vec<ValidAccountId>, fee: u32) -> u32 {
+    pub fn add_simple_pool(&mut self, tokens: Vec<ValidAccountId>, fee: u32) -> u64 {
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
@@ -162,9 +162,9 @@ impl Contract {
     /// Adds given pool to the list and returns it's id.
     /// If there is not enough attached balance to cover storage, fails.
     /// If too much attached - refunds it back.
-    fn internal_add_pool(&mut self, pool: Pool) -> u32 {
+    fn internal_add_pool(&mut self, pool: Pool) -> u64 {
         let prev_storage = env::storage_usage();
-        let id = self.pools.len() as u32;
+        let id = self.pools.len() as u64;
         self.pools.push(&pool);
 
         // Check how much storage cost and refund the left over back.
@@ -217,22 +217,16 @@ mod tests {
 
     use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
     use near_sdk::test_utils::{accounts, VMContextBuilder};
-    use near_sdk::{testing_env, MockedBlockchain};
+    use near_sdk::{testing_env, Balance, MockedBlockchain};
     use near_sdk_sim::to_yocto;
 
     use super::*;
 
     /// Creates contract and a pool with tokens with 0.3% of total fee.
-    fn setup_contract(tokens: Vec<ValidAccountId>) -> (VMContextBuilder, Contract) {
+    fn setup_contract() -> (VMContextBuilder, Contract) {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let mut contract = Contract::new(accounts(0), 4, 1);
-        contract.extend_whitelisted_tokens(tokens.clone());
-        testing_env!(context
-            .predecessor_account_id(accounts(3))
-            .attached_deposit(env::storage_byte_cost() * 300)
-            .build());
-        contract.add_simple_pool(tokens, 25);
+        let contract = Contract::new(accounts(0), 4, 1);
         (context, contract)
     }
 
@@ -242,6 +236,13 @@ mod tests {
         account_id: ValidAccountId,
         token_amounts: Vec<(ValidAccountId, Balance)>,
     ) {
+        if contract.storage_balance_of(account_id.clone()).is_none() {
+            testing_env!(context
+                .predecessor_account_id(account_id.clone())
+                .attached_deposit(to_yocto("1"))
+                .build());
+            contract.storage_deposit(None, None);
+        }
         for (token_id, amount) in token_amounts {
             testing_env!(context
                 .predecessor_account_id(token_id)
@@ -251,35 +252,69 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_basics() {
-        let one_near = 10u128.pow(24);
-        let (mut context, mut contract) = setup_contract(vec![accounts(1), accounts(2)]);
-
-        // add liquidity of (1,2) tokens and create 1st pool.
+    fn create_pool_with_liquidity(
+        context: &mut VMContextBuilder,
+        contract: &mut Contract,
+        account_id: ValidAccountId,
+        token_amounts: Vec<(ValidAccountId, Balance)>,
+    ) -> u64 {
+        let tokens = token_amounts
+            .iter()
+            .map(|(x, _)| x.clone())
+            .collect::<Vec<_>>();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        contract.extend_whitelisted_tokens(tokens.clone());
         testing_env!(context
-            .predecessor_account_id(accounts(3))
+            .predecessor_account_id(account_id.clone())
+            .attached_deposit(env::storage_byte_cost() * 300)
+            .build());
+        let pool_id = contract.add_simple_pool(tokens, 25);
+        testing_env!(context
+            .predecessor_account_id(account_id.clone())
             .attached_deposit(to_yocto("0.03"))
             .build());
         contract.storage_deposit(None, None);
+        deposit_tokens(context, contract, accounts(3), token_amounts.clone());
+        testing_env!(context
+            .predecessor_account_id(account_id.clone())
+            .attached_deposit(1)
+            .build());
+        contract.add_liquidity(
+            pool_id,
+            token_amounts.into_iter().map(|(_, x)| U128(x)).collect(),
+        );
+        pool_id
+    }
+
+    #[test]
+    fn test_basics() {
+        let one_near = 10u128.pow(24);
+        let (mut context, mut contract) = setup_contract();
+        // add liquidity of (1,2) tokens
+        create_pool_with_liquidity(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![(accounts(1), to_yocto("5")), (accounts(2), to_yocto("10"))],
+        );
         deposit_tokens(
             &mut context,
             &mut contract,
             accounts(3),
-            vec![(accounts(1), 105 * one_near), (accounts(2), 110 * one_near)],
+            vec![
+                (accounts(1), to_yocto("100")),
+                (accounts(2), to_yocto("100")),
+            ],
         );
 
         assert_eq!(
             contract.get_deposit(accounts(3), accounts(1)),
-            (105 * one_near).into()
+            (100 * one_near).into()
         );
         assert_eq!(
             contract.get_deposit(accounts(3), accounts(2)),
-            (110 * one_near).into()
+            (100 * one_near).into()
         );
-
-        testing_env!(context.predecessor_account_id(accounts(3)).build());
-        contract.add_liquidity(0, vec![U128(5 * one_near), U128(10 * one_near)]);
         assert_eq!(
             contract.get_pool_total_shares(0).0,
             crate::utils::INIT_SHARES_SUPPLY
@@ -289,6 +324,10 @@ mod tests {
         let expected_out = contract.get_return(0, accounts(1), one_near.into(), accounts(2));
         assert_eq!(expected_out.0, 1662497915624478906119726);
 
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(1)
+            .build());
         let amount_out = contract.swap(
             vec![SwapAction {
                 pool_id: 0,
@@ -330,28 +369,54 @@ mod tests {
     #[test]
     #[should_panic(expected = "ERR_TOKEN_DUPLICATES")]
     fn test_deny_duplicate_tokens_pool() {
-        setup_contract(vec![accounts(1), accounts(1)]);
+        let (mut context, mut contract) = setup_contract();
+        create_pool_with_liquidity(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![(accounts(1), to_yocto("5")), (accounts(1), to_yocto("10"))],
+        );
     }
 
     /// Deny pool with a single token
     #[test]
     #[should_panic(expected = "ERR_NOT_ENOUGH_TOKENS")]
     fn test_deny_single_token_pool() {
-        setup_contract(vec![accounts(1)]);
+        let (mut context, mut contract) = setup_contract();
+        create_pool_with_liquidity(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![(accounts(1), to_yocto("5"))],
+        );
     }
 
     /// Deny pool with a single token
     #[test]
     #[should_panic(expected = "ERR_TOO_MANY_TOKENS")]
     fn test_deny_too_many_tokens_pool() {
-        setup_contract(vec![accounts(1), accounts(2), accounts(3)]);
+        let (mut context, mut contract) = setup_contract();
+        create_pool_with_liquidity(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![
+                (accounts(1), to_yocto("5")),
+                (accounts(2), to_yocto("10")),
+                (accounts(3), to_yocto("10")),
+            ],
+        );
     }
 
     #[test]
     #[should_panic(expected = "ERR_TOKEN_NOT_WHITELISTED")]
-    fn test_send_malicious_token() {
-        let (mut context, mut contract) = setup_contract(vec![accounts(1), accounts(2)]);
+    fn test_deny_send_malicious_token() {
+        let (mut context, mut contract) = setup_contract();
         let acc = ValidAccountId::try_from("test_user").unwrap();
+        testing_env!(context
+            .predecessor_account_id(acc.clone())
+            .attached_deposit(to_yocto("1"))
+            .build());
         contract.storage_deposit(Some(acc.clone()), None);
         testing_env!(context
             .predecessor_account_id(ValidAccountId::try_from("malicious").unwrap())
@@ -361,10 +426,13 @@ mod tests {
 
     #[test]
     fn test_send_user_specific_token() {
-        let (mut context, mut contract) = setup_contract(vec![accounts(1), accounts(2)]);
+        let (mut context, mut contract) = setup_contract();
         let acc = ValidAccountId::try_from("test_user").unwrap();
         let custom_token = ValidAccountId::try_from("custom").unwrap();
-        testing_env!(context.predecessor_account_id(acc.clone()).build());
+        testing_env!(context
+            .predecessor_account_id(acc.clone())
+            .attached_deposit(to_yocto("1"))
+            .build());
         contract.storage_deposit(None, None);
         contract.register_tokens(vec![custom_token.clone()]);
         testing_env!(context.predecessor_account_id(custom_token.clone()).build());
@@ -378,5 +446,81 @@ mod tests {
         let new = contract.storage_balance_of(acc.clone()).unwrap();
         // More available storage after withdrawing & unregistering the token.
         assert!(new.available.0 > prev.available.0);
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_MIN_AMOUNT")]
+    fn test_deny_min_amount() {
+        let (mut context, mut contract) = setup_contract();
+        create_pool_with_liquidity(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![(accounts(1), to_yocto("1")), (accounts(2), to_yocto("1"))],
+        );
+        let acc = ValidAccountId::try_from("test_user").unwrap();
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            acc.clone(),
+            vec![(accounts(1), 1_000_000)],
+        );
+        testing_env!(context
+            .predecessor_account_id(acc.clone())
+            .attached_deposit(1)
+            .build());
+        contract.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in: accounts(1),
+                amount_in: Some(U128(1_000_000)),
+                token_out: accounts(2),
+                min_amount_out: U128(1_000_000),
+            }],
+            None,
+        );
+    }
+
+    #[test]
+    fn test_roundtrip_swap() {
+        let (mut context, mut contract) = setup_contract();
+        create_pool_with_liquidity(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![(accounts(1), to_yocto("5")), (accounts(2), to_yocto("10"))],
+        );
+        let acc = ValidAccountId::try_from("test_user").unwrap();
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            acc.clone(),
+            vec![(accounts(1), 1_000_000)],
+        );
+        testing_env!(context
+            .predecessor_account_id(acc.clone())
+            .attached_deposit(1)
+            .build());
+        contract.swap(
+            vec![
+                SwapAction {
+                    pool_id: 0,
+                    token_in: accounts(1),
+                    amount_in: Some(U128(1_000)),
+                    token_out: accounts(2),
+                    min_amount_out: U128(1),
+                },
+                SwapAction {
+                    pool_id: 0,
+                    token_in: accounts(2),
+                    amount_in: None,
+                    token_out: accounts(1),
+                    min_amount_out: U128(1),
+                },
+            ],
+            None,
+        );
+        // Roundtrip returns almost everything except 0.3% fee.
+        assert_eq!(contract.get_deposit(acc, accounts(1)).0, 1_000_000 - 7);
     }
 }

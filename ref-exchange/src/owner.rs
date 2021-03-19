@@ -25,7 +25,7 @@ impl Contract {
         self.owner_id.clone()
     }
 
-    /// Extend whitelisted tokens with new tokens.
+    /// Extend whitelisted tokens with new tokens. Only can be called by owner.
     #[payable]
     pub fn extend_whitelisted_tokens(&mut self, tokens: Vec<ValidAccountId>) {
         assert_eq!(
@@ -38,7 +38,7 @@ impl Contract {
         }
     }
 
-    /// Remove whitelisted token.
+    /// Remove whitelisted token. Only can be called by owner.
     pub fn remove_whitelisted_token(&mut self, token: ValidAccountId) {
         assert_eq!(
             env::predecessor_account_id(),

@@ -82,13 +82,11 @@ impl StorageManagement for Contract {
     }
 
     fn storage_balance_of(&self, account_id: ValidAccountId) -> Option<StorageBalance> {
-        let deposits = self
-            .deposited_amounts
+        self.deposited_amounts
             .get(account_id.as_ref())
-            .expect(ERR_NOT_REGISTERED);
-        Some(StorageBalance {
-            total: U128(deposits.amount),
-            available: U128(deposits.storage_available()),
-        })
+            .map(|deposits| StorageBalance {
+                total: U128(deposits.amount),
+                available: U128(deposits.storage_available()),
+            })
     }
 }

@@ -48,7 +48,6 @@ fn test_upgrade() {
         .status();
     assert!(format!("{:?}", result).contains("ERR_NOT_ALLOWED"));
     // Upgrade with calling migration. Should fail as currently migration not implemented
-    // TODO: when migration will be added, change this test.
     let args = UpgradeArgs {
         code: EXCHANGE_WASM_BYTES.to_vec(),
         migrate: true,
