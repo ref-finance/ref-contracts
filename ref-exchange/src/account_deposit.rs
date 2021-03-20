@@ -14,6 +14,17 @@ const MAX_ACCOUNT_LENGTH: u128 = 64;
 const MIN_ACCOUNT_DEPOSIT_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4;
 
 /// Account deposits information and storage cost.
+#[cfg(not(test))]
+#[derive(BorshSerialize, BorshDeserialize, Default)]
+pub struct AccountDeposit {
+    /// Native amount sent to the exchange.
+    /// Used for storage now, but in future can be used for trading as well.
+    pub amount: Balance,
+    /// Amounts of various tokens in this account.
+    pub tokens: HashMap<AccountId, Balance>,
+}
+
+#[cfg(test)]
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
 pub struct AccountDeposit {
     /// Native amount sent to the exchange.
