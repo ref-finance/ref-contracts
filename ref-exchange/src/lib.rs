@@ -9,7 +9,7 @@ use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise};
 
 use crate::account_deposit::AccountDeposit;
-use crate::action::*;
+pub use crate::action::*;
 use crate::errors::*;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
@@ -51,7 +51,6 @@ pub struct Contract {
 impl Contract {
     #[init]
     pub fn new(owner_id: ValidAccountId, exchange_fee: u32, referral_fee: u32) -> Self {
-        assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
         Self {
             owner_id: owner_id.as_ref().clone(),
             exchange_fee,
