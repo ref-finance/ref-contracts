@@ -14,8 +14,10 @@ use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
 use crate::utils::check_token_duplicates;
 pub use crate::views::PoolInfo;
+use errors::*;
 
 mod account_deposit;
+mod errors;
 mod legacy;
 mod owner;
 mod pool;
@@ -409,7 +411,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "ERR_TOKEN_NOT_WHITELISTED")]
+    #[should_panic(expected = "E12: token not whitelisted")]
     fn test_deny_send_malicious_token() {
         let (mut context, mut contract) = setup_contract();
         let acc = ValidAccountId::try_from("test_user").unwrap();
