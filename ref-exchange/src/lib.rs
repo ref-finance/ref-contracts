@@ -9,7 +9,7 @@ use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise};
 
 use crate::account_deposit::AccountDeposit;
-use crate::action::*;
+pub use crate::action::*;
 use crate::errors::*;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;

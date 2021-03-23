@@ -56,6 +56,7 @@ impl Contract {
 
     /// Migration function from v1 to v2.
     /// For next version upgrades, change this function.
+    #[init(ignore_state)]
     pub fn migrate() -> Self {
         let contract_v1: ContractV1 = env::state_read().expect("ERR_NOT_INITIALIZED");
         Self {
