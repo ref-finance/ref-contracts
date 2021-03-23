@@ -57,9 +57,8 @@ pub fn add_to_collection(c: &mut LookupMap<AccountId, Balance>, key: &String, va
 }
 
 /// Checks if there are any duplicates in the given list of tokens.
-#[inline]
 pub fn check_token_duplicates(tokens: &[ValidAccountId]) {
-    let token_set: HashSet<_> = tokens.iter().map(|a| AccountId::from(a.clone())).collect();
+    let token_set: HashSet<_> = tokens.iter().map(|a| a.as_ref()).collect();
     assert_eq!(token_set.len(), tokens.len(), "ERR_TOKEN_DUPLICATES");
 }
 
