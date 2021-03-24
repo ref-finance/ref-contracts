@@ -22,8 +22,6 @@ pub const FEE_DIVISOR: u32 = 10_000;
 /// Initial shares supply on deposit of liquidity.
 pub const INIT_SHARES_SUPPLY: u128 = 1_000_000_000_000_000_000_000_000;
 
-pub const ERR_NOT_REGISTERED: &str = "ERR_NOT_REGISTERED";
-
 construct_uint! {
     /// 256-bit unsigned integer.
     pub struct U256(4);
@@ -60,7 +58,7 @@ pub fn add_to_collection(c: &mut LookupMap<AccountId, Balance>, key: &String, va
 
 /// Checks if there are any duplicates in the given list of tokens.
 pub fn check_token_duplicates(tokens: &[ValidAccountId]) {
-    let token_set: HashSet<_> = tokens.iter().map(|a| AccountId::from(a.clone())).collect();
+    let token_set: HashSet<_> = tokens.iter().map(|a| a.as_ref()).collect();
     assert_eq!(token_set.len(), tokens.len(), "ERR_TOKEN_DUPLICATES");
 }
 

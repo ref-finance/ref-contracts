@@ -6,16 +6,19 @@ use near_contract_standards::storage_management::{
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise};
 
 use crate::account_deposit::AccountDeposit;
+pub use crate::action::*;
+use crate::errors::*;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
 use crate::utils::check_token_duplicates;
 pub use crate::views::PoolInfo;
 
 mod account_deposit;
+mod action;
+mod errors;
 mod legacy;
 mod owner;
 mod pool;
@@ -26,24 +29,6 @@ mod utils;
 mod views;
 
 near_sdk::setup_alloc!();
-
-/// Single swap action.
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "near_sdk::serde")]
-pub struct SwapAction {
-    /// Pool which should be used for swapping.
-    pub pool_id: u64,
-    /// Token to swap from.
-    pub token_in: ValidAccountId,
-    /// Amount to exchange.
-    /// If amount_in is None, it will take amount_out from previous step.
-    /// Will fail if amount_in is None on the first step.
-    pub amount_in: Option<U128>,
-    /// Token to swap into.
-    pub token_out: ValidAccountId,
-    /// Required minimum amount of token_out.
-    pub min_amount_out: U128,
-}
 
 #[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
@@ -66,7 +51,6 @@ pub struct Contract {
 impl Contract {
     #[init]
     pub fn new(owner_id: ValidAccountId, exchange_fee: u32, referral_fee: u32) -> Self {
-        assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
         Self {
             owner_id: owner_id.as_ref().clone(),
             exchange_fee,
@@ -409,7 +393,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "ERR_TOKEN_NOT_WHITELISTED")]
+    #[should_panic(expected = "E12: token not whitelisted")]
     fn test_deny_send_malicious_token() {
         let (mut context, mut contract) = setup_contract();
         let acc = ValidAccountId::try_from("test_user").unwrap();

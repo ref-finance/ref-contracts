@@ -2,7 +2,6 @@ use std::convert::TryFrom;
 
 use near_sdk::borsh::{self, BorshSerialize};
 use near_sdk::json_types::ValidAccountId;
-use near_sdk::PendingContractTx;
 use near_sdk_sim::{deploy, init_simulator, to_yocto};
 
 use ref_exchange::ContractContract as Exchange;
@@ -36,43 +35,36 @@ fn test_upgrade() {
     // Failed upgrade with no permissions.
     let result = test_user
         .call(
-            PendingContractTx {
-                receiver_id: pool.user_account.account_id.clone(),
-                method: "upgrade".to_string(),
-                args: args_nomigration.try_to_vec().unwrap(),
-                is_view: false,
-            },
-            to_yocto("0"),
+            pool.user_account.account_id.clone(),
+            "upgrade",
+            &args_nomigration.try_to_vec().unwrap(),
             near_sdk_sim::DEFAULT_GAS,
+            0,
         )
         .status();
     assert!(format!("{:?}", result).contains("ERR_NOT_ALLOWED"));
+
     // Upgrade with calling migration. Should fail as currently migration not implemented
     let args = UpgradeArgs {
         code: EXCHANGE_WASM_BYTES.to_vec(),
         migrate: true,
     };
     root.call(
-        PendingContractTx {
-            receiver_id: pool.user_account.account_id.clone(),
-            method: "upgrade".to_string(),
-            args: args.try_to_vec().unwrap(),
-            is_view: false,
-        },
-        to_yocto("0"),
+        pool.user_account.account_id.clone(),
+        "upgrade",
+        &args.try_to_vec().unwrap(),
         near_sdk_sim::DEFAULT_GAS,
+        0,
     )
     .assert_success();
+
     // Upgrade to the same code without migration is successful.
     root.call(
-        PendingContractTx {
-            receiver_id: pool.user_account.account_id.clone(),
-            method: "upgrade".to_string(),
-            args: args_nomigration.try_to_vec().unwrap(),
-            is_view: false,
-        },
-        to_yocto("0"),
+        pool.user_account.account_id.clone(),
+        "upgrade",
+        &args_nomigration.try_to_vec().unwrap(),
         near_sdk_sim::DEFAULT_GAS,
+        0,
     )
     .assert_success();
 }

@@ -18,7 +18,6 @@ pub struct Contract {
 impl Contract {
     #[init]
     pub fn new() -> Self {
-        assert!(!env::state_exists(), "ERR_CONTRACT_IS_INITIALIZED");
         Self {
             token: FungibleToken::new(b"t".to_vec()),
         }
