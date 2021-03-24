@@ -40,7 +40,7 @@ impl AccountDeposit {
             .tokens
             .get(&token)
             .expect(&format!("ERR_MISSING_TOKEN:{}", token));
-        assert!(value >= amount, format!("ERR_NOT_ENOUGH_TOKEN:{}", token));
+        assert!(value >= amount, "ERR_NOT_ENOUGH_TOKEN:{}", token);
         self.tokens.insert(token, value - amount);
     }
 

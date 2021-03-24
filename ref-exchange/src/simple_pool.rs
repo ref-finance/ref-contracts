@@ -79,7 +79,8 @@ impl SimplePool {
     }
 
     /// Adds the amounts of tokens to liquidity pool and returns number of shares that this user receives.
-    pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: Vec<Balance>) -> Balance {
+    /// Updates amount to amount kept in the pool.
+    pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>) -> Balance {
         assert_eq!(
             amounts.len(),
             self.token_account_ids.len(),
@@ -95,9 +96,11 @@ impl SimplePool {
                 );
             }
             for i in 0..self.token_account_ids.len() {
-                let amount = U256::from(self.amounts[i]) * fair_supply
-                    / U256::from(self.shares_total_supply);
-                self.amounts[i] += amount.as_u128();
+                let amount = (U256::from(self.amounts[i]) * fair_supply
+                    / U256::from(self.shares_total_supply))
+                .as_u128();
+                self.amounts[i] += amount;
+                amounts[i] = amount;
             }
             fair_supply.as_u128()
         } else {
@@ -262,6 +265,7 @@ impl SimplePool {
 mod tests {
     use near_sdk::test_utils::{accounts, VMContextBuilder};
     use near_sdk::{testing_env, MockedBlockchain};
+    use near_sdk_sim::to_yocto;
 
     use super::*;
 
@@ -272,8 +276,9 @@ mod tests {
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
         let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 30, 0, 0);
-        let num_shares =
-            pool.add_liquidity(accounts(0).as_ref(), vec![5 * one_near, 10 * one_near]);
+        let mut amounts = vec![to_yocto("5"), to_yocto("10")];
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
+        assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
         assert_eq!(
             pool.share_balances(accounts(0).as_ref()),
             INIT_SHARES_SUPPLY
@@ -303,8 +308,9 @@ mod tests {
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
         let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 100, 100, 0);
-        let num_shares =
-            pool.add_liquidity(accounts(0).as_ref(), vec![5 * one_near, 10 * one_near]);
+        let mut amounts = vec![to_yocto("5"), to_yocto("10")];
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
+        assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
         assert_eq!(
             pool.share_balances(accounts(0).as_ref()),
             INIT_SHARES_SUPPLY
@@ -324,7 +330,7 @@ mod tests {
         let liq1 = pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1]);
         let num_shares2 = pool.share_balances(accounts(3).as_ref());
         let liq2 = pool.remove_liquidity(accounts(3).as_ref(), num_shares2, vec![1, 1]);
-        assert_eq!(liq1[0] + liq2[0], 6 * one_near);
-        assert_eq!(liq1[1] + liq2[1], 10 * one_near - out);
+        assert_eq!(liq1[0] + liq2[0], to_yocto("6"));
+        assert_eq!(liq1[1] + liq2[1], to_yocto("10") - out);
     }
 }

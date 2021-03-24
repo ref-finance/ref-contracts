@@ -27,7 +27,8 @@ impl Pool {
     }
 
     /// Adds liquidity into underlying pool.
-    pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: Vec<Balance>) -> Balance {
+    /// Updates amounts to amount kept in the pool.
+    pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts),
         }
@@ -82,7 +83,14 @@ impl Pool {
         referral_id: Option<AccountId>,
     ) -> Balance {
         match self {
-            Pool::SimplePool(pool) => pool.swap(token_in, amount_in, token_out, min_amount_out, exchange_id, referral_id),
+            Pool::SimplePool(pool) => pool.swap(
+                token_in,
+                amount_in,
+                token_out,
+                min_amount_out,
+                exchange_id,
+                referral_id,
+            ),
         }
     }
 
