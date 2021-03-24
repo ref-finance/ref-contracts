@@ -1,7 +1,7 @@
 // Storage errors //
 
-pub const ERR10_ACC_NOT_REGISTERED: &str = "E20: account not registered";
-pub const ERR11_INSUFFICIENT_STORAGE: &str = "E10: insufficient $NEAR storage deposit";
+pub const ERR10_ACC_NOT_REGISTERED: &str = "E10: account not registered";
+pub const ERR11_INSUFFICIENT_STORAGE: &str = "E11: insufficient $NEAR storage deposit";
 pub const ERR12_TOKEN_NOT_WHITELISTED: &str = "E12: token not whitelisted";
 
 // Account Deposits //

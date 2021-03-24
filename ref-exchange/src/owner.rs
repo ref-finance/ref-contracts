@@ -9,7 +9,7 @@ use crate::utils::{GAS_FOR_DEPLOY_CALL, GAS_FOR_UPGRADE_CALL};
 impl Contract {
     /// Change owner. Only can be called by owner.
     pub fn set_owner(&mut self, owner_id: ValidAccountId) {
-        self.only_owner();
+        self.assert_owner();
         self.owner_id = owner_id.as_ref().clone();
     }
 
@@ -21,7 +21,7 @@ impl Contract {
     /// Extend whitelisted tokens with new tokens. Only can be called by owner.
     #[payable]
     pub fn extend_whitelisted_tokens(&mut self, tokens: Vec<ValidAccountId>) {
-        self.only_owner();
+        self.assert_owner();
         for token in tokens {
             self.whitelisted_tokens.insert(token.as_ref());
         }
@@ -29,7 +29,7 @@ impl Contract {
 
     /// Remove whitelisted token. Only can be called by owner.
     pub fn remove_whitelisted_token(&mut self, token: ValidAccountId) {
-        self.only_owner();
+        self.assert_owner();
         self.whitelisted_tokens.remove(token.as_ref());
     }
 
@@ -41,7 +41,7 @@ impl Contract {
         #[serializer(borsh)] code: Vec<u8>,
         #[serializer(borsh)] migrate: bool,
     ) -> Promise {
-        self.only_owner();
+        self.assert_owner();
         let mut promise = Promise::new(env::current_account_id()).deploy_contract(code);
         if migrate {
             promise = promise.function_call(
@@ -69,7 +69,7 @@ impl Contract {
         }
     }
 
-    pub(crate) fn only_owner(&self) {
+    pub(crate) fn assert_owner(&self) {
         assert_eq!(
             env::predecessor_account_id(),
             self.owner_id,
