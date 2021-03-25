@@ -1,4 +1,3 @@
-use crate::utils::ERR_NOT_REGISTERED;
 use crate::*;
 
 /// Implements users storage management for the pool.
@@ -40,14 +39,10 @@ impl StorageManagement for Contract {
             .unwrap()
     }
 
-    #[allow(unused_variables)]
     fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
         assert_one_yocto();
         let account_id = env::predecessor_account_id();
-        let account_deposit = self
-            .deposited_amounts
-            .get(&account_id)
-            .expect(ERR_NOT_REGISTERED);
+        let account_deposit = self.get_account_depoists(&account_id);
         let available = account_deposit.storage_available();
         let amount = amount.map(|a| a.0).unwrap_or(available);
         assert!(amount <= available, "ERR_STORAGE_WITHDRAW_TOO_MUCH");
