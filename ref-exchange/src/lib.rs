@@ -105,14 +105,16 @@ impl Contract {
     pub fn add_liquidity(&mut self, pool_id: u64, amounts: Vec<U128>) {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
-        let amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
+        let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        // Add amounts given to liquidity first. It will return the balanced amounts.
+        pool.add_liquidity(&sender_id, &mut amounts);
         let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
         let tokens = pool.tokens();
+        // Subtract updated amounts from deposits. This will fail if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
             deposits.sub(tokens[i].clone(), amounts[i]);
         }
-        pool.add_liquidity(&sender_id, amounts);
         self.deposited_amounts.insert(&sender_id, &deposits);
         self.pools.replace(pool_id, &pool);
     }
@@ -227,6 +229,15 @@ mod tests {
                 .build());
             contract.storage_deposit(None, None);
         }
+        testing_env!(context
+            .predecessor_account_id(account_id.clone())
+            .attached_deposit(to_yocto("1"))
+            .build());
+        let tokens = token_amounts
+            .iter()
+            .map(|(token_id, _)| token_id.clone().into())
+            .collect();
+        contract.register_tokens(tokens);
         for (token_id, amount) in token_amounts {
             testing_env!(context
                 .predecessor_account_id(token_id)
@@ -293,11 +304,11 @@ mod tests {
 
         assert_eq!(
             contract.get_deposit(accounts(3), accounts(1)),
-            (100 * one_near).into()
+            to_yocto("100").into()
         );
         assert_eq!(
             contract.get_deposit(accounts(3), accounts(2)),
-            (100 * one_near).into()
+            to_yocto("100").into()
         );
         assert_eq!(
             contract.get_pool_total_shares(0).0,
@@ -347,6 +358,37 @@ mod tests {
             None,
         );
         assert_eq!(contract.get_deposit(accounts(3), accounts(1)).0, 0);
+    }
+
+    /// Test liquidity management.
+    #[test]
+    fn test_liquidity() {
+        let (mut context, mut contract) = setup_contract();
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![
+                (accounts(1), to_yocto("100")),
+                (accounts(2), to_yocto("100")),
+            ],
+        );
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(to_yocto("1"))
+            .build());
+        let id = contract.add_simple_pool(vec![accounts(1), accounts(2)], 25);
+        testing_env!(context.attached_deposit(1).build());
+        contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("10"))]);
+        contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("50"))]);
+        contract.remove_liquidity(id, U128(to_yocto("1")), vec![U128(1), U128(1)]);
+
+        // Check that amounts add up to deposits.
+        let amounts = contract.get_pool(id).amounts;
+        let deposit1 = contract.get_deposit(accounts(3), accounts(1)).0;
+        let deposit2 = contract.get_deposit(accounts(3), accounts(2)).0;
+        assert_eq!(amounts[0].0 + deposit1, to_yocto("100"));
+        assert_eq!(amounts[1].0 + deposit2, to_yocto("100"));
     }
 
     /// Should deny creating a pool with duplicate tokens.
