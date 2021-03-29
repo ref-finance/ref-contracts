@@ -109,7 +109,10 @@ impl Contract {
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         // Add amounts given to liquidity first. It will return the balanced amounts.
         pool.add_liquidity(&sender_id, &mut amounts);
-        let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
+        let mut deposits = self
+            .deposited_amounts
+            .get(&sender_id)
+            .expect(ERR10_ACC_NOT_REGISTERED);
         let tokens = pool.tokens();
         // Subtract updated amounts from deposits. This will fail if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
@@ -135,7 +138,10 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
+        let mut deposits = self
+            .deposited_amounts
+            .get(&sender_id)
+            .expect(ERR10_ACC_NOT_REGISTERED);
         for i in 0..tokens.len() {
             deposits.add(tokens[i].clone(), amounts[i]);
         }
@@ -178,7 +184,10 @@ impl Contract {
         min_amount_out: U128,
         referral_id: Option<AccountId>,
     ) -> U128 {
-        let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
+        let mut deposits = self
+            .deposited_amounts
+            .get(&sender_id)
+            .expect(ERR10_ACC_NOT_REGISTERED);
         let amount_in: u128 = amount_in.into();
         deposits.sub(token_in.as_ref().clone(), amount_in);
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");

@@ -15,7 +15,7 @@ const SIZE_LENGTH: StorageUsage = 4;
 const MIN_ACCOUNT_DEPOSIT_LENGTH: StorageUsage = 64 + INT_LENGTH + SIZE_LENGTH;
 
 /// Account deposits information and storage cost.
-#[derive(BorshSerialize, BorshDeserialize, Default)]
+#[derive(BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "test", derive(Clone))]
 pub struct AccountDeposit {
     /// Native amount sent to the exchange.
@@ -151,9 +151,14 @@ impl Contract {
     /// If account already exists, adds amount to it.
     /// This should be used when it's known that storage is prepaid.
     pub(crate) fn internal_register_account(&mut self, account_id: &AccountId, amount: Balance) {
-        let mut deposit_amount = self.deposited_amounts.get(&account_id).unwrap_or_default();
-        deposit_amount.amount += amount;
-        self.deposited_amounts.insert(&account_id, &deposit_amount);
+        let account_deposit =
+            if let Some(mut account_deposit) = self.deposited_amounts.get(&account_id) {
+                account_deposit.amount += amount;
+                account_deposit
+            } else {
+                AccountDeposit::new(account_id, amount)
+            };
+        self.deposited_amounts.insert(&account_id, &account_deposit);
     }
 
     /// Record deposit of some number of tokens to this contract.
