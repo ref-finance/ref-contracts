@@ -125,9 +125,9 @@ fn test_swap() {
         pool.swap(
             vec![SwapAction {
                 pool_id: 0,
-                token_in: to_va(dai()),
+                token_in: dai(),
                 amount_in: Some(U128(to_yocto("1"))),
-                token_out: to_va(eth()),
+                token_out: eth(),
                 min_amount_out: U128(1)
             }],
             None
