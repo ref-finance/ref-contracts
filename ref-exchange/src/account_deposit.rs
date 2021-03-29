@@ -5,13 +5,14 @@ use std::convert::TryInto;
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance};
+use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, StorageUsage};
 
 use crate::utils::{ext_fungible_token, GAS_FOR_FT_TRANSFER};
 use crate::*;
 
-const MAX_ACCOUNT_LENGTH: u128 = 64;
-const MIN_ACCOUNT_DEPOSIT_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4;
+const INT_LENGTH: StorageUsage = 8;
+const SIZE_LENGTH: StorageUsage = 4;
+const MIN_ACCOUNT_DEPOSIT_LENGTH: StorageUsage = 64 + INT_LENGTH + SIZE_LENGTH;
 
 /// Account deposits information and storage cost.
 #[derive(BorshSerialize, BorshDeserialize, Default)]
@@ -22,15 +23,27 @@ pub struct AccountDeposit {
     pub amount: Balance,
     /// Amounts of various tokens in this account.
     pub tokens: HashMap<AccountId, Balance>,
+    /// Storage used across this struct and all the pools.
+    pub storage_used: StorageUsage,
 }
 
 impl AccountDeposit {
+    pub fn new(account_id: &AccountId, amount: Balance) -> Self {
+        Self {
+            amount,
+            tokens: HashMap::default(),
+            // Empty AccountDeposit stores length of account id + amount + length of tokens.
+            storage_used: account_id.len() as StorageUsage + INT_LENGTH + SIZE_LENGTH,
+        }
+    }
+
     /// Adds amount to the balance of given token while checking that storage is covered.
     pub fn add(&mut self, token: AccountId, amount: Balance) {
         if let Some(x) = self.tokens.get_mut(&token) {
             *x = *x + amount;
         } else {
             self.tokens.insert(token.clone(), amount);
+            self.storage_used += token.len() as StorageUsage + INT_LENGTH;
             self.assert_storage_usage();
         }
     }
@@ -39,14 +52,13 @@ impl AccountDeposit {
     /// Panics if `amount` is bigger than the current balance.
     pub fn sub(&mut self, token: AccountId, amount: Balance) {
         let value = *self.tokens.get(&token).expect(ERR21_TOKEN_NOT_REG);
-        assert!(value >= amount, ERR22_NOT_ENOUGH_TOKENS);
+        assert!(value >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
         self.tokens.insert(token, value - amount);
     }
 
     /// Returns amount of $NEAR necessary to cover storage used by this data structure.
     pub fn storage_usage(&self) -> Balance {
-        (MIN_ACCOUNT_DEPOSIT_LENGTH + self.tokens.len() as u128 * (MAX_ACCOUNT_LENGTH + 16))
-            * env::storage_byte_cost()
+        self.storage_used as Balance * env::storage_byte_cost()
     }
 
     /// Returns how much NEAR is available for storage.
@@ -58,19 +70,21 @@ impl AccountDeposit {
     pub fn assert_storage_usage(&self) {
         assert!(
             self.storage_usage() <= self.amount,
+            "{}",
             ERR11_INSUFFICIENT_STORAGE
         );
     }
 
     /// Returns minimal account deposit storage usage possible.
     pub fn min_storage_usage() -> Balance {
-        MIN_ACCOUNT_DEPOSIT_LENGTH * env::storage_byte_cost()
+        MIN_ACCOUNT_DEPOSIT_LENGTH as Balance * env::storage_byte_cost()
     }
 
     /// Registers given token and set balance to 0.
     /// Fails if not enough amount to cover new storage usage.
     pub fn register(&mut self, token_id: &AccountId) {
         self.tokens.insert(token_id.clone(), 0);
+        self.storage_used += token_id.len() as StorageUsage + INT_LENGTH;
         self.assert_storage_usage();
     }
 
@@ -78,6 +92,7 @@ impl AccountDeposit {
     /// Panics if the `token_id` balance is not 0.
     pub fn unregister(&mut self, token_id: &AccountId) {
         let amount = self.tokens.remove(token_id).unwrap_or_default();
+        self.storage_used -= token_id.len() as StorageUsage + INT_LENGTH;
         assert_eq!(amount, 0, "{}", ERR24_NON_ZERO_TOKEN_BALANCE);
     }
 }
@@ -153,6 +168,7 @@ impl Contract {
         assert!(
             self.whitelisted_tokens.contains(token_id)
                 || account_deposit.tokens.contains_key(token_id),
+            "{}",
             ERR12_TOKEN_NOT_WHITELISTED
         );
         account_deposit.add(token_id.clone(), amount);
