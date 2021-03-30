@@ -26,8 +26,8 @@ pub struct AccountDeposit {
 
 impl AccountDeposit {
     /// Adds amount to the balance of given token while checking that storage is covered.
-    pub fn add(&mut self, token: AccountId, amount: Balance) {
-        if let Some(x) = self.tokens.get_mut(&token) {
+    pub(crate) fn add(&mut self, token: &AccountId, amount: Balance) {
+        if let Some(x) = self.tokens.get_mut(token) {
             *x = *x + amount;
         } else {
             self.tokens.insert(token.clone(), amount);
@@ -37,10 +37,10 @@ impl AccountDeposit {
 
     /// Subtract from `token` balance.
     /// Panics if `amount` is bigger than the current balance.
-    pub fn sub(&mut self, token: AccountId, amount: Balance) {
-        let value = *self.tokens.get(&token).expect(ERR21_TOKEN_NOT_REG);
+    pub(crate) fn sub(&mut self, token: &AccountId, amount: Balance) {
+        let value = *self.tokens.get(token).expect(ERR21_TOKEN_NOT_REG);
         assert!(value >= amount, ERR22_NOT_ENOUGH_TOKENS);
-        self.tokens.insert(token, value - amount);
+        self.tokens.insert(token.clone(), value - amount);
     }
 
     /// Returns amount of $NEAR necessary to cover storage used by this data structure.
@@ -69,14 +69,14 @@ impl AccountDeposit {
 
     /// Registers given token and set balance to 0.
     /// Fails if not enough amount to cover new storage usage.
-    pub fn register(&mut self, token_id: &AccountId) {
+    pub(crate) fn register(&mut self, token_id: &AccountId) {
         self.tokens.insert(token_id.clone(), 0);
         self.assert_storage_usage();
     }
 
     /// Unregisters `token_id` from this account balance.
     /// Panics if the `token_id` balance is not 0.
-    pub fn unregister(&mut self, token_id: &AccountId) {
+    pub(crate) fn unregister(&mut self, token_id: &AccountId) {
         let amount = self.tokens.remove(token_id).unwrap_or_default();
         assert_eq!(amount, 0, "{}", ERR24_NON_ZERO_TOKEN_BALANCE);
     }
@@ -112,19 +112,20 @@ impl Contract {
     #[payable]
     pub fn withdraw(&mut self, token_id: ValidAccountId, amount: U128, unregister: Option<bool>) {
         assert_one_yocto();
+        let token_id: AccountId = token_id.into();
         let amount: u128 = amount.into();
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.get_account_depoists(&sender_id);
-        deposits.sub(token_id.as_ref().clone(), amount);
+        deposits.sub(&token_id, amount);
         if unregister == Some(true) {
-            deposits.unregister(token_id.as_ref());
+            deposits.unregister(&token_id);
         }
         self.deposited_amounts.insert(&sender_id, &deposits);
         ext_fungible_token::ft_transfer(
             sender_id.try_into().unwrap(),
             amount.into(),
             None,
-            token_id.as_ref(),
+            &token_id,
             1,
             GAS_FOR_FT_TRANSFER,
         );
@@ -155,7 +156,7 @@ impl Contract {
                 || account_deposit.tokens.contains_key(token_id),
             ERR12_TOKEN_NOT_WHITELISTED
         );
-        account_deposit.add(token_id.clone(), amount);
+        account_deposit.add(token_id, amount);
         self.deposited_amounts.insert(sender_id, &account_deposit);
     }
 

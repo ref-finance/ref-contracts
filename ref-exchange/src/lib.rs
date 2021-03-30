@@ -90,9 +90,9 @@ impl Contract {
             prev_amount = Some(self.internal_swap(
                 &sender_id,
                 action.pool_id,
-                action.token_in,
+                &action.token_in,
                 amount_in,
-                action.token_out,
+                &action.token_out,
                 action.min_amount_out,
                 referral_id.clone(),
             ));
@@ -113,7 +113,7 @@ impl Contract {
         let tokens = pool.tokens();
         // Subtract updated amounts from deposits. This will fail if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
-            deposits.sub(tokens[i].clone(), amounts[i]);
+            deposits.sub(&tokens[i], amounts[i]);
         }
         self.deposited_amounts.insert(&sender_id, &deposits);
         self.pools.replace(pool_id, &pool);
@@ -137,7 +137,7 @@ impl Contract {
         let tokens = pool.tokens();
         let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
         for i in 0..tokens.len() {
-            deposits.add(tokens[i].clone(), amounts[i]);
+            deposits.add(&tokens[i], amounts[i]);
         }
         self.deposited_amounts.insert(&sender_id, &deposits);
     }
@@ -172,25 +172,25 @@ impl Contract {
         &mut self,
         sender_id: &AccountId,
         pool_id: u64,
-        token_in: ValidAccountId,
+        token_in: &AccountId,
         amount_in: U128,
-        token_out: ValidAccountId,
+        token_out: &AccountId,
         min_amount_out: U128,
         referral_id: Option<AccountId>,
     ) -> U128 {
         let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
         let amount_in: u128 = amount_in.into();
-        deposits.sub(token_in.as_ref().clone(), amount_in);
+        deposits.sub(token_in, amount_in);
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         let amount_out = pool.swap(
-            token_in.as_ref(),
+            token_in,
             amount_in,
-            token_out.as_ref(),
+            token_out,
             min_amount_out.into(),
             &self.owner_id,
             referral_id,
         );
-        deposits.add(token_out.as_ref().clone(), amount_out);
+        deposits.add(token_out, amount_out);
         self.deposited_amounts.insert(&sender_id, &deposits);
         self.pools.replace(pool_id, &pool);
         amount_out.into()
@@ -326,9 +326,9 @@ mod tests {
         let amount_out = contract.swap(
             vec![SwapAction {
                 pool_id: 0,
-                token_in: accounts(1),
+                token_in: accounts(1).into(),
                 amount_in: Some(one_near.into()),
-                token_out: accounts(2),
+                token_out: accounts(2).into(),
                 min_amount_out: U128(1),
             }],
             None,
@@ -498,9 +498,9 @@ mod tests {
         contract.swap(
             vec![SwapAction {
                 pool_id: 0,
-                token_in: accounts(1),
+                token_in: accounts(1).into(),
                 amount_in: Some(U128(1_000_000)),
-                token_out: accounts(2),
+                token_out: accounts(2).into(),
                 min_amount_out: U128(1_000_000),
             }],
             None,
@@ -531,16 +531,16 @@ mod tests {
             vec![
                 SwapAction {
                     pool_id: 0,
-                    token_in: accounts(1),
+                    token_in: accounts(1).into(),
                     amount_in: Some(U128(1_000)),
-                    token_out: accounts(2),
+                    token_out: accounts(2).into(),
                     min_amount_out: U128(1),
                 },
                 SwapAction {
                     pool_id: 0,
-                    token_in: accounts(2),
+                    token_in: accounts(2).into(),
                     amount_in: None,
-                    token_out: accounts(1),
+                    token_out: accounts(1).into(),
                     min_amount_out: U128(1),
                 },
             ],
