@@ -255,7 +255,7 @@ impl SimplePool {
 
         // Update volumes.
         self.volumes[in_idx].input.0 += amount_in;
-        self.volumes[in_idx].output.0 += amount_out;
+        self.volumes[out_idx].output.0 += amount_out;
 
         amount_out
     }
