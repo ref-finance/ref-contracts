@@ -12,6 +12,8 @@ use crate::*;
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(crate = "near_sdk::serde")]
 pub struct PoolInfo {
+    /// Pool kind.
+    pub pool_kind: String,
     /// List of tokens in the pool.
     pub token_account_ids: Vec<AccountId>,
     /// How much NEAR this contract has.
@@ -24,8 +26,10 @@ pub struct PoolInfo {
 
 impl From<Pool> for PoolInfo {
     fn from(pool: Pool) -> Self {
+        let pool_kind = pool.kind();
         match pool {
             Pool::SimplePool(pool) => Self {
+                pool_kind,
                 token_account_ids: pool.token_account_ids,
                 amounts: pool.amounts.into_iter().map(|a| U128(a)).collect(),
                 total_fee: pool.total_fee,

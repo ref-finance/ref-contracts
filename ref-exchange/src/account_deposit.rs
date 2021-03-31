@@ -39,7 +39,7 @@ impl AccountDeposit {
     /// Panics if `amount` is bigger than the current balance.
     pub(crate) fn sub(&mut self, token: &AccountId, amount: Balance) {
         let value = *self.tokens.get(token).expect(ERR21_TOKEN_NOT_REG);
-        assert!(value >= amount, ERR22_NOT_ENOUGH_TOKENS);
+        assert!(value >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
         self.tokens.insert(token.clone(), value - amount);
     }
 
@@ -58,6 +58,7 @@ impl AccountDeposit {
     pub fn assert_storage_usage(&self) {
         assert!(
             self.storage_usage() <= self.amount,
+            "{}",
             ERR11_INSUFFICIENT_STORAGE
         );
     }
@@ -154,6 +155,7 @@ impl Contract {
         assert!(
             self.whitelisted_tokens.contains(token_id)
                 || account_deposit.tokens.contains_key(token_id),
+            "{}",
             ERR12_TOKEN_NOT_WHITELISTED
         );
         account_deposit.add(token_id, amount);

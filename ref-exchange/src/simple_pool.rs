@@ -110,6 +110,18 @@ impl SimplePool {
             INIT_SHARES_SUPPLY
         };
         self.mint_shares(&sender_id, shares);
+        env::log(
+            format!(
+                "Liquidity added {:?}, minted {} shares",
+                amounts
+                    .iter()
+                    .zip(self.token_account_ids.iter())
+                    .map(|(amount, token_id)| format!("{} {}", amount, token_id))
+                    .collect::<Vec<String>>(),
+                shares
+            )
+            .as_bytes(),
+        );
         shares
     }
 
@@ -146,6 +158,18 @@ impl SimplePool {
             self.shares
                 .insert(&sender_id, &(prev_shares_amount - shares));
         }
+        env::log(
+            format!(
+                "{} shares of liquidity removed: receive back {:?}",
+                shares,
+                result
+                    .iter()
+                    .zip(self.token_account_ids.iter())
+                    .map(|(amount, token_id)| format!("{} {}", amount, token_id))
+                    .collect::<Vec<String>>(),
+            )
+            .as_bytes(),
+        );
         self.shares_total_supply -= shares;
         result
     }

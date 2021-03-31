@@ -109,6 +109,7 @@ fn test_swap() {
     assert_eq!(
         view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
         PoolInfo {
+            pool_kind: "SIMPLE_POOL".to_string(),
             token_account_ids: vec![dai(), eth()],
             amounts: vec![to_yocto("5").into(), to_yocto("10").into()],
             total_fee: 30,
