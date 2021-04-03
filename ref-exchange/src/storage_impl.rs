@@ -39,6 +39,7 @@ impl StorageManagement for Contract {
             .unwrap()
     }
 
+    #[payable]
     fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
         assert_one_yocto();
         let account_id = env::predecessor_account_id();
