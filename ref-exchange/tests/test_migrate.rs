@@ -8,7 +8,7 @@ use ref_exchange::ContractContract as Exchange;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_v1.wasm",
-    EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
+    EXCHANGE_WASM_BYTES => "../res/ref_exchange_local.wasm",
 }
 
 #[derive(BorshSerialize)]
