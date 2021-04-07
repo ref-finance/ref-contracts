@@ -5,7 +5,7 @@ use std::convert::TryInto;
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance};
+use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult};
 
 use crate::utils::{ext_fungible_token, ext_self, GAS_FOR_FT_TRANSFER};
 use crate::*;
@@ -143,13 +143,20 @@ impl Contract {
 
     #[private]
     pub fn exchange_callback_post_withdraw(&mut self, token_id: ValidAccountId, sender_id: ValidAccountId, amount: U128, unregister: Option<bool>) {
-        let mut deposits = self.get_account_deposits(&sender_id.as_ref());
-        // This reverts the changes from withdraw function
-        deposits.add(&token_id.as_ref(), amount.0);
-        if unregister == Some(true) {
-            deposits.register(&token_id.as_ref());
-        }
-        self.deposited_amounts.insert(&sender_id.as_ref(), &deposits);
+        assert_eq!(env::promise_results_count(), 1, "Expected 1 promise result from withdraw.");
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Successful(_) => {},
+            PromiseResult::Failed => {
+                let mut deposits = self.get_account_deposits(&sender_id.as_ref());
+                // This reverts the changes from withdraw function
+                deposits.add(&token_id.as_ref(), amount.0);
+                if unregister == Some(true) {
+                    deposits.register(&token_id.as_ref());
+                }
+                self.deposited_amounts.insert(&sender_id.as_ref(), &deposits);
+            },
+        };
     }
 }
 
