@@ -15,7 +15,7 @@ impl StorageManagement for Contract {
             .unwrap_or_else(|| env::predecessor_account_id());
         let registration_only = registration_only.unwrap_or(false);
         let min_balance = self.storage_balance_bounds().min.0;
-        if amount < min_balance {
+        if amount < min_balance && registration_only {
             env::panic(b"ERR_DEPOSIT_LESS_THAN_MIN_STORAGE");
         }
         if registration_only {

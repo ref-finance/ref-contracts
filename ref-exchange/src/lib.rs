@@ -508,6 +508,15 @@ mod tests {
     }
 
     #[test]
+    fn test_two_storage_deposits() {
+        let (mut context, mut contract) = setup_contract();
+        testing_env!(context.attached_deposit(to_yocto("1")).build());
+        contract.storage_deposit(None, None);
+        testing_env!(context.attached_deposit(to_yocto("0.001")).build());
+        contract.storage_deposit(None, None);
+    }
+
+    #[test]
     fn test_roundtrip_swap() {
         let (mut context, mut contract) = setup_contract();
         create_pool_with_liquidity(
