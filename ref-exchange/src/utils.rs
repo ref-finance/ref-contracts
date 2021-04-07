@@ -52,7 +52,12 @@ pub trait FungibleToken {
 
 #[ext_contract(ext_self)]
 pub trait RefExchange {
-    fn exchange_callback_post_withdraw(&mut self, token_id: ValidAccountId, sender_id: ValidAccountId, amount: U128, unregister: Option<bool>);
+    fn exchange_callback_post_withdraw(
+        &mut self,
+        token_id: AccountId,
+        sender_id: AccountId,
+        amount: U128,
+    );
 }
 
 /// Adds given value to item stored in the given key in the LookupMap collection.

@@ -113,28 +113,28 @@ impl Contract {
     #[payable]
     pub fn withdraw(&mut self, token_id: ValidAccountId, amount: U128, unregister: Option<bool>) {
         assert_one_yocto();
-        let token_id_acct: AccountId = token_id.clone().into();
+        let token_id: AccountId = token_id.into();
         let amount: u128 = amount.into();
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.get_account_deposits(&sender_id);
         // Note: subtraction and deregistration will be reverted if the promise fails.
-        deposits.sub(&token_id_acct, amount);
+        deposits.sub(&token_id, amount);
         if unregister == Some(true) {
-            deposits.unregister(&token_id.as_ref());
+            deposits.unregister(&token_id);
         }
         self.deposited_amounts.insert(&sender_id, &deposits);
         ext_fungible_token::ft_transfer(
             sender_id.clone().try_into().unwrap(),
             amount.into(),
             None,
-            &token_id_acct,
+            &token_id,
             1,
             GAS_FOR_FT_TRANSFER,
-        ).then(ext_self::exchange_callback_post_withdraw(
+        )
+        .then(ext_self::exchange_callback_post_withdraw(
             token_id,
-            sender_id.clone().try_into().unwrap(),
+            sender_id,
             amount.into(),
-            unregister,
             &env::current_account_id(),
             0,
             GAS_FOR_FT_TRANSFER,
@@ -142,20 +142,27 @@ impl Contract {
     }
 
     #[private]
-    pub fn exchange_callback_post_withdraw(&mut self, token_id: ValidAccountId, sender_id: ValidAccountId, amount: U128, unregister: Option<bool>) {
-        assert_eq!(env::promise_results_count(), 1, "Expected 1 promise result from withdraw.");
+    pub fn exchange_callback_post_withdraw(
+        &mut self,
+        token_id: AccountId,
+        sender_id: AccountId,
+        amount: U128,
+    ) {
+        assert_eq!(
+            env::promise_results_count(),
+            1,
+            "{}",
+            ERR25_CALLBACK_POST_WITHDRAW_INVALID
+        );
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(_) => {},
+            PromiseResult::Successful(_) => {}
             PromiseResult::Failed => {
-                let mut deposits = self.get_account_deposits(&sender_id.as_ref());
-                // This reverts the changes from withdraw function
-                deposits.add(&token_id.as_ref(), amount.0);
-                if unregister == Some(true) {
-                    deposits.register(&token_id.as_ref());
-                }
-                self.deposited_amounts.insert(&sender_id.as_ref(), &deposits);
-            },
+                // This reverts the changes from withdraw function.
+                let mut deposits = self.get_account_deposits(&sender_id);
+                deposits.add(&token_id, amount.0);
+                self.deposited_amounts.insert(&sender_id, &deposits);
+            }
         };
     }
 }
