@@ -50,6 +50,16 @@ pub trait FungibleToken {
     fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
 }
 
+#[ext_contract(ext_self)]
+pub trait RefExchange {
+    fn exchange_callback_post_withdraw(
+        &mut self,
+        token_id: AccountId,
+        sender_id: AccountId,
+        amount: U128,
+    );
+}
+
 /// Adds given value to item stored in the given key in the LookupMap collection.
 pub fn add_to_collection(c: &mut LookupMap<AccountId, Balance>, key: &String, value: Balance) {
     let prev_value = c.get(key).unwrap_or(0);

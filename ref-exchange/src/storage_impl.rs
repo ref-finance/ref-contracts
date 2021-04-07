@@ -16,7 +16,7 @@ impl StorageManagement for Contract {
         let registration_only = registration_only.unwrap_or(false);
         let min_balance = self.storage_balance_bounds().min.0;
         if amount < min_balance {
-            env::panic(b"ERR_DEPSOIT_LESS_THAN_MIN_STORAGE");
+            env::panic(b"ERR_DEPOSIT_LESS_THAN_MIN_STORAGE");
         }
         if registration_only {
             // Registration only setups the account but doesn't leave space for tokens.
@@ -43,7 +43,7 @@ impl StorageManagement for Contract {
     fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
         assert_one_yocto();
         let account_id = env::predecessor_account_id();
-        let account_deposit = self.get_account_depoists(&account_id);
+        let account_deposit = self.get_account_deposits(&account_id);
         let available = account_deposit.storage_available();
         let amount = amount.map(|a| a.0).unwrap_or(available);
         assert!(amount <= available, "ERR_STORAGE_WITHDRAW_TOO_MUCH");
@@ -53,6 +53,7 @@ impl StorageManagement for Contract {
     }
 
     #[allow(unused_variables)]
+    #[payable]
     fn storage_unregister(&mut self, force: Option<bool>) -> bool {
         assert_one_yocto();
         let account_id = env::predecessor_account_id();

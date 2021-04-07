@@ -5,9 +5,9 @@ use std::convert::TryInto;
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance};
+use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult};
 
-use crate::utils::{ext_fungible_token, GAS_FOR_FT_TRANSFER};
+use crate::utils::{ext_fungible_token, ext_self, GAS_FOR_FT_TRANSFER};
 use crate::*;
 
 const MAX_ACCOUNT_LENGTH: u128 = 64;
@@ -89,7 +89,7 @@ impl Contract {
     /// Fails if not enough balance on this account to cover storage.
     pub fn register_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         let sender_id = env::predecessor_account_id();
-        let mut deposits = self.get_account_depoists(&sender_id);
+        let mut deposits = self.get_account_deposits(&sender_id);
         for token_id in token_ids {
             deposits.register(token_id.as_ref());
         }
@@ -100,7 +100,7 @@ impl Contract {
     /// Panics if the balance of any given token is non 0.
     pub fn unregister_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         let sender_id = env::predecessor_account_id();
-        let mut deposits = self.get_account_depoists(&sender_id);
+        let mut deposits = self.get_account_deposits(&sender_id);
         for token_id in token_ids {
             deposits.unregister(token_id.as_ref());
         }
@@ -116,20 +116,54 @@ impl Contract {
         let token_id: AccountId = token_id.into();
         let amount: u128 = amount.into();
         let sender_id = env::predecessor_account_id();
-        let mut deposits = self.get_account_depoists(&sender_id);
+        let mut deposits = self.get_account_deposits(&sender_id);
+        // Note: subtraction and deregistration will be reverted if the promise fails.
         deposits.sub(&token_id, amount);
         if unregister == Some(true) {
             deposits.unregister(&token_id);
         }
         self.deposited_amounts.insert(&sender_id, &deposits);
         ext_fungible_token::ft_transfer(
-            sender_id.try_into().unwrap(),
+            sender_id.clone().try_into().unwrap(),
             amount.into(),
             None,
             &token_id,
             1,
             GAS_FOR_FT_TRANSFER,
+        )
+        .then(ext_self::exchange_callback_post_withdraw(
+            token_id,
+            sender_id,
+            amount.into(),
+            &env::current_account_id(),
+            0,
+            GAS_FOR_FT_TRANSFER,
+        ));
+    }
+
+    #[private]
+    pub fn exchange_callback_post_withdraw(
+        &mut self,
+        token_id: AccountId,
+        sender_id: AccountId,
+        amount: U128,
+    ) {
+        assert_eq!(
+            env::promise_results_count(),
+            1,
+            "{}",
+            ERR25_CALLBACK_POST_WITHDRAW_INVALID
         );
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Successful(_) => {}
+            PromiseResult::Failed => {
+                // This reverts the changes from withdraw function.
+                let mut deposits = self.get_account_deposits(&sender_id);
+                deposits.add(&token_id, amount.0);
+                self.deposited_amounts.insert(&sender_id, &deposits);
+            }
+        };
     }
 }
 
@@ -151,7 +185,7 @@ impl Contract {
         token_id: &AccountId,
         amount: Balance,
     ) {
-        let mut account_deposit = self.get_account_depoists(sender_id);
+        let mut account_deposit = self.get_account_deposits(sender_id);
         assert!(
             self.whitelisted_tokens.contains(token_id)
                 || account_deposit.tokens.contains_key(token_id),
@@ -164,7 +198,7 @@ impl Contract {
 
     // Returns `from` AccountDeposit.
     #[inline]
-    pub(crate) fn get_account_depoists(&self, from: &AccountId) -> AccountDeposit {
+    pub(crate) fn get_account_deposits(&self, from: &AccountId) -> AccountDeposit {
         self.deposited_amounts
             .get(from)
             .expect(ERR10_ACC_NOT_REGISTERED)
