@@ -151,7 +151,7 @@ impl Contract {
         token_id: &AccountId,
         amount: Balance,
     ) {
-        let mut account_deposit = self.get_account_depoists(sender_id);
+        let mut account_deposit = self.get_account_deposits(sender_id);
         assert!(
             self.whitelisted_tokens.contains(token_id)
                 || account_deposit.tokens.contains_key(token_id),
@@ -164,7 +164,7 @@ impl Contract {
 
     // Returns `from` AccountDeposit.
     #[inline]
-    pub(crate) fn get_account_depoists(&self, from: &AccountId) -> AccountDeposit {
+    pub(crate) fn get_account_deposits(&self, from: &AccountId) -> AccountDeposit {
         self.deposited_amounts
             .get(from)
             .expect(ERR10_ACC_NOT_REGISTERED)
