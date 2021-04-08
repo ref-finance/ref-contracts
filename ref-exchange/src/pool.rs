@@ -80,7 +80,7 @@ impl Pool {
         token_out: &AccountId,
         min_amount_out: Balance,
         exchange_id: &AccountId,
-        referral_id: Option<AccountId>,
+        referral_id: &Option<AccountId>,
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.swap(

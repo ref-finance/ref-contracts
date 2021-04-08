@@ -237,11 +237,12 @@ impl SimplePool {
         token_out: &AccountId,
         min_amount_out: Balance,
         exchange_id: &AccountId,
-        referral_id: Option<AccountId>,
+        referral_id: &Option<AccountId>,
     ) -> Balance {
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
         let amount_out = self.internal_get_return(in_idx, amount_in, out_idx);
+        assert!(amount_out >= min_amount_out, "ERR_MIN_AMOUNT");
         env::log(
             format!(
                 "Swapped {} {} for {} {}",
@@ -249,7 +250,6 @@ impl SimplePool {
             )
             .as_bytes(),
         );
-        assert!(amount_out >= min_amount_out, "ERR_MIN_AMOUNT");
 
         let prev_invariant =
             integer_sqrt(U256::from(self.amounts[in_idx]) * U256::from(self.amounts[out_idx]));
@@ -257,13 +257,15 @@ impl SimplePool {
         self.amounts[in_idx] += amount_in;
         self.amounts[out_idx] -= amount_out;
 
+        // "Invariant" is by how much the dot product of amounts increased due to fees.
         let new_invariant =
             integer_sqrt(U256::from(self.amounts[in_idx]) * U256::from(self.amounts[out_idx]));
 
-        // Invariant can not reduce.
+        // Invariant can not reduce (otherwise loosing balance of the pool and something it broken).
         assert!(new_invariant >= prev_invariant, "ERR_INVARIANT");
         let numerator = (new_invariant - prev_invariant) * U256::from(self.shares_total_supply);
 
+        // Allocate exchange fee as fraction of total fee by issuing LP shares proportionally.
         if self.exchange_fee > 0 && numerator > U256::zero() {
             let denominator = new_invariant * self.total_fee / self.exchange_fee;
             self.mint_shares(&exchange_id, (numerator / denominator).as_u128());
@@ -277,7 +279,8 @@ impl SimplePool {
             }
         }
 
-        // Update volumes.
+        // Keeping track of volume per each input traded separately.
+        // Reported volume with fees will be sum of `input`, without fees will be sum of `output`.
         self.volumes[in_idx].input.0 += amount_in;
         self.volumes[in_idx].output.0 += amount_out;
 
