@@ -82,10 +82,11 @@ impl Contract {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
         let mut prev_amount = None;
-        let referral_id = referral_id.map(|r| r.as_ref().clone());
+        let referral_id = referral_id.map(|r| r.into());
         for action in actions {
             let amount_in = action
                 .amount_in
+                .map(|value| value.0)
                 .unwrap_or_else(|| prev_amount.expect("ERR_FIRST_SWAP_MISSING_AMOUNT"));
             prev_amount = Some(self.internal_swap(
                 &sender_id,
@@ -93,22 +94,33 @@ impl Contract {
                 &action.token_in,
                 amount_in,
                 &action.token_out,
-                action.min_amount_out,
-                referral_id.clone(),
+                action.min_amount_out.0,
+                &referral_id,
             ));
         }
-        prev_amount.unwrap()
+        U128(prev_amount.expect("ERR_AT_LEAST_ONE_SWAP"))
     }
 
     /// Add liquidity from already deposited amounts to given pool.
     #[payable]
-    pub fn add_liquidity(&mut self, pool_id: u64, amounts: Vec<U128>) {
+    pub fn add_liquidity(
+        &mut self,
+        pool_id: u64,
+        amounts: Vec<U128>,
+        min_amounts: Option<Vec<U128>>,
+    ) {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
         let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         // Add amounts given to liquidity first. It will return the balanced amounts.
         pool.add_liquidity(&sender_id, &mut amounts);
+        if let Some(min_amounts) = min_amounts {
+            // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
+            for (amount, min_amount) in amounts.iter().zip(min_amounts.iter()) {
+                assert!(amount >= &min_amount.0, "ERR_MIN_AMOUNT");
+            }
+        }
         let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
         let tokens = pool.tokens();
         // Subtract updated amounts from deposits. This will fail if there is not enough funds for any of the tokens.
@@ -173,27 +185,26 @@ impl Contract {
         sender_id: &AccountId,
         pool_id: u64,
         token_in: &AccountId,
-        amount_in: U128,
+        amount_in: u128,
         token_out: &AccountId,
-        min_amount_out: U128,
-        referral_id: Option<AccountId>,
-    ) -> U128 {
+        min_amount_out: u128,
+        referral_id: &Option<AccountId>,
+    ) -> u128 {
         let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
-        let amount_in: u128 = amount_in.into();
         deposits.sub(token_in, amount_in);
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         let amount_out = pool.swap(
             token_in,
             amount_in,
             token_out,
-            min_amount_out.into(),
+            min_amount_out,
             &self.owner_id,
             referral_id,
         );
         deposits.add(token_out, amount_out);
         self.deposited_amounts.insert(&sender_id, &deposits);
         self.pools.replace(pool_id, &pool);
-        amount_out.into()
+        amount_out
     }
 }
 
@@ -277,6 +288,7 @@ mod tests {
         contract.add_liquidity(
             pool_id,
             token_amounts.into_iter().map(|(_, x)| U128(x)).collect(),
+            None,
         );
         pool_id
     }
@@ -379,8 +391,8 @@ mod tests {
             .build());
         let id = contract.add_simple_pool(vec![accounts(1), accounts(2)], 25);
         testing_env!(context.attached_deposit(1).build());
-        contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("10"))]);
-        contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("50"))]);
+        contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("10"))], None);
+        contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("50"))], None);
         contract.remove_liquidity(id, U128(to_yocto("1")), vec![U128(1), U128(1)]);
 
         // Check that amounts add up to deposits.
@@ -508,12 +520,20 @@ mod tests {
     }
 
     #[test]
-    fn test_two_storage_deposits() {
+    fn test_second_storage_deposit_works() {
         let (mut context, mut contract) = setup_contract();
         testing_env!(context.attached_deposit(to_yocto("1")).build());
         contract.storage_deposit(None, None);
         testing_env!(context.attached_deposit(to_yocto("0.001")).build());
         contract.storage_deposit(None, None);
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_AT_LEAST_ONE_SWAP")]
+    fn test_fail_swap_no_actions() {
+        let (mut context, mut contract) = setup_contract();
+        testing_env!(context.attached_deposit(1).build());
+        contract.swap(vec![], None);
     }
 
     #[test]

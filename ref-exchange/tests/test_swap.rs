@@ -4,10 +4,10 @@ use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::AccountId;
 use near_sdk_sim::{call, deploy, init_simulator, to_yocto, view, ContractAccount, UserAccount};
 
+use near_sdk_sim::transaction::ExecutionStatus;
 use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
 use std::collections::HashMap;
 use test_token::ContractContract as TestToken;
-use near_sdk_sim::transaction::ExecutionStatus;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
@@ -103,7 +103,7 @@ fn test_swap() {
     .assert_success();
     call!(
         root,
-        pool.add_liquidity(0, vec![U128(to_yocto("5")), U128(to_yocto("10"))]),
+        pool.add_liquidity(0, vec![U128(to_yocto("5")), U128(to_yocto("10"))], None),
         deposit = 1
     )
     .assert_success();
@@ -191,34 +191,41 @@ fn test_withdraw_failure() {
         root,
         pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 25),
         deposit = to_yocto("1")
-    ).assert_success();
+    )
+    .assert_success();
 
     // Deposit 1 NEAR storage balance for root account
     call!(
         root,
         pool.storage_deposit(None, None),
         deposit = to_yocto("1")
-    ).assert_success();
+    )
+    .assert_success();
 
     call!(
         root,
         dai_contract.ft_transfer_call(to_va(swap()), to_yocto("105").into(), None, "".to_string()),
         deposit = 1
-    ).assert_success();
+    )
+    .assert_success();
     call!(
         root,
         weth_contract.ft_transfer_call(to_va(swap()), to_yocto("110").into(), None, "".to_string()),
         deposit = 1
-    ).assert_success();
+    )
+    .assert_success();
 
     // Check exchange balance before user unregisters from fungible token
     let balances_before = view!(pool.get_deposits(to_va(root.account_id.clone())))
         .unwrap_json::<HashMap<AccountId, U128>>();
-    assert_eq!(balances_before.get(&dai()).unwrap(), &to_yocto("105").into());
+    assert_eq!(
+        balances_before.get(&dai()).unwrap(),
+        &to_yocto("105").into()
+    );
 
     // See how much root account has on each fungible token
-    let mut dai_amount: U128 = view!(
-        dai_contract.ft_balance_of(to_va("root".to_string()))).unwrap_json();
+    let mut dai_amount: U128 =
+        view!(dai_contract.ft_balance_of(to_va("root".to_string()))).unwrap_json();
     assert_eq!(dai_amount, to_yocto("895").into());
 
     // User (perhaps accidentally) unregisters account from fungible token.
@@ -226,11 +233,11 @@ fn test_withdraw_failure() {
         root,
         dai_contract.storage_unregister(Some(true)),
         deposit = 1
-    ).assert_success();
+    )
+    .assert_success();
 
     // Now DAI balance for root is now 0, with no storage either
-    dai_amount = view!(
-        dai_contract.ft_balance_of(to_va("root".to_string()))).unwrap_json();
+    dai_amount = view!(dai_contract.ft_balance_of(to_va("root".to_string()))).unwrap_json();
     assert_eq!(dai_amount, U128(0));
 
     // Root tries to withdraw and the transfer fails
@@ -249,7 +256,10 @@ fn test_withdraw_failure() {
     if let ExecutionStatus::Failure(err) = promise_failure.status() {
         // At this time, this is the way to check for error messages.
         // This error comes from the fungible token contract.
-        assert_eq!(err.to_string(), "Action #0: Smart contract panicked: The account root is not registered");
+        assert_eq!(
+            err.to_string(),
+            "Action #0: Smart contract panicked: The account root is not registered"
+        );
     } else {
         panic!("Expected failure when withdrawing to unregistered account.");
     }
