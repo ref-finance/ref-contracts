@@ -64,7 +64,7 @@ impl Contract {
             exchange_fee: contract_v1.exchange_fee,
             referral_fee: contract_v1.referral_fee,
             pools: contract_v1.pools,
-            deposited_amounts: contract_v1.deposited_amounts,
+            accounts: contract_v1.deposited_amounts,
             whitelisted_tokens: UnorderedSet::new(b"w".to_vec()),
         }
     }
