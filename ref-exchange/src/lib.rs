@@ -75,20 +75,30 @@ impl Contract {
         )))
     }
 
-    /// Execute set of swap actions between pools.
+    /// Execute chain of swap actions between pools. Returns the amount of tokens bought after
+    /// executing all swaps. The bought tokens are deposited in the account - user must withdraw
+    /// from the AccountDeposit to get the tokens in his/her wallet.
+    /// In the chain of swaps, the output of an `action[i]` (tokens received in i-th swap), are
+    /// used in `action[i+1]`. All swap actions except the first one must not specify the `amount_in`.
     /// If referrer provided, pays referral_fee to it.
     #[payable]
     pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
-        let mut prev_amount = None;
+        let mut prev_amount: u128 = 0;
+        let mut is_first = true;
         let referral_id = referral_id.map(|r| r.into());
         for action in actions {
-            let amount_in = action
-                .amount_in
-                .map(|value| value.0)
-                .unwrap_or_else(|| prev_amount.expect("ERR_FIRST_SWAP_MISSING_AMOUNT"));
-            prev_amount = Some(self.internal_swap(
+            let amount_in = if is_first {
+                is_first = false;
+                action.amount_in.expect("ERR_FIRST_SWAP_MISSING_AMOUNT").0
+            } else {
+                if let Some(_) = action.amount_in {
+                    panic!("ERR_SUBSEQUENT_SWAP_SOME_AMOUNT_IN")
+                }
+                prev_amount
+            };
+            prev_amount = self.internal_swap(
                 &sender_id,
                 action.pool_id,
                 &action.token_in,
@@ -96,9 +106,10 @@ impl Contract {
                 &action.token_out,
                 action.min_amount_out.0,
                 &referral_id,
-            ));
+            );
         }
-        U128(prev_amount.expect("ERR_AT_LEAST_ONE_SWAP"))
+        assert!(!is_first, "ERR_AT_LEAST_ONE_SWAP");
+        U128(prev_amount)
     }
 
     /// Add liquidity from already deposited amounts to given pool.
@@ -534,6 +545,49 @@ mod tests {
         let (mut context, mut contract) = setup_contract();
         testing_env!(context.attached_deposit(1).build());
         contract.swap(vec![], None);
+    }
+
+    #[test]
+    #[should_panic(expected = "ERR_SUBSEQUENT_SWAP_SOME_AMOUNT_IN")]
+    fn test_fail_swap_subsequent_amount_in() {
+        let (mut context, mut contract) = setup_contract();
+        create_pool_with_liquidity(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![(accounts(1), to_yocto("5")), (accounts(2), to_yocto("10"))],
+        );
+        let acc = ValidAccountId::try_from("test_user").unwrap();
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            acc.clone(),
+            vec![(accounts(1), 1_000_000)],
+        );
+        testing_env!(context
+            .predecessor_account_id(acc.clone())
+            .attached_deposit(1)
+            .build());
+        contract.swap(
+            vec![
+                SwapAction {
+                    pool_id: 0,
+                    token_in: accounts(1).into(),
+                    amount_in: Some(U128(1_000)),
+                    token_out: accounts(2).into(),
+                    min_amount_out: U128(1),
+                },
+                SwapAction {
+                    pool_id: 0,
+                    // amount_in must be None in all actions except the first one
+                    token_in: accounts(2).into(),
+                    amount_in: Some(U128(1)),
+                    token_out: accounts(1).into(),
+                    min_amount_out: U128(1),
+                },
+            ],
+            None,
+        );
     }
 
     #[test]

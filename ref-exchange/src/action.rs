@@ -11,7 +11,7 @@ pub struct SwapAction {
     pub token_in: AccountId,
     /// Amount to exchange.
     /// If amount_in is None, it will take amount_out from previous step.
-    /// Will fail if amount_in is None on the first step.
+    /// Must be `None` in the first step and `Some(.)` in any other step. Will panic otherwise.
     pub amount_in: Option<U128>,
     /// Token to swap into.
     pub token_out: AccountId,
