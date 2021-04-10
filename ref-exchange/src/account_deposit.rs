@@ -126,6 +126,17 @@ impl AccountDeposit {
 
 #[near_bindgen]
 impl Contract {
+    /// Deposits attached NEAR into predecessor account deposits. The deposited near will be used
+    /// for trades and for storage. Predecessor account must be registered. Panics otherwise.
+    /// NOTE: this is a simplified and more direct version of `storage_deposit` function.
+    #[payable]
+    pub fn deposit_near(&mut self) {
+        let sender_id = env::predecessor_account_id();
+        let mut acc = self.get_account(&sender_id);
+        acc.near_amount += env::attached_deposit();
+        self.accounts.insert(&sender_id, &acc);
+    }
+
     /// Registers given token in the user's account deposit.
     /// Fails if not enough balance on this account to cover storage.
     pub fn register_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
@@ -244,15 +255,17 @@ impl Contract {
         self.accounts.get(from).expect(ERR10_ACC_NOT_REGISTERED)
     }
 
-    /// Returns current balance of given token for given user. If there is nothing recorded, returns 0.
+    /// Returns current balance of given token for given user. If token_id == "" then returns NEAR (native)
+    /// balance. If there is nothing recorded, returns 0.
     pub(crate) fn get_deposit_balance(
         &self,
         sender_id: &AccountId,
         token_id: &AccountId,
     ) -> Balance {
-        self.accounts
-            .get(sender_id)
-            .and_then(|d| d.tokens.get(token_id).cloned())
-            .unwrap_or_default()
+        let acc = self.get_account(sender_id);
+        if token_id == "" {
+            return acc.near_amount;
+        }
+        *acc.tokens.get(token_id).unwrap_or(&0)
     }
 }

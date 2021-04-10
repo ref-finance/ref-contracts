@@ -107,7 +107,7 @@ impl Contract {
         U128(prev_amount.expect("ERR_AT_LEAST_ONE_SWAP"))
     }
 
-    /// Add liquidity from already deposited amounts to given pool.
+    /// Add liquidity from already deposited amounts to the given pool.
     #[payable]
     pub fn add_liquidity(
         &mut self,
@@ -116,6 +116,7 @@ impl Contract {
         min_amounts: Option<Vec<U128>>,
     ) {
         assert_one_yocto();
+        let start_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
@@ -129,18 +130,21 @@ impl Contract {
         }
         let mut acc = self.get_account(&sender_id);
         let tokens = pool.tokens();
-        // Subtract updated amounts from deposits. This will fail if there is not enough funds for any of the tokens.
+        // Subtract updated amounts from deposits. Fails if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
             acc.sub(&tokens[i], amounts[i]);
         }
-        self.accounts.insert(&sender_id, &acc);
         self.pools.replace(pool_id, &pool);
+        // Can create a new shares record in a pool
+        acc.update_storage(start_storage);
+        self.accounts.insert(&sender_id, &acc);
     }
 
-    /// Remove liquidity from the pool into general pool of liquidity.
+    /// Remove liquidity from the pool and transfer it into account deposit.
     #[payable]
     pub fn remove_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
         assert_one_yocto();
+        let start_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         let amounts = pool.remove_liquidity(
@@ -157,6 +161,8 @@ impl Contract {
         for i in 0..tokens.len() {
             acc.add(&tokens[i], amounts[i]);
         }
+        // Can remove shares record in a pool
+        acc.update_storage(start_storage);
         self.accounts.insert(&sender_id, &acc);
     }
 }
@@ -210,9 +216,10 @@ impl Contract {
         acc.add(token_out, amount_out);
         self.accounts.insert(&sender_id, &acc);
         self.pools.replace(pool_id, &pool);
-        // NOTE: this can cause changes in the deposits which increases an account storage (eg, if user doesn't
-        // have `token_out` in AccountDepoist, then a new record will be created). This is not a problem,
-        // because we compute the `AccountDepoist` storage consumption separaterly.
+        // NOTE: this can cause changes in the deposits which increases an account storage (eg,
+        // if user doesn't have `token_out` in AccountDepoist, then a new record will be created).
+        // This is not a problem, because we compute the `AccountDepoist` storage consumption
+        // separaterly, hence we must do this update.
         acc.update_storage(start_storage);
         self.accounts.insert(&sender_id, &acc);
         amount_out
@@ -381,6 +388,18 @@ mod tests {
             None,
         );
         assert_eq!(contract.get_deposit(accounts(3), accounts(1)).0, 0);
+
+        // must work with NEAR deposits
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(100)
+            .build());
+        assert_eq!(
+            contract
+                .get_deposit(accounts(3), "".to_string().try_into().unwrap())
+                .0,
+            100
+        );
     }
 
     /// Test liquidity management.

@@ -316,7 +316,7 @@ mod tests {
             accounts(2).as_ref(),
             1,
             accounts(3).as_ref(),
-            Some(accounts(4).as_ref().clone()),
+            &Some(accounts(4).as_ref().clone()),
         );
         assert_eq!(
             pool.share_balances(accounts(0).as_ref()),
@@ -348,7 +348,7 @@ mod tests {
             accounts(2).as_ref(),
             1,
             accounts(3).as_ref(),
-            Some(accounts(4).as_ref().clone()),
+            &Some(accounts(4).as_ref().clone()),
         );
         assert_eq!(
             pool.share_balances(accounts(0).as_ref()),
