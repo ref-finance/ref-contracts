@@ -6,7 +6,9 @@ use near_contract_standards::storage_management::{
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise};
+use near_sdk::{
+    assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise, StorageUsage,
+};
 
 use crate::account_deposit::{AccountDeposit, INIT_ACCOUNT_STORAGE};
 pub use crate::action::*;
@@ -61,7 +63,10 @@ impl Contract {
         }
     }
 
-    /// Adds new "Simple Pool" with given tokens and given fee.
+    /// Adds new "Simple Pool" with given tokens and given fee. The effective pool fee is
+    ///   `fee + exchange_fee + referralp_fee`.
+    /// This function doesn't set the initial price nor adds any liquidity to the pool. You must call the
+    /// `add_liquidity` for that.
     /// Deposited NEAR must be enough to cover the added storage.
     #[payable]
     pub fn add_simple_pool(&mut self, tokens: Vec<ValidAccountId>, fee: u32) -> u64 {
@@ -158,6 +163,15 @@ impl Contract {
 
 /// Internal methods implementation.
 impl Contract {
+    /// loads the accoutn from self.accounts, updates the storage used and asserts that there is enough NEAR
+    /// balance to cover storage cost.
+    fn update_acc_storage(&mut self, tx_start_storage: StorageUsage) {
+        let from = env::predecessor_account_id();
+        let mut acc = self.get_account(&from);
+        acc.update_storage(tx_start_storage);
+        self.accounts.insert(&from, &acc);
+    }
+
     /// Adds given pool to the list and returns it's id.
     /// If there is not enough attached balance to cover storage, fails.
     /// If too much attached - refunds it back.
@@ -165,9 +179,7 @@ impl Contract {
         let start_storage = env::storage_usage();
         let id = self.pools.len() as u64;
         self.pools.push(&pool);
-
-        // TODO: update deposit handling
-
+        self.update_acc_storage(start_storage);
         id
     }
 
@@ -184,8 +196,8 @@ impl Contract {
         referral_id: &Option<AccountId>,
     ) -> u128 {
         let start_storage = env::storage_usage();
-        let mut acc = self.accounts.get(&sender_id).unwrap_or_default();
-        acc.sub(token_in, amount_in);
+        let mut acc = self.get_account(&sender_id);
+        acc.sub(token_in, amount_in); // NOTE: panics when there is not enough `token_in` deposit.
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         let amount_out = pool.swap(
             token_in,
@@ -198,13 +210,11 @@ impl Contract {
         acc.add(token_out, amount_out);
         self.accounts.insert(&sender_id, &acc);
         self.pools.replace(pool_id, &pool);
-        // TODO:
-        // we need to insert 2 times: once in line 194 (prev) and second time here.
-        // This is because we won't trace properly new storage until we insert the record into the storage tree.
-        // Alternative would be to refactor the AccountDeposit and move ynear to another, top-level map.
-        // Better solution: compute the storage consumed by AccountDeposit on the fly.
+        // NOTE: this can cause changes in the deposits which increases an account storage (eg, if user doesn't
+        // have `token_out` in AccountDepoist, then a new record will be created). This is not a problem,
+        // because we compute the `AccountDepoist` storage consumption separaterly.
         acc.update_storage(start_storage);
-
+        self.accounts.insert(&sender_id, &acc);
         amount_out
     }
 }

@@ -73,7 +73,6 @@ impl AccountDeposit {
     }
 
     /// Returns amount of $NEAR necessary to cover storage used by account referenced to this structure.
-    #[inline]
     pub fn storage_usage(&self) -> Balance {
         (if self.storage_used < INIT_ACCOUNT_STORAGE {
             self.storage_used
@@ -90,6 +89,7 @@ impl AccountDeposit {
     }
 
     /// Asserts there is sufficient amount of $NEAR to cover storage usage.
+    #[inline]
     pub fn assert_storage_usage(&self) {
         assert!(
             self.storage_usage() <= self.near_amount,
@@ -100,8 +100,7 @@ impl AccountDeposit {
 
     /// Updates the account storage usage and sets.
     pub(crate) fn update_storage(&mut self, tx_start_storage: StorageUsage) {
-        let s = env::storage_usage();
-        self.storage_used += s - tx_start_storage;
+        self.storage_used += env::storage_usage() - tx_start_storage;
         self.assert_storage_usage();
     }
 
