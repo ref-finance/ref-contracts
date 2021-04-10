@@ -12,12 +12,16 @@ use near_sdk::{
 use crate::utils::{ext_fungible_token, ext_self, GAS_FOR_FT_TRANSFER};
 use crate::*;
 
+const U128_STORAGE: StorageUsage = 16;
 /// bytes length of u64 values
 const U64_STORAGE: StorageUsage = 8;
 /// bytes length of u32 values. Used in length operations
 const U32_STORAGE: StorageUsage = 4;
+/// max length of account id * 8 (1 byte)
+const ACC_ID_STORAGE: StorageUsage = 64 * 8;
 // 64 = max account name length
-pub const INIT_ACCOUNT_STORAGE: StorageUsage = 64 + 2 * U64_STORAGE + U32_STORAGE;
+pub const INIT_ACCOUNT_STORAGE: StorageUsage =
+    ACC_ID_STORAGE + U128_STORAGE + U32_STORAGE + 2 * U64_STORAGE;
 
 // NEAR native token. This is not a valid token ID. HACK: NEAR is a native token, we use the
 // empty string we use it to reference not existing near account.
@@ -74,15 +78,13 @@ impl AccountDeposit {
 
     /// Returns amount of $NEAR necessary to cover storage used by account referenced to this structure.
     pub fn storage_usage(&self) -> Balance {
-        (if self.storage_used < INIT_ACCOUNT_STORAGE {
-            self.storage_used
-        } else {
-            INIT_ACCOUNT_STORAGE
-        }) as Balance
-            * env::storage_byte_cost()
+        let s = self.storage_used
+            + INIT_ACCOUNT_STORAGE  // empty account storage
+            + (ACC_ID_STORAGE + U64_STORAGE) * self.tokens.len() as u64; // self.tokens storage
+        return s as Balance * env::storage_byte_cost();
     }
 
-    /// Returns how much NEAR is available for storage.
+    /// Returns how much NEAR is available for storage and swaps.
     #[inline]
     pub(crate) fn storage_available(&self) -> Balance {
         self.near_amount - self.storage_usage()
@@ -98,14 +100,15 @@ impl AccountDeposit {
         );
     }
 
-    /// Updates the account storage usage and sets.
+    /// Updates the account storage usage.
+    /// Panics if there is not enought $NEAR to cover storage usage.
     pub(crate) fn update_storage(&mut self, tx_start_storage: StorageUsage) {
         self.storage_used += env::storage_usage() - tx_start_storage;
         self.assert_storage_usage();
     }
 
     /// Registers given `token_id` and set balance to 0.
-    /// Fails if not enough NEAR is in deposit to cover new storage usage.
+    /// Panics if there is not enought $NEAR to cover storage usage.
     pub(crate) fn register(&mut self, token_ids: &Vec<ValidAccountId>) {
         for token_id in token_ids {
             let t = token_id.as_ref();
