@@ -70,8 +70,13 @@ impl AccountDeposit {
 
     /// Registers given token and set balance to 0.
     /// Fails if not enough amount to cover new storage usage.
-    pub(crate) fn register(&mut self, token_id: &AccountId) {
-        self.tokens.insert(token_id.clone(), 0);
+    pub(crate) fn register(&mut self, token_ids: &Vec<ValidAccountId>) {
+        for token_id in token_ids {
+            let t = token_id.as_ref();
+            if !self.tokens.contains_key(t) {
+                self.tokens.insert(t.clone(), 0);
+            }
+        }
         self.assert_storage_usage();
     }
 
@@ -90,9 +95,7 @@ impl Contract {
     pub fn register_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.get_account_deposits(&sender_id);
-        for token_id in token_ids {
-            deposits.register(token_id.as_ref());
-        }
+        deposits.register(&token_ids);
         self.deposited_amounts.insert(&sender_id, &deposits);
     }
 
