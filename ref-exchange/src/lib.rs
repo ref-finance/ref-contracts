@@ -10,7 +10,7 @@ use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise, StorageUsage,
 };
 
-use crate::account_deposit::{AccountDeposit, INIT_ACCOUNT_STORAGE};
+use crate::account_deposit::{AccountDeposit, AccountDepositV1, INIT_ACCOUNT_STORAGE};
 pub use crate::action::*;
 use crate::errors::*;
 use crate::pool::Pool;
@@ -137,7 +137,7 @@ impl Contract {
         self.pools.replace(pool_id, &pool);
         // Can create a new shares record in a pool
         acc.update_storage(start_storage);
-        self.accounts.insert(&sender_id, &acc);
+        self.accounts.insert(&sender_id, &acc.into());
     }
 
     /// Remove liquidity from the pool and transfer it into account deposit.
@@ -163,7 +163,7 @@ impl Contract {
         }
         // Can remove shares record in a pool
         acc.update_storage(start_storage);
-        self.accounts.insert(&sender_id, &acc);
+        self.accounts.insert(&sender_id, &acc.into());
     }
 }
 
@@ -175,7 +175,7 @@ impl Contract {
         let from = env::predecessor_account_id();
         let mut acc = self.get_account(&from);
         acc.update_storage(tx_start_storage);
-        self.accounts.insert(&from, &acc);
+        self.accounts.insert(&from, &acc.into());
     }
 
     /// Adds given pool to the list and returns it's id.
@@ -214,14 +214,14 @@ impl Contract {
             referral_id,
         );
         acc.add(token_out, amount_out);
-        self.accounts.insert(&sender_id, &acc);
+        self.accounts.insert(&sender_id, &acc.into());
         self.pools.replace(pool_id, &pool);
         // NOTE: this can cause changes in the deposits which increases an account storage (eg,
         // if user doesn't have `token_out` in AccountDepoist, then a new record will be created).
         // This is not a problem, because we compute the `AccountDepoist` storage consumption
         // separaterly, hence we must do this update.
         acc.update_storage(start_storage);
-        self.accounts.insert(&sender_id, &acc);
+        self.accounts.insert(&sender_id, &acc.into());
         amount_out
     }
 }

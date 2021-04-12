@@ -6,7 +6,7 @@ use crate::legacy::ContractV1;
 use crate::utils::{GAS_FOR_DEPLOY_CALL, GAS_FOR_UPGRADE_CALL};
 
 #[near_bindgen]
-impl Contract {
+impl ContractV1 {
     /// Change owner. Only can be called by owner.
     pub fn set_owner(&mut self, owner_id: ValidAccountId) {
         self.assert_owner();

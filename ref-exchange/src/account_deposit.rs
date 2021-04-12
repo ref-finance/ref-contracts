@@ -20,17 +20,55 @@ const U32_STORAGE: StorageUsage = 4;
 /// max length of account id * 8 (1 byte)
 const ACC_ID_STORAGE: StorageUsage = 64 * 8;
 // 64 = max account name length
+
+// ACC_ID: the Contract accounts map
+// + U128_STORAGE: near_amount storage
+// + U32_STORAGE: tokens HashMap length
+// + U64_STORAGE: storage_used
+// + 2: version
 pub const INIT_ACCOUNT_STORAGE: StorageUsage =
-    ACC_ID_STORAGE + U128_STORAGE + U32_STORAGE + 2 * U64_STORAGE;
+    ACC_ID_STORAGE + U128_STORAGE + U32_STORAGE + 2 * U64_STORAGE + 2;
 
 // NEAR native token. This is not a valid token ID. HACK: NEAR is a native token, we use the
 // empty string we use it to reference not existing near account.
 // pub const NEAR: AccountId = "".to_string();
 
+#[derive(BorshDeserialize, BorshSerialize)]
+pub enum AccountDeposit {
+    V2(AccountDepositV2),
+}
+
+impl From<AccountDeposit> for AccountDepositV2 {
+    fn from(account: AccountDeposit) -> Self {
+        match account {
+            AccountDeposit::V2(a) => {
+                if a.storage_used > 0 {
+                    return a;
+                }
+                // migrate from V1
+                a.storage_used = U64_STORAGE;
+                a
+            }
+        }
+    }
+}
+
+/// Account deposits information and storage cost.
+/// Legacy version
+#[derive(BorshSerialize, BorshDeserialize, Default)]
+#[cfg_attr(feature = "test", derive(Clone))]
+pub struct AccountDepositV1 {
+    /// NEAR sent to the exchange.
+    /// Used for storage and trading.
+    pub near_amount: Balance,
+    /// Amounts of various tokens in this account.
+    pub tokens: HashMap<AccountId, Balance>,
+}
+
 /// Account deposits information and storage cost.
 #[derive(BorshSerialize, BorshDeserialize, Default)]
 #[cfg_attr(feature = "test", derive(Clone))]
-pub struct AccountDeposit {
+pub struct AccountDepositV2 {
     /// NEAR sent to the exchange.
     /// Used for storage and trading.
     pub near_amount: Balance,
@@ -39,13 +77,19 @@ pub struct AccountDeposit {
     pub storage_used: StorageUsage,
 }
 
-impl AccountDeposit {
+impl From<AccountDepositV2> for AccountDeposit {
+    fn from(a: AccountDepositV2) -> Self {
+        AccountDeposit::V2(a)
+    }
+}
+
+impl AccountDepositV2 {
     pub fn new(account_id: &AccountId, near_amount: Balance) -> Self {
         Self {
             near_amount,
             tokens: HashMap::default(),
             // Here we manually compute the initial storage size of account deposit.
-            storage_used: account_id.len() as StorageUsage + U64_STORAGE + U32_STORAGE,
+            storage_used: U64_STORAGE,
         }
     }
 
@@ -137,16 +181,16 @@ impl Contract {
         let sender_id = env::predecessor_account_id();
         let mut acc = self.get_account(&sender_id);
         acc.near_amount += env::attached_deposit();
-        self.accounts.insert(&sender_id, &acc);
+        self.accounts.insert(&sender_id, &acc.into());
     }
 
     /// Registers given token in the user's account deposit.
     /// Fails if not enough balance on this account to cover storage.
     pub fn register_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         let sender_id = env::predecessor_account_id();
-        let mut deposits = self.get_account(&sender_id);
-        deposits.register(&token_ids);
-        self.accounts.insert(&sender_id, &deposits);
+        let mut acc = self.get_account(&sender_id);
+        acc.register(&token_ids);
+        self.accounts.insert(&sender_id, &acc.into());
     }
 
     /// Unregister given token from user's account deposit.
@@ -157,7 +201,7 @@ impl Contract {
         for token_id in token_ids {
             deposits.unregister(token_id.as_ref());
         }
-        self.accounts.insert(&sender_id, &deposits);
+        self.accounts.insert(&sender_id, &deposits.into());
     }
 
     /// Withdraws given token from the deposits of given user.
@@ -175,7 +219,7 @@ impl Contract {
         if unregister == Some(true) {
             deposits.unregister(&token_id);
         }
-        self.accounts.insert(&sender_id, &deposits);
+        self.accounts.insert(&sender_id, &deposits.into());
         ext_fungible_token::ft_transfer(
             sender_id.clone().try_into().unwrap(),
             amount.into(),
@@ -214,7 +258,7 @@ impl Contract {
                 // This reverts the changes from withdraw function.
                 let mut deposits = self.get_account(&sender_id);
                 deposits.add(&token_id, amount.0);
-                self.accounts.insert(&sender_id, &deposits);
+                self.accounts.insert(&sender_id, &deposits.into());
             }
         };
     }
@@ -229,7 +273,7 @@ impl Contract {
             account_deposit.near_amount += amount;
             account_deposit
         } else {
-            AccountDeposit::new(account_id, amount)
+            AccountDepositV2::new(account_id, amount)
         };
         self.accounts.insert(&account_id, &acc);
     }
@@ -249,13 +293,29 @@ impl Contract {
             ERR12_TOKEN_NOT_WHITELISTED
         );
         acc.add(token_id, amount);
-        self.accounts.insert(sender_id, &acc);
+        self.accounts.insert(sender_id, &acc.into());
     }
 
     // Returns `from` AccountDeposit.
     #[inline]
-    pub(crate) fn get_account(&self, from: &AccountId) -> AccountDeposit {
-        self.accounts.get(from).expect(ERR10_ACC_NOT_REGISTERED)
+    pub(crate) fn get_account(&self, from: &AccountId) -> AccountDepositV2 {
+        self.accounts
+            .get(from)
+            .expect(ERR10_ACC_NOT_REGISTERED)
+            .into()
+    }
+
+    pub(crate) fn get_account_option(&self, from: &AccountId) -> Option<AccountDepositV2> {
+        // let key = ("d".to_owned() + from).into_bytes();
+        // let data = env::storage_read(&key);
+        // if data == None {
+        //     return None;
+        // }
+        // let Some(data) = data;
+        // AccountDepositV1::Dese
+        // borsh::de::
+
+        self.accounts.get(from).and_then(|a| a.into())
     }
 
     /// Returns current balance of given token for given user. If token_id == "" then returns NEAR (native)
