@@ -6,7 +6,9 @@ use near_contract_standards::storage_management::{
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise};
+use near_sdk::{
+    assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise, PromiseResult,
+};
 
 use crate::account_deposit::AccountDeposit;
 pub use crate::action::*;
@@ -22,6 +24,7 @@ mod errors;
 mod legacy;
 mod owner;
 mod pool;
+mod shares;
 mod simple_pool;
 mod storage_impl;
 mod token_receiver;
