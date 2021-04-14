@@ -4,7 +4,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, Vector};
 use near_sdk::AccountId;
 
-use crate::account_deposit::AccountDeposit;
+use crate::account_deposit::AccountDepositV2;
 use crate::pool::Pool;
 
 /// Version before whitelisted tokens collection.
@@ -19,5 +19,5 @@ pub struct ContractV1 {
     /// List of all the pools.
     pub pools: Vector<Pool>,
     /// Balances of deposited tokens for each account.
-    pub deposited_amounts: LookupMap<AccountId, AccountDeposit>,
+    pub deposited_amounts: LookupMap<AccountId, AccountDepositV2>,
 }

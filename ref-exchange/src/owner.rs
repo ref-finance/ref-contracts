@@ -6,7 +6,7 @@ use crate::legacy::ContractV1;
 use crate::utils::{GAS_FOR_DEPLOY_CALL, GAS_FOR_UPGRADE_CALL};
 
 #[near_bindgen]
-impl Contract {
+impl ContractV1 {
     /// Change owner. Only can be called by owner.
     pub fn set_owner(&mut self, owner_id: ValidAccountId) {
         self.assert_owner();
@@ -64,7 +64,7 @@ impl Contract {
             exchange_fee: contract_v1.exchange_fee,
             referral_fee: contract_v1.referral_fee,
             pools: contract_v1.pools,
-            deposited_amounts: contract_v1.deposited_amounts,
+            accounts: contract_v1.deposited_amounts,
             whitelisted_tokens: UnorderedSet::new(b"w".to_vec()),
         }
     }

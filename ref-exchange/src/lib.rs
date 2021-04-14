@@ -6,9 +6,11 @@ use near_contract_standards::storage_management::{
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise};
+use near_sdk::{
+    assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise, StorageUsage,
+};
 
-use crate::account_deposit::AccountDeposit;
+use crate::account_deposit::{AccountDeposit, AccountDepositV1, INIT_ACCOUNT_STORAGE};
 pub use crate::action::*;
 use crate::errors::*;
 use crate::pool::Pool;
@@ -42,7 +44,7 @@ pub struct Contract {
     /// List of all the pools.
     pools: Vector<Pool>,
     /// Balances of deposited tokens for each account.
-    deposited_amounts: LookupMap<AccountId, AccountDeposit>,
+    accounts: LookupMap<AccountId, AccountDeposit>,
     /// Set of whitelisted tokens by "owner".
     whitelisted_tokens: UnorderedSet<AccountId>,
 }
@@ -56,15 +58,19 @@ impl Contract {
             exchange_fee,
             referral_fee,
             pools: Vector::new(b"p".to_vec()),
-            deposited_amounts: LookupMap::new(b"d".to_vec()),
+            accounts: LookupMap::new(b"d".to_vec()),
             whitelisted_tokens: UnorderedSet::new(b"w".to_vec()),
         }
     }
 
-    /// Adds new "Simple Pool" with given tokens and given fee.
-    /// Attached NEAR should be enough to cover the added storage.
+    /// Adds new "Simple Pool" with given tokens and given fee. The effective pool fee is
+    ///   `fee + exchange_fee + referralp_fee`.
+    /// This function doesn't set the initial price nor adds any liquidity to the pool. You must call the
+    /// `add_liquidity` for that.
+    /// Deposited NEAR must be enough to cover the added storage.
     #[payable]
     pub fn add_simple_pool(&mut self, tokens: Vec<ValidAccountId>, fee: u32) -> u64 {
+        assert_one_yocto();
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
@@ -101,7 +107,7 @@ impl Contract {
         U128(prev_amount.expect("ERR_AT_LEAST_ONE_SWAP"))
     }
 
-    /// Add liquidity from already deposited amounts to given pool.
+    /// Add liquidity from already deposited amounts to the given pool.
     #[payable]
     pub fn add_liquidity(
         &mut self,
@@ -110,6 +116,7 @@ impl Contract {
         min_amounts: Option<Vec<U128>>,
     ) {
         assert_one_yocto();
+        let start_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
@@ -121,20 +128,23 @@ impl Contract {
                 assert!(amount >= &min_amount.0, "ERR_MIN_AMOUNT");
             }
         }
-        let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
+        let mut acc = self.get_account(&sender_id);
         let tokens = pool.tokens();
-        // Subtract updated amounts from deposits. This will fail if there is not enough funds for any of the tokens.
+        // Subtract updated amounts from deposits. Fails if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
-            deposits.sub(&tokens[i], amounts[i]);
+            acc.sub(&tokens[i], amounts[i]);
         }
-        self.deposited_amounts.insert(&sender_id, &deposits);
         self.pools.replace(pool_id, &pool);
+        // Can create a new shares record in a pool
+        acc.update_storage(start_storage);
+        self.accounts.insert(&sender_id, &acc.into());
     }
 
-    /// Remove liquidity from the pool into general pool of liquidity.
+    /// Remove liquidity from the pool and transfer it into account deposit.
     #[payable]
     pub fn remove_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
         assert_one_yocto();
+        let start_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         let amounts = pool.remove_liquidity(
@@ -147,34 +157,35 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
+        let mut acc = self.get_account(&&sender_id);
         for i in 0..tokens.len() {
-            deposits.add(&tokens[i], amounts[i]);
+            acc.add(&tokens[i], amounts[i]);
         }
-        self.deposited_amounts.insert(&sender_id, &deposits);
+        // Can remove shares record in a pool
+        acc.update_storage(start_storage);
+        self.accounts.insert(&sender_id, &acc.into());
     }
 }
 
 /// Internal methods implementation.
 impl Contract {
+    /// loads the accoutn from self.accounts, updates the storage used and asserts that there is enough NEAR
+    /// balance to cover storage cost.
+    fn update_acc_storage(&mut self, tx_start_storage: StorageUsage) {
+        let from = env::predecessor_account_id();
+        let mut acc = self.get_account(&from);
+        acc.update_storage(tx_start_storage);
+        self.accounts.insert(&from, &acc.into());
+    }
+
     /// Adds given pool to the list and returns it's id.
     /// If there is not enough attached balance to cover storage, fails.
     /// If too much attached - refunds it back.
     fn internal_add_pool(&mut self, pool: Pool) -> u64 {
-        let prev_storage = env::storage_usage();
+        let start_storage = env::storage_usage();
         let id = self.pools.len() as u64;
         self.pools.push(&pool);
-
-        // Check how much storage cost and refund the left over back.
-        let storage_cost = (env::storage_usage() - prev_storage) as u128 * env::storage_byte_cost();
-        assert!(
-            storage_cost <= env::attached_deposit(),
-            "ERR_STORAGE_DEPOSIT"
-        );
-        let refund = env::attached_deposit() - storage_cost;
-        if refund > 0 {
-            Promise::new(env::predecessor_account_id()).transfer(refund);
-        }
+        self.update_acc_storage(start_storage);
         id
     }
 
@@ -190,8 +201,9 @@ impl Contract {
         min_amount_out: u128,
         referral_id: &Option<AccountId>,
     ) -> u128 {
-        let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
-        deposits.sub(token_in, amount_in);
+        let start_storage = env::storage_usage();
+        let mut acc = self.get_account(&sender_id);
+        acc.sub(token_in, amount_in); // NOTE: panics when there is not enough `token_in` deposit.
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         let amount_out = pool.swap(
             token_in,
@@ -201,9 +213,15 @@ impl Contract {
             &self.owner_id,
             referral_id,
         );
-        deposits.add(token_out, amount_out);
-        self.deposited_amounts.insert(&sender_id, &deposits);
+        acc.add(token_out, amount_out);
+        self.accounts.insert(&sender_id, &acc.into());
         self.pools.replace(pool_id, &pool);
+        // NOTE: this can cause changes in the deposits which increases an account storage (eg,
+        // if user doesn't have `token_out` in AccountDepoist, then a new record will be created).
+        // This is not a problem, because we compute the `AccountDepoist` storage consumption
+        // separaterly, hence we must do this update.
+        acc.update_storage(start_storage);
+        self.accounts.insert(&sender_id, &acc.into());
         amount_out
     }
 }
@@ -370,6 +388,18 @@ mod tests {
             None,
         );
         assert_eq!(contract.get_deposit(accounts(3), accounts(1)).0, 0);
+
+        // must work with NEAR deposits
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(100)
+            .build());
+        assert_eq!(
+            contract
+                .get_deposit(accounts(3), "".to_string().try_into().unwrap())
+                .0,
+            100
+        );
     }
 
     /// Test liquidity management.

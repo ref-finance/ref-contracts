@@ -5,29 +5,100 @@ use std::convert::TryInto;
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult};
+use near_sdk::{
+    assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult, StorageUsage,
+};
 
 use crate::utils::{ext_fungible_token, ext_self, GAS_FOR_FT_TRANSFER};
 use crate::*;
 
-const MAX_ACCOUNT_LENGTH: u128 = 64;
-const MIN_ACCOUNT_DEPOSIT_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4;
+const U128_STORAGE: StorageUsage = 16;
+/// bytes length of u64 values
+const U64_STORAGE: StorageUsage = 8;
+/// bytes length of u32 values. Used in length operations
+const U32_STORAGE: StorageUsage = 4;
+/// max length of account id * 8 (1 byte)
+const ACC_ID_STORAGE: StorageUsage = 64 * 8;
+// 64 = max account name length
+
+// ACC_ID: the Contract accounts map
+// + U128_STORAGE: near_amount storage
+// + U32_STORAGE: tokens HashMap length
+// + U64_STORAGE: storage_used
+// + 2: version
+pub const INIT_ACCOUNT_STORAGE: StorageUsage =
+    ACC_ID_STORAGE + U128_STORAGE + U32_STORAGE + 2 * U64_STORAGE + 2;
+
+// NEAR native token. This is not a valid token ID. HACK: NEAR is a native token, we use the
+// empty string we use it to reference not existing near account.
+// pub const NEAR: AccountId = "".to_string();
+
+#[derive(BorshDeserialize, BorshSerialize)]
+pub enum AccountDeposit {
+    V2(AccountDepositV2),
+}
+
+impl From<AccountDeposit> for AccountDepositV2 {
+    fn from(account: AccountDeposit) -> Self {
+        match account {
+            AccountDeposit::V2(a) => {
+                if a.storage_used > 0 {
+                    return a;
+                }
+                // migrate from V1
+                a.storage_used = U64_STORAGE;
+                a
+            }
+        }
+    }
+}
 
 /// Account deposits information and storage cost.
+/// Legacy version
 #[derive(BorshSerialize, BorshDeserialize, Default)]
 #[cfg_attr(feature = "test", derive(Clone))]
-pub struct AccountDeposit {
-    /// Native amount sent to the exchange.
-    /// Used for storage now, but in future can be used for trading as well.
-    pub amount: Balance,
+pub struct AccountDepositV1 {
+    /// NEAR sent to the exchange.
+    /// Used for storage and trading.
+    pub near_amount: Balance,
     /// Amounts of various tokens in this account.
     pub tokens: HashMap<AccountId, Balance>,
 }
 
-impl AccountDeposit {
+/// Account deposits information and storage cost.
+#[derive(BorshSerialize, BorshDeserialize, Default)]
+#[cfg_attr(feature = "test", derive(Clone))]
+pub struct AccountDepositV2 {
+    /// NEAR sent to the exchange.
+    /// Used for storage and trading.
+    pub near_amount: Balance,
+    /// Amounts of various tokens in this account.
+    pub tokens: HashMap<AccountId, Balance>,
+    pub storage_used: StorageUsage,
+}
+
+impl From<AccountDepositV2> for AccountDeposit {
+    fn from(a: AccountDepositV2) -> Self {
+        AccountDeposit::V2(a)
+    }
+}
+
+impl AccountDepositV2 {
+    pub fn new(account_id: &AccountId, near_amount: Balance) -> Self {
+        Self {
+            near_amount,
+            tokens: HashMap::default(),
+            // Here we manually compute the initial storage size of account deposit.
+            storage_used: U64_STORAGE,
+        }
+    }
+
     /// Adds amount to the balance of given token while checking that storage is covered.
     pub(crate) fn add(&mut self, token: &AccountId, amount: Balance) {
-        if let Some(x) = self.tokens.get_mut(token) {
+        if *token == "" {
+            // We use empty string to represent NEAR
+            self.near_amount += amount;
+        } else if let Some(x) = self.tokens.get_mut(token) {
             *x = *x + amount;
         } else {
             self.tokens.insert(token.clone(), amount);
@@ -38,38 +109,50 @@ impl AccountDeposit {
     /// Subtract from `token` balance.
     /// Panics if `amount` is bigger than the current balance.
     pub(crate) fn sub(&mut self, token: &AccountId, amount: Balance) {
+        if *token == "" {
+            // We use empty string to represent NEAR
+            self.near_amount -= amount;
+            self.assert_storage_usage();
+            return;
+        }
         let value = *self.tokens.get(token).expect(ERR21_TOKEN_NOT_REG);
         assert!(value >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
         self.tokens.insert(token.clone(), value - amount);
     }
 
-    /// Returns amount of $NEAR necessary to cover storage used by this data structure.
+    /// Returns amount of $NEAR necessary to cover storage used by account referenced to this structure.
     pub fn storage_usage(&self) -> Balance {
-        (MIN_ACCOUNT_DEPOSIT_LENGTH + self.tokens.len() as u128 * (MAX_ACCOUNT_LENGTH + 16))
-            * env::storage_byte_cost()
+        let s = self.storage_used
+            + INIT_ACCOUNT_STORAGE  // empty account storage
+            + (ACC_ID_STORAGE + U64_STORAGE) * self.tokens.len() as u64; // self.tokens storage
+        return s as Balance * env::storage_byte_cost();
     }
 
-    /// Returns how much NEAR is available for storage.
-    pub fn storage_available(&self) -> Balance {
-        self.amount - self.storage_usage()
+    /// Returns how much NEAR is available for storage and swaps.
+    #[inline]
+    pub(crate) fn storage_available(&self) -> Balance {
+        self.near_amount - self.storage_usage()
     }
 
     /// Asserts there is sufficient amount of $NEAR to cover storage usage.
+    #[inline]
     pub fn assert_storage_usage(&self) {
         assert!(
-            self.storage_usage() <= self.amount,
+            self.storage_usage() <= self.near_amount,
             "{}",
             ERR11_INSUFFICIENT_STORAGE
         );
     }
 
-    /// Returns minimal account deposit storage usage possible.
-    pub fn min_storage_usage() -> Balance {
-        MIN_ACCOUNT_DEPOSIT_LENGTH * env::storage_byte_cost()
+    /// Updates the account storage usage.
+    /// Panics if there is not enought $NEAR to cover storage usage.
+    pub(crate) fn update_storage(&mut self, tx_start_storage: StorageUsage) {
+        self.storage_used += env::storage_usage() - tx_start_storage;
+        self.assert_storage_usage();
     }
 
-    /// Registers given token and set balance to 0.
-    /// Fails if not enough amount to cover new storage usage.
+    /// Registers given `token_id` and set balance to 0.
+    /// Panics if there is not enought $NEAR to cover storage usage.
     pub(crate) fn register(&mut self, token_ids: &Vec<ValidAccountId>) {
         for token_id in token_ids {
             let t = token_id.as_ref();
@@ -90,24 +173,35 @@ impl AccountDeposit {
 
 #[near_bindgen]
 impl Contract {
+    /// Deposits attached NEAR into predecessor account deposits. The deposited near will be used
+    /// for trades and for storage. Predecessor account must be registered. Panics otherwise.
+    /// NOTE: this is a simplified and more direct version of `storage_deposit` function.
+    #[payable]
+    pub fn deposit_near(&mut self) {
+        let sender_id = env::predecessor_account_id();
+        let mut acc = self.get_account(&sender_id);
+        acc.near_amount += env::attached_deposit();
+        self.accounts.insert(&sender_id, &acc.into());
+    }
+
     /// Registers given token in the user's account deposit.
     /// Fails if not enough balance on this account to cover storage.
     pub fn register_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         let sender_id = env::predecessor_account_id();
-        let mut deposits = self.get_account_deposits(&sender_id);
-        deposits.register(&token_ids);
-        self.deposited_amounts.insert(&sender_id, &deposits);
+        let mut acc = self.get_account(&sender_id);
+        acc.register(&token_ids);
+        self.accounts.insert(&sender_id, &acc.into());
     }
 
     /// Unregister given token from user's account deposit.
     /// Panics if the balance of any given token is non 0.
     pub fn unregister_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         let sender_id = env::predecessor_account_id();
-        let mut deposits = self.get_account_deposits(&sender_id);
+        let mut deposits = self.get_account(&sender_id);
         for token_id in token_ids {
             deposits.unregister(token_id.as_ref());
         }
-        self.deposited_amounts.insert(&sender_id, &deposits);
+        self.accounts.insert(&sender_id, &deposits.into());
     }
 
     /// Withdraws given token from the deposits of given user.
@@ -119,13 +213,13 @@ impl Contract {
         let token_id: AccountId = token_id.into();
         let amount: u128 = amount.into();
         let sender_id = env::predecessor_account_id();
-        let mut deposits = self.get_account_deposits(&sender_id);
+        let mut deposits = self.get_account(&sender_id);
         // Note: subtraction and deregistration will be reverted if the promise fails.
         deposits.sub(&token_id, amount);
         if unregister == Some(true) {
             deposits.unregister(&token_id);
         }
-        self.deposited_amounts.insert(&sender_id, &deposits);
+        self.accounts.insert(&sender_id, &deposits.into());
         ext_fungible_token::ft_transfer(
             sender_id.clone().try_into().unwrap(),
             amount.into(),
@@ -162,9 +256,9 @@ impl Contract {
             PromiseResult::Successful(_) => {}
             PromiseResult::Failed => {
                 // This reverts the changes from withdraw function.
-                let mut deposits = self.get_account_deposits(&sender_id);
+                let mut deposits = self.get_account(&sender_id);
                 deposits.add(&token_id, amount.0);
-                self.deposited_amounts.insert(&sender_id, &deposits);
+                self.accounts.insert(&sender_id, &deposits.into());
             }
         };
     }
@@ -174,10 +268,14 @@ impl Contract {
     /// Registers account in deposited amounts with given amount of $NEAR.
     /// If account already exists, adds amount to it.
     /// This should be used when it's known that storage is prepaid.
-    pub(crate) fn internal_register_account(&mut self, account_id: &AccountId, amount: Balance) {
-        let mut deposit_amount = self.deposited_amounts.get(&account_id).unwrap_or_default();
-        deposit_amount.amount += amount;
-        self.deposited_amounts.insert(&account_id, &deposit_amount);
+    pub(crate) fn register_account(&mut self, account_id: &AccountId, amount: Balance) {
+        let acc = if let Some(mut account_deposit) = self.accounts.get(&account_id) {
+            account_deposit.near_amount += amount;
+            account_deposit
+        } else {
+            AccountDepositV2::new(account_id, amount)
+        };
+        self.accounts.insert(&account_id, &acc);
     }
 
     /// Record deposit of some number of tokens to this contract.
@@ -188,34 +286,49 @@ impl Contract {
         token_id: &AccountId,
         amount: Balance,
     ) {
-        let mut account_deposit = self.get_account_deposits(sender_id);
+        let mut acc = self.get_account(sender_id);
         assert!(
-            self.whitelisted_tokens.contains(token_id)
-                || account_deposit.tokens.contains_key(token_id),
+            self.whitelisted_tokens.contains(token_id) || acc.tokens.contains_key(token_id),
             "{}",
             ERR12_TOKEN_NOT_WHITELISTED
         );
-        account_deposit.add(token_id, amount);
-        self.deposited_amounts.insert(sender_id, &account_deposit);
+        acc.add(token_id, amount);
+        self.accounts.insert(sender_id, &acc.into());
     }
 
     // Returns `from` AccountDeposit.
     #[inline]
-    pub(crate) fn get_account_deposits(&self, from: &AccountId) -> AccountDeposit {
-        self.deposited_amounts
+    pub(crate) fn get_account(&self, from: &AccountId) -> AccountDepositV2 {
+        self.accounts
             .get(from)
             .expect(ERR10_ACC_NOT_REGISTERED)
+            .into()
     }
 
-    /// Returns current balance of given token for given user. If there is nothing recorded, returns 0.
-    pub(crate) fn internal_get_deposit(
+    pub(crate) fn get_account_option(&self, from: &AccountId) -> Option<AccountDepositV2> {
+        // let key = ("d".to_owned() + from).into_bytes();
+        // let data = env::storage_read(&key);
+        // if data == None {
+        //     return None;
+        // }
+        // let Some(data) = data;
+        // AccountDepositV1::Dese
+        // borsh::de::
+
+        self.accounts.get(from).and_then(|a| a.into())
+    }
+
+    /// Returns current balance of given token for given user. If token_id == "" then returns NEAR (native)
+    /// balance. If there is nothing recorded, returns 0.
+    pub(crate) fn get_deposit_balance(
         &self,
         sender_id: &AccountId,
         token_id: &AccountId,
     ) -> Balance {
-        self.deposited_amounts
-            .get(sender_id)
-            .and_then(|d| d.tokens.get(token_id).cloned())
-            .unwrap_or_default()
+        let acc = self.get_account(sender_id);
+        if token_id == "" {
+            return acc.near_amount;
+        }
+        *acc.tokens.get(token_id).unwrap_or(&0)
     }
 }

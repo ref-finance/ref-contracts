@@ -89,7 +89,7 @@ impl Contract {
     /// Returns balances of the deposits for given user outside of any pools.
     /// Returns empty list if no tokens deposited.
     pub fn get_deposits(&self, account_id: ValidAccountId) -> HashMap<AccountId, U128> {
-        self.deposited_amounts
+        self.accounts
             .get(account_id.as_ref())
             .map(|d| {
                 d.tokens
@@ -102,7 +102,7 @@ impl Contract {
 
     /// Returns balance of the deposit for given user outside of any pools.
     pub fn get_deposit(&self, account_id: ValidAccountId, token_id: ValidAccountId) -> U128 {
-        self.internal_get_deposit(account_id.as_ref(), token_id.as_ref())
+        self.get_deposit_balance(account_id.as_ref(), token_id.as_ref())
             .into()
     }
 
@@ -126,7 +126,7 @@ impl Contract {
 
     /// Get specific user whitelisted tokens.
     pub fn get_user_whitelisted_tokens(&self, account_id: &AccountId) -> Vec<AccountId> {
-        self.deposited_amounts
+        self.accounts
             .get(&account_id)
             .map(|d| d.tokens.keys().cloned().collect())
             .unwrap_or_default()
