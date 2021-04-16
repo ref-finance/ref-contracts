@@ -15,12 +15,13 @@ impl StorageManagement for Contract {
             .unwrap_or_else(|| env::predecessor_account_id());
         let registration_only = registration_only.unwrap_or(false);
         let min_balance = self.storage_balance_bounds().min.0;
-        if amount < min_balance && registration_only {
+        let already_registered = self.deposited_amounts.contains_key(&account_id);
+        if amount < min_balance && !already_registered {
             env::panic(b"ERR_DEPOSIT_LESS_THAN_MIN_STORAGE");
         }
         if registration_only {
             // Registration only setups the account but doesn't leave space for tokens.
-            if self.deposited_amounts.contains_key(&account_id) {
+            if already_registered {
                 log!("ERR_ACC_REGISTERED");
                 if amount > 0 {
                     Promise::new(env::predecessor_account_id()).transfer(amount);

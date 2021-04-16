@@ -22,9 +22,9 @@ mod account_deposit;
 mod action;
 mod errors;
 mod legacy;
+mod multi_fungible_token;
 mod owner;
 mod pool;
-mod shares;
 mod simple_pool;
 mod storage_impl;
 mod token_receiver;
@@ -316,6 +316,7 @@ mod tests {
                 (accounts(2), to_yocto("100")),
             ],
         );
+        deposit_tokens(&mut context, &mut contract, accounts(1), vec![]);
 
         assert_eq!(
             contract.get_deposit(accounts(3), accounts(1)),
@@ -353,10 +354,18 @@ mod tests {
             contract.get_deposit(accounts(3), accounts(1)).0,
             99 * one_near
         );
+        // transfer some of token_id 2 from acc 3 to acc 1.
+        testing_env!(context.predecessor_account_id(accounts(3)).build());
+        contract.mft_transfer(accounts(2).to_string(), accounts(1), U128(one_near), None);
         assert_eq!(
             contract.get_deposit(accounts(3), accounts(2)).0,
-            100 * one_near + amount_out.0
+            99 * one_near + amount_out.0
         );
+        assert_eq!(contract.get_deposit(accounts(1), accounts(2)).0, one_near);
+
+        testing_env!(context.predecessor_account_id(accounts(3)).build());
+        // transfer 1m shares in pool 0 to acc 1.
+        contract.mft_transfer("0".to_string(), accounts(1), U128(1_000_000), None);
 
         testing_env!(context.predecessor_account_id(accounts(3)).build());
         contract.remove_liquidity(
@@ -364,8 +373,11 @@ mod tests {
             contract.get_pool_shares(0, accounts(3)),
             vec![1.into(), 2.into()],
         );
-        // Exchange fees left in the pool as liquidity.
-        assert_eq!(contract.get_pool_total_shares(0).0, 33337501041992301475);
+        // Exchange fees left in the pool as liquidity + 1m from transfer.
+        assert_eq!(
+            contract.get_pool_total_shares(0).0,
+            33337501041992301475 + 1_000_000
+        );
 
         contract.withdraw(
             accounts(1),
