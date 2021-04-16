@@ -5,6 +5,7 @@ use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance};
 
+use crate::errors::{ERR31_ZERO_AMOUNT, ERR32_ZERO_SHARES};
 use crate::utils::{
     add_to_collection, integer_sqrt, SwapVolume, FEE_DIVISOR, INIT_SHARES_SUPPLY, U256,
 };
@@ -103,7 +104,7 @@ impl SimplePool {
         let shares = if self.shares_total_supply > 0 {
             let mut fair_supply = U256::max_value();
             for i in 0..self.token_account_ids.len() {
-                assert!(amounts[i] > 0, "ERR_AMOUNT_ZERO");
+                assert!(amounts[i] > 0, ERR31_ZERO_AMOUNT);
                 fair_supply = min(
                     fair_supply,
                     U256::from(amounts[i]) * U256::from(self.shares_total_supply) / self.amounts[i],
@@ -113,6 +114,7 @@ impl SimplePool {
                 let amount = (U256::from(self.amounts[i]) * fair_supply
                     / U256::from(self.shares_total_supply))
                 .as_u128();
+                assert!(amount > 0, ERR31_ZERO_AMOUNT);
                 self.amounts[i] += amount;
                 amounts[i] = amount;
             }
@@ -124,6 +126,7 @@ impl SimplePool {
             INIT_SHARES_SUPPLY
         };
         self.mint_shares(&sender_id, shares);
+        assert!(shares > 0, ERR32_ZERO_SHARES);
         env::log(
             format!(
                 "Liquidity added {:?}, minted {} shares",
@@ -386,5 +389,23 @@ mod tests {
         let liq2 = pool.remove_liquidity(accounts(3).as_ref(), num_shares2, vec![1, 1]);
         assert_eq!(liq1[0] + liq2[0], to_yocto("6"));
         assert_eq!(liq1[1] + liq2[1], to_yocto("10") - out);
+    }
+
+    #[test]
+    #[should_panic(expected = "E31: adding zero amount")]
+    fn test_rounding() {
+        testing_env!(VMContextBuilder::new().build());
+        let mut pool = SimplePool {
+            token_account_ids: vec![accounts(0).to_string(), accounts(1).to_string()],
+            amounts: vec![367701466208080431008668441, 2267116519548219219535],
+            volumes: vec![SwapVolume::default(), SwapVolume::default()],
+            total_fee: 30,
+            exchange_fee: 5,
+            referral_fee: 1,
+            shares_total_supply: 35967818779820559673547466,
+            shares: LookupMap::new(b"s0".to_vec()),
+        };
+        let mut amounts = vec![145782, 1];
+        let shares = pool.add_liquidity(&accounts(2).to_string(), &mut amounts);
     }
 }
