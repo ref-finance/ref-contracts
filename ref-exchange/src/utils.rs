@@ -21,7 +21,7 @@ pub const GAS_FOR_FT_TRANSFER: Gas = 10_000_000_000_000;
 pub const GAS_FOR_UPGRADE_CALL: Gas = 50_000_000_000_000;
 
 /// Amount of gas for deploy action.
-pub const GAS_FOR_DEPLOY_CALL: Gas = 5_000_000_000_000;
+pub const GAS_FOR_DEPLOY_CALL: Gas = 20_000_000_000_000;
 
 /// Fee divisor, allowing to provide fee in bps.
 pub const FEE_DIVISOR: u32 = 10_000;

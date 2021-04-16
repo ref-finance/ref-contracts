@@ -64,24 +64,13 @@ impl SimplePool {
     }
 
     /// Transfers shares from predecessor to receiver.
-    pub fn share_transfer(&mut self, receiver_id: &AccountId, amount: u128) {
-        let account_id = env::predecessor_account_id();
-        self.share_withdraw(&account_id, amount);
-        self.share_deposit(receiver_id, amount);
-    }
-
-    /// Withdraws shares from the given account.
-    pub fn share_withdraw(&mut self, sender_id: &AccountId, amount: u128) {
+    pub fn share_transfer(&mut self, sender_id: &AccountId, receiver_id: &AccountId, amount: u128) {
         let balance = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
         if let Some(new_balance) = balance.checked_sub(amount) {
             self.shares.insert(&sender_id, &new_balance);
         } else {
             env::panic(b"ERR_NOT_ENOUGH_SHARES");
         }
-    }
-
-    /// Deposit shares to the receiver account.
-    pub fn share_deposit(&mut self, receiver_id: &AccountId, amount: u128) {
         // TODO: add charging for storage.
         // TODO: handle returns from callback.
         let balance_out = self.shares.get(&receiver_id).unwrap_or(0);
@@ -347,7 +336,11 @@ mod tests {
             pool.share_balance_of(accounts(0).as_ref()),
             INIT_SHARES_SUPPLY
         );
-        pool.share_transfer(accounts(1).as_ref(), INIT_SHARES_SUPPLY / 2);
+        pool.share_transfer(
+            accounts(0).as_ref(),
+            accounts(1).as_ref(),
+            INIT_SHARES_SUPPLY / 2,
+        );
         assert_eq!(
             pool.share_balance_of(accounts(0).as_ref()),
             INIT_SHARES_SUPPLY / 2

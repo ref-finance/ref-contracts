@@ -52,7 +52,7 @@ impl Contract {
         match parse_token_id(token_id) {
             TokenOrPool::Pool(pool_id) => {
                 let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
-                pool.share_transfer(receiver_id, amount);
+                pool.share_transfer(sender_id, receiver_id, amount);
                 self.pools.replace(pool_id, &pool);
                 log!(
                     "Transfer shares {} pool: {} from {} to {}",

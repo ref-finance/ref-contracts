@@ -106,21 +106,9 @@ impl Pool {
         }
     }
 
-    pub fn share_transfer(&mut self, receiver_id: &AccountId, amount: u128) {
+    pub fn share_transfer(&mut self, sender_id: &AccountId, receiver_id: &AccountId, amount: u128) {
         match self {
-            Pool::SimplePool(pool) => pool.share_transfer(receiver_id, amount),
-        }
-    }
-
-    pub fn share_withdraw(&mut self, sender_id: &AccountId, amount: u128) {
-        match self {
-            Pool::SimplePool(pool) => pool.share_withdraw(sender_id, amount),
-        }
-    }
-
-    pub fn share_deposit(&mut self, receiver_id: &AccountId, amount: u128) {
-        match self {
-            Pool::SimplePool(pool) => pool.share_deposit(receiver_id, amount),
+            Pool::SimplePool(pool) => pool.share_transfer(sender_id, receiver_id, amount),
         }
     }
 }
