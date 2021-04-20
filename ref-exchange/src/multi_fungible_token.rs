@@ -41,7 +41,7 @@ fn parse_token_id(token_id: String) -> TokenOrPool {
 
 #[near_bindgen]
 impl Contract {
-    pub fn internal_transfer(
+    fn internal_transfer(
         &mut self,
         token_id: String,
         sender_id: &AccountId,

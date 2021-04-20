@@ -406,6 +406,6 @@ mod tests {
             shares: LookupMap::new(b"s0".to_vec()),
         };
         let mut amounts = vec![145782, 1];
-        let shares = pool.add_liquidity(&accounts(2).to_string(), &mut amounts);
+        let _ = pool.add_liquidity(&accounts(2).to_string(), &mut amounts);
     }
 }
