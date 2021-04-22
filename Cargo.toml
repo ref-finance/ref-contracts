@@ -1,7 +1,8 @@
 [workspace]
 members = [
     "./ref-exchange",
-    "./test-token"
+    "./test-token",
+    "./ref-farming"
 ]
 
 
