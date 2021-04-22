@@ -1,5 +1,5 @@
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{ext_contract, near_bindgen, PromiseOrValue};
+use near_sdk::{ext_contract, near_bindgen, Balance, PromiseOrValue};
 
 use crate::utils::{GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_RESOLVE_TRANSFER, NO_DEPOSIT};
 use crate::*;
@@ -41,7 +41,7 @@ fn parse_token_id(token_id: String) -> TokenOrPool {
 
 #[near_bindgen]
 impl Contract {
-    fn internal_transfer(
+    fn internal_mft_transfer(
         &mut self,
         token_id: String,
         sender_id: &AccountId,
@@ -90,6 +90,34 @@ impl Contract {
         }
     }
 
+    fn internal_mft_balance(&self, token_id: String, account_id: &AccountId) -> Balance {
+        match parse_token_id(token_id) {
+            TokenOrPool::Pool(pool_id) => {
+                let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+                pool.share_balances(account_id)
+            }
+            TokenOrPool::Token(token_id) => self.internal_get_deposit(account_id, &token_id),
+        }
+    }
+
+    /// Returns the balance of the given account. If the account doesn't exist will return `"0"`.
+    pub fn mft_balance_of(&self, token_id: String, account_id: ValidAccountId) -> U128 {
+        self.internal_mft_balance(token_id, account_id.as_ref())
+            .into()
+    }
+
+    /// Returns the total supply of the given token, if the token is one of the pools.
+    /// If token references external token - fails with unimplemented.
+    pub fn mft_total_supply(&self, token_id: String) -> U128 {
+        match parse_token_id(token_id) {
+            TokenOrPool::Pool(pool_id) => {
+                let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+                U128(pool.share_total_balance())
+            }
+            TokenOrPool::Token(_token_id) => unimplemented!(),
+        }
+    }
+
     /// Transfer one of internal tokens: LP or balances.
     /// `token_id` can either by account of the token or pool number.
     #[payable]
@@ -101,7 +129,7 @@ impl Contract {
         memo: Option<String>,
     ) {
         assert_one_yocto();
-        self.internal_transfer(
+        self.internal_mft_transfer(
             token_id,
             &env::predecessor_account_id(),
             receiver_id.as_ref(),
@@ -121,7 +149,7 @@ impl Contract {
     ) -> PromiseOrValue<U128> {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
-        self.internal_transfer(
+        self.internal_mft_transfer(
             token_id.clone(),
             &sender_id,
             receiver_id.as_ref(),
@@ -149,6 +177,9 @@ impl Contract {
         .into()
     }
 
+    /// Returns how much was refunded back to the sender.
+    /// If sender removed account in the meantime, the tokens are sent to the owner account.
+    /// Tokens are never burnt.
     #[private]
     pub fn mft_resolve_transfer(
         &mut self,
@@ -168,17 +199,20 @@ impl Contract {
             }
             PromiseResult::Failed => amount.0,
         };
-        // TODO: handle storage / account removal / etc.
         if unused_amount > 0 {
-            self.internal_transfer(
-                token_id,
-                &receiver_id,
-                &sender_id,
-                amount.0 - unused_amount,
-                None,
-            );
+            let receiver_balance = self.internal_mft_balance(token_id.clone(), &receiver_id);
+            if receiver_balance > 0 {
+                let refund_amount = std::cmp::min(receiver_balance, unused_amount);
+                // If sender's account was deleted, we assume that they have also withdrew all the liquidity from pools.
+                // Funds are sent to the owner account.
+                let refund_to = if self.deposited_amounts.get(&sender_id).is_some() {
+                    sender_id
+                } else {
+                    self.owner_id.clone()
+                };
+                self.internal_mft_transfer(token_id, &receiver_id, &refund_to, refund_amount, None);
+            }
         }
-        // Returns burnt amount.
-        U128(0)
+        U128(unused_amount)
     }
 }

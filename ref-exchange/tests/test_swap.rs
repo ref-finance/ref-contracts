@@ -117,6 +117,12 @@ fn test_swap() {
             shares_total_supply: to_yocto("1").into(),
         }
     );
+    assert_eq!(
+        view!(pool.mft_balance_of("0".to_string(), to_va(root.account_id.clone())))
+            .unwrap_json::<U128>()
+            .0,
+        to_yocto("1")
+    );
     let balances = view!(pool.get_deposits(to_va(root.account_id.clone())))
         .unwrap_json::<HashMap<AccountId, U128>>();
     let balances = balances.values().cloned().collect::<Vec<_>>();
