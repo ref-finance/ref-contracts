@@ -17,17 +17,15 @@ const U128_STORAGE: StorageUsage = 16;
 const U64_STORAGE: StorageUsage = 8;
 /// bytes length of u32 values. Used in length operations
 const U32_STORAGE: StorageUsage = 4;
-/// max length of account id * 8 (1 byte)
-const ACC_ID_STORAGE: StorageUsage = 64 * 8;
-// 64 = max account name length
+/// max length of account id is 64 bytes. We charge per byte.
+const ACC_ID_STORAGE: StorageUsage = 64;
 
 // ACC_ID: the Contract accounts map
 // + U128_STORAGE: near_amount storage
 // + U32_STORAGE: tokens HashMap length
 // + U64_STORAGE: storage_used
-// + 2: version
 pub const INIT_ACCOUNT_STORAGE: StorageUsage =
-    ACC_ID_STORAGE + U128_STORAGE + U32_STORAGE + 2 * U64_STORAGE + 2;
+    ACC_ID_STORAGE + U128_STORAGE + U32_STORAGE + 2 * U64_STORAGE;
 
 // NEAR native token. This is not a valid token ID. HACK: NEAR is a native token, we use the
 // empty string we use it to reference not existing near account.
