@@ -3,6 +3,7 @@ use near_sdk::{env, near_bindgen, Promise};
 
 use simple_farm::{SimpleFarm, HRSimpleFarmTerms};
 use crate::utils::{gen_farmid};
+use crate::errors::*;
 use crate::*;
 
 
@@ -16,11 +17,12 @@ impl Contract {
 
         let farm_id = self.internal_add_farm(&terms);
 
+        let storage_needed = env::storage_usage() - prev_storage;
         // Check how much storage cost and refund the left over back.
-        let storage_cost = (env::storage_usage() - prev_storage) as u128 * env::storage_byte_cost();
+        let storage_cost = storage_needed as u128 * env::storage_byte_cost();
         assert!(
             storage_cost <= env::attached_deposit(),
-            "ERR_STORAGE_DEPOSIT"
+            "{}: {}", ERR11_INSUFFICIENT_STORAGE, storage_needed
         );
         let refund = env::attached_deposit() - storage_cost;
         if refund > 0 {

@@ -1,7 +1,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, Balance};
 
-use crate::simple_farm::{SimpleFarm};
+use crate::simple_farm::{SimpleFarm, SimpleFarmRewardDistribution};
 use crate::SeedId;
 
 pub(crate) type FarmId = String;
@@ -63,11 +63,11 @@ impl Farm {
         }
     }
 
-    pub fn update_farm_reward(&mut self, total_seeds: &Balance) {
-        match self {
-            Farm::SimpleFarm(farm) => farm.distribute(total_seeds),
-        }
-    }
+    // pub fn update_farm_reward(&mut self, total_seeds: &Balance) {
+    //     match self {
+    //         Farm::SimpleFarm(farm) => farm.distribute(total_seeds),
+    //     }
+    // }
 
     /// return (user_rps, reward_amount) 
     pub fn claim_user_reward(&mut self, 
@@ -77,6 +77,13 @@ impl Farm {
         match self {
             Farm::SimpleFarm(farm) 
                 => farm.claim_user_reward(user_rps, user_seeds, total_seeds),
+        }
+    }
+
+    pub fn get_farm_dis(&self) -> SimpleFarmRewardDistribution {
+        match self {
+            Farm::SimpleFarm(farm) 
+                => farm.last_distribution.clone(),
         }
     }
 }

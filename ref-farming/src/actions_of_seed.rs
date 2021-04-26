@@ -174,21 +174,23 @@ impl Contract {
         amount: Balance, 
         seed_type: SeedType) {
 
-        let mut farm_seed = self.seeds.get(seed_id).unwrap_or(FarmSeed::new(seed_id));
-        let mut farmer = self.farmers.get(sender_id).expect(&format!("{}", ERR10_ACC_NOT_REGISTERED));
-
         // first claim all reward of the user for this seed farms 
         // to update user reward_per_seed in each farm 
         self.internal_claim_user_reward_by_seedid(sender_id, seed_id);
 
-        // // if this is the very first deposit of seed, reset start_at of farm
-        // farm_seed.first_farmer_in();
-
+        let mut farm_seed = self.seeds.get(seed_id).unwrap_or(FarmSeed::new(seed_id));
         farm_seed.seed_type = seed_type;
         farm_seed.add_amount(amount);
-        farmer.add_seed(&seed_id, amount);
         self.seeds.insert(&seed_id, &farm_seed);
+
+        let mut farmer = self.farmers.get(sender_id).expect(&format!("{}", ERR10_ACC_NOT_REGISTERED));
+        farmer.add_seed(&seed_id, amount);
         self.farmers.insert(sender_id, &farmer);
+
+        // // debug
+        // let dbg_user_rps = self.farmers.get(sender_id).unwrap().get_rps(&String::from("bob#0"));
+        // let dbg_dis = self.seeds.get(&String::from("bob")).unwrap().get_farm_dis(0);
+        // println!("farm [rps:{}, rr:{}, user_rps:{}",dbg_dis.rps, dbg_dis.rr, dbg_user_rps);
     }
 
     fn internal_seed_withdraw(
@@ -197,12 +199,12 @@ impl Contract {
         sender_id: &AccountId, 
         amount: Balance) -> SeedType {
         
-        let mut farm_seed = self.seeds.get(seed_id).expect(&format!("{}", ERR31_SEED_NOT_EXIST));
-        let mut farmer = self.farmers.get(sender_id).expect(&format!("{}", ERR10_ACC_NOT_REGISTERED));
-
         // first claim all reward of the user for this seed farms 
         // to update user reward_per_seed in each farm
         self.internal_claim_user_reward_by_seedid(sender_id, seed_id);
+
+        let mut farm_seed = self.seeds.get(seed_id).expect(&format!("{}", ERR31_SEED_NOT_EXIST));
+        let mut farmer = self.farmers.get(sender_id).expect(&format!("{}", ERR10_ACC_NOT_REGISTERED));
 
         // Then update user seed and total seed of this LPT
         let farmer_seed_remain = farmer.sub_seed(seed_id, amount);

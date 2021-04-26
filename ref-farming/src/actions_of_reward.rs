@@ -104,6 +104,7 @@ fn claim_user_reward_from_farm(
             )
             .as_bytes(),
         );
+        // println!("[debug_test]user_rps@{} increased to {}", farm.get_farm_id(), new_user_rps);
         farmer.set_rps(&farm.get_farm_id(), new_user_rps);
         if reward_amount > 0 {
             farmer.add_reward(&farm.get_reward_token(), reward_amount);
@@ -134,7 +135,9 @@ impl Contract {
                     farm, 
                     &mut farmer,  
                     &farm_seed.amount);
+                // println!("[debug_test] {} user_rps@{}={}", sender_id, farm.get_farm_id(), farmer.get_rps(&farm.get_farm_id()));
             }
+            
             self.seeds.insert(seed_id, &farm_seed);
             self.farmers.insert(sender_id, &farmer);
         }
@@ -154,6 +157,7 @@ impl Contract {
                     farm, 
                     &mut farmer, 
                     &farm_seed.amount);
+                // println!("[debug_test] {} user_rps@{}={}", sender_id, farm.get_farm_id(), farmer.get_rps(&farm.get_farm_id()));
                 self.seeds.insert(&seed_id, &farm_seed);
                 self.farmers.insert(sender_id, &farmer);
             }

@@ -4,6 +4,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{env, Balance};
 use crate::errors::*;
 use crate::farm::Farm;
+use crate::simple_farm::SimpleFarmRewardDistribution;
 
 const MAX_ACCOUNT_LENGTH: u128 = 64;
 
@@ -64,6 +65,11 @@ impl FarmSeed {
     pub fn storage_usage(&self) -> Balance {
         (MAX_ACCOUNT_LENGTH + 16) * (self.xfarms.len() as u128)
             * env::storage_byte_cost()
+    }
+
+    /// for debug
+    pub fn get_farm_dis(&self, index: usize) -> SimpleFarmRewardDistribution {
+        self.xfarms.get(index).unwrap().get_farm_dis()
     }
 }
 

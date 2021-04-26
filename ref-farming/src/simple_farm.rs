@@ -203,6 +203,8 @@ impl SimpleFarm {
             return 0;
         }
         if let Some(dis) = self.try_distribute(total_seeds) {
+            // println!("[debug_test] {} read last.RPS {} and last.RR = #{}", self.farm_id, self.last_distribution.rps, self.last_distribution.rr);
+            // println!("[debug_test]user_seeds:{}, rr:{}, rps:{}, user_rps:{}", user_seeds, dis.rr, dis.rps, user_rps);
             (U256::from(*user_seeds) 
             * U256::from(dis.rps - user_rps) 
             / U256::from(DENOM)).as_u128()
@@ -219,6 +221,8 @@ impl SimpleFarm {
         if let Some(dis) = self.try_distribute(total_seeds) {
             if self.last_distribution.rr != dis.rr {
                 self.last_distribution = dis.clone();
+                // println!("[debug_test] {} RPS increased to {} and RR update to #{}", self.farm_id, dis.rps, dis.rr);
+                // println!("[debug_test] {} RPS increased to {} and RR update to #{}", self.farm_id, self.last_distribution.rps, self.last_distribution.rr);
                 env::log(
                     format!(
                         "{} RPS increased to {} and RR update to #{}",
