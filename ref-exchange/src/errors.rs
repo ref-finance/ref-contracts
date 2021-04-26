@@ -12,3 +12,8 @@ pub const ERR22_NOT_ENOUGH_TOKENS: &str = "E22: not enough tokens in deposit";
 pub const ERR24_NON_ZERO_TOKEN_BALANCE: &str = "E24: non-zero token balance";
 pub const ERR25_CALLBACK_POST_WITHDRAW_INVALID: &str =
     "E25: expected 1 promise result from withdraw";
+
+// Liquidity operations //
+
+pub const ERR31_ZERO_AMOUNT: &str = "E31: adding zero amount";
+pub const ERR32_ZERO_SHARES: &str = "E32: minting zero shares";

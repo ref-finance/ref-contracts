@@ -7,7 +7,7 @@ use near_sdk_sim::{deploy, init_simulator, to_yocto};
 use ref_exchange::ContractContract as Exchange;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_v1.wasm",
+    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_local.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange_local.wasm",
 }
 

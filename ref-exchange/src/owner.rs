@@ -2,7 +2,6 @@
 
 use crate::*;
 
-use crate::legacy::ContractV1;
 use crate::utils::{GAS_FOR_DEPLOY_CALL, GAS_FOR_UPGRADE_CALL};
 
 #[near_bindgen]
@@ -54,19 +53,12 @@ impl Contract {
         promise
     }
 
-    /// Migration function from v1 to v2.
+    /// Migration function from v2 to v2.
     /// For next version upgrades, change this function.
     #[init(ignore_state)]
     pub fn migrate() -> Self {
-        let contract_v1: ContractV1 = env::state_read().expect("ERR_NOT_INITIALIZED");
-        Self {
-            owner_id: contract_v1.owner_id,
-            exchange_fee: contract_v1.exchange_fee,
-            referral_fee: contract_v1.referral_fee,
-            pools: contract_v1.pools,
-            deposited_amounts: contract_v1.deposited_amounts,
-            whitelisted_tokens: UnorderedSet::new(b"w".to_vec()),
-        }
+        let contract: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
+        contract
     }
 
     pub(crate) fn assert_owner(&self) {

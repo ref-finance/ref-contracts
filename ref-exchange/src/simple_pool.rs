@@ -5,6 +5,7 @@ use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance};
 
+use crate::errors::{ERR31_ZERO_AMOUNT, ERR32_ZERO_SHARES};
 use crate::utils::{
     add_to_collection, integer_sqrt, SwapVolume, FEE_DIVISOR, INIT_SHARES_SUPPLY, U256,
 };
@@ -63,8 +64,22 @@ impl SimplePool {
         }
     }
 
-    /// Returns
-    pub fn share_balances(&self, account_id: &AccountId) -> Balance {
+    /// Transfers shares from predecessor to receiver.
+    pub fn share_transfer(&mut self, sender_id: &AccountId, receiver_id: &AccountId, amount: u128) {
+        let balance = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
+        if let Some(new_balance) = balance.checked_sub(amount) {
+            self.shares.insert(&sender_id, &new_balance);
+        } else {
+            env::panic(b"ERR_NOT_ENOUGH_SHARES");
+        }
+        // TODO: add charging for storage.
+        // TODO: handle returns from callback.
+        let balance_out = self.shares.get(&receiver_id).unwrap_or(0);
+        self.shares.insert(&receiver_id, &(balance_out + amount));
+    }
+
+    /// Returns balance of shares for given user.
+    pub fn share_balance_of(&self, account_id: &AccountId) -> Balance {
         self.shares.get(account_id).unwrap_or_default()
     }
 
@@ -89,7 +104,7 @@ impl SimplePool {
         let shares = if self.shares_total_supply > 0 {
             let mut fair_supply = U256::max_value();
             for i in 0..self.token_account_ids.len() {
-                assert!(amounts[i] > 0, "ERR_AMOUNT_ZERO");
+                assert!(amounts[i] > 0, ERR31_ZERO_AMOUNT);
                 fair_supply = min(
                     fair_supply,
                     U256::from(amounts[i]) * U256::from(self.shares_total_supply) / self.amounts[i],
@@ -99,6 +114,7 @@ impl SimplePool {
                 let amount = (U256::from(self.amounts[i]) * fair_supply
                     / U256::from(self.shares_total_supply))
                 .as_u128();
+                assert!(amount > 0, ERR31_ZERO_AMOUNT);
                 self.amounts[i] += amount;
                 amounts[i] = amount;
             }
@@ -110,6 +126,7 @@ impl SimplePool {
             INIT_SHARES_SUPPLY
         };
         self.mint_shares(&sender_id, shares);
+        assert!(shares > 0, ERR32_ZERO_SHARES);
         env::log(
             format!(
                 "Liquidity added {:?}, minted {} shares",
@@ -307,7 +324,7 @@ mod tests {
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
         assert_eq!(
-            pool.share_balances(accounts(0).as_ref()),
+            pool.share_balance_of(accounts(0).as_ref()),
             INIT_SHARES_SUPPLY
         );
         let out = pool.swap(
@@ -316,15 +333,28 @@ mod tests {
             accounts(2).as_ref(),
             1,
             accounts(3).as_ref(),
-            Some(accounts(4).as_ref().clone()),
+            &None,
         );
         assert_eq!(
-            pool.share_balances(accounts(0).as_ref()),
+            pool.share_balance_of(accounts(0).as_ref()),
             INIT_SHARES_SUPPLY
         );
+        pool.share_transfer(
+            accounts(0).as_ref(),
+            accounts(1).as_ref(),
+            INIT_SHARES_SUPPLY / 2,
+        );
         assert_eq!(
-            pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1]),
-            [6 * one_near, 10 * one_near - out]
+            pool.share_balance_of(accounts(0).as_ref()),
+            INIT_SHARES_SUPPLY / 2
+        );
+        assert_eq!(
+            pool.share_balance_of(accounts(1).as_ref()),
+            INIT_SHARES_SUPPLY / 2
+        );
+        assert_eq!(
+            pool.remove_liquidity(accounts(0).as_ref(), num_shares / 2, vec![1, 1]),
+            [3 * one_near, 5 * one_near - out / 2]
         );
     }
 
@@ -339,7 +369,7 @@ mod tests {
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
         assert_eq!(
-            pool.share_balances(accounts(0).as_ref()),
+            pool.share_balance_of(accounts(0).as_ref()),
             INIT_SHARES_SUPPLY
         );
         let out = pool.swap(
@@ -348,16 +378,34 @@ mod tests {
             accounts(2).as_ref(),
             1,
             accounts(3).as_ref(),
-            Some(accounts(4).as_ref().clone()),
+            &None,
         );
         assert_eq!(
-            pool.share_balances(accounts(0).as_ref()),
+            pool.share_balance_of(accounts(0).as_ref()),
             INIT_SHARES_SUPPLY
         );
         let liq1 = pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1]);
-        let num_shares2 = pool.share_balances(accounts(3).as_ref());
+        let num_shares2 = pool.share_balance_of(accounts(3).as_ref());
         let liq2 = pool.remove_liquidity(accounts(3).as_ref(), num_shares2, vec![1, 1]);
         assert_eq!(liq1[0] + liq2[0], to_yocto("6"));
         assert_eq!(liq1[1] + liq2[1], to_yocto("10") - out);
+    }
+
+    #[test]
+    #[should_panic(expected = "E31: adding zero amount")]
+    fn test_rounding() {
+        testing_env!(VMContextBuilder::new().build());
+        let mut pool = SimplePool {
+            token_account_ids: vec![accounts(0).to_string(), accounts(1).to_string()],
+            amounts: vec![367701466208080431008668441, 2267116519548219219535],
+            volumes: vec![SwapVolume::default(), SwapVolume::default()],
+            total_fee: 30,
+            exchange_fee: 5,
+            referral_fee: 1,
+            shares_total_supply: 35967818779820559673547466,
+            shares: LookupMap::new(b"s0".to_vec()),
+        };
+        let mut amounts = vec![145782, 1];
+        let _ = pool.add_liquidity(&accounts(2).to_string(), &mut amounts);
     }
 }

@@ -6,7 +6,9 @@ use near_contract_standards::storage_management::{
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise};
+use near_sdk::{
+    assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise, PromiseResult,
+};
 
 use crate::account_deposit::AccountDeposit;
 pub use crate::action::*;
@@ -20,6 +22,7 @@ mod account_deposit;
 mod action;
 mod errors;
 mod legacy;
+mod multi_fungible_token;
 mod owner;
 mod pool;
 mod simple_pool;
@@ -313,6 +316,7 @@ mod tests {
                 (accounts(2), to_yocto("100")),
             ],
         );
+        deposit_tokens(&mut context, &mut contract, accounts(1), vec![]);
 
         assert_eq!(
             contract.get_deposit(accounts(3), accounts(1)),
@@ -350,10 +354,18 @@ mod tests {
             contract.get_deposit(accounts(3), accounts(1)).0,
             99 * one_near
         );
+        // transfer some of token_id 2 from acc 3 to acc 1.
+        testing_env!(context.predecessor_account_id(accounts(3)).build());
+        contract.mft_transfer(accounts(2).to_string(), accounts(1), U128(one_near), None);
         assert_eq!(
             contract.get_deposit(accounts(3), accounts(2)).0,
-            100 * one_near + amount_out.0
+            99 * one_near + amount_out.0
         );
+        assert_eq!(contract.get_deposit(accounts(1), accounts(2)).0, one_near);
+
+        testing_env!(context.predecessor_account_id(accounts(3)).build());
+        // transfer 1m shares in pool 0 to acc 1.
+        contract.mft_transfer("0".to_string(), accounts(1), U128(1_000_000), None);
 
         testing_env!(context.predecessor_account_id(accounts(3)).build());
         contract.remove_liquidity(
@@ -361,8 +373,11 @@ mod tests {
             contract.get_pool_shares(0, accounts(3)),
             vec![1.into(), 2.into()],
         );
-        // Exchange fees left in the pool as liquidity.
-        assert_eq!(contract.get_pool_total_shares(0).0, 33337501041992301475);
+        // Exchange fees left in the pool as liquidity + 1m from transfer.
+        assert_eq!(
+            contract.get_pool_total_shares(0).0,
+            33337501041992301475 + 1_000_000
+        );
 
         contract.withdraw(
             accounts(1),
