@@ -7,6 +7,13 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{ext_contract, AccountId, Balance, Gas};
 use uint::construct_uint;
 
+/// Attach no deposit.
+pub const NO_DEPOSIT: u128 = 0;
+
+pub const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
+
+pub const GAS_FOR_FT_TRANSFER_CALL: Gas = 25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER;
+
 /// Amount of gas for fungible token transfers.
 pub const GAS_FOR_FT_TRANSFER: Gas = 10_000_000_000_000;
 
@@ -14,7 +21,7 @@ pub const GAS_FOR_FT_TRANSFER: Gas = 10_000_000_000_000;
 pub const GAS_FOR_UPGRADE_CALL: Gas = 50_000_000_000_000;
 
 /// Amount of gas for deploy action.
-pub const GAS_FOR_DEPLOY_CALL: Gas = 5_000_000_000_000;
+pub const GAS_FOR_DEPLOY_CALL: Gas = 20_000_000_000_000;
 
 /// Fee divisor, allowing to provide fee in bps.
 pub const FEE_DIVISOR: u32 = 10_000;

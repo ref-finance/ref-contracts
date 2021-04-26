@@ -102,7 +102,13 @@ impl Pool {
 
     pub fn share_balances(&self, account_id: &AccountId) -> Balance {
         match self {
-            Pool::SimplePool(pool) => pool.share_balances(account_id),
+            Pool::SimplePool(pool) => pool.share_balance_of(account_id),
+        }
+    }
+
+    pub fn share_transfer(&mut self, sender_id: &AccountId, receiver_id: &AccountId, amount: u128) {
+        match self {
+            Pool::SimplePool(pool) => pool.share_transfer(sender_id, receiver_id, amount),
         }
     }
 }
