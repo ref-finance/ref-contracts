@@ -12,6 +12,10 @@ use crate::farm::{Farm, FarmId};
 use crate::farm_seed::{FarmSeed, SeedId};
 use crate::farmer::Farmer;
 
+// for simulator test
+pub use crate::simple_farm::HRSimpleFarmTerms;
+pub use crate::view::FarmInfo;
+
 
 mod utils;
 mod errors;
@@ -66,7 +70,7 @@ impl Contract {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryFrom;
+    // use std::convert::TryFrom;
 
     use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
     use near_sdk::test_utils::{accounts, VMContextBuilder};
@@ -75,7 +79,7 @@ mod tests {
     use simple_farm::{HRSimpleFarmTerms};
     use near_contract_standards::storage_management::{StorageBalance, StorageManagement};
 
-    use near_sdk_sim::to_yocto;
+    // use near_sdk_sim::to_yocto;
 
     use super::*;
 
@@ -153,7 +157,7 @@ mod tests {
 
     #[test]
     fn test_basics() {
-        let one_near = 10u128.pow(24);
+        // let one_near = 10u128.pow(24);
         let (mut context, mut contract) = setup_contract();
 
         let farm_id = create_farm(&mut context, &mut contract,
