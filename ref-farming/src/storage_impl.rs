@@ -97,6 +97,7 @@ impl StorageManagement for Contract {
                 "ERR_STORAGE_UNREGISTER_SEED_NOT_EMPTY"
             );
             self.farmers.remove(&account_id);
+            self.farmer_count -= 1;
             Promise::new(account_id.clone()).transfer(farmer.amount);
             true
         } else {

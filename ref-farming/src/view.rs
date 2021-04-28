@@ -72,9 +72,9 @@ impl Contract {
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
             owner_id: self.owner_id.clone(),
-            version: String::from("0.1.2"),
+            version: String::from("0.1.3"),
             farmer_count: self.farmer_count.into(),
-            farm_count: 0.into(),
+            farm_count: self.farm_count.into(),
             seed_count: self.seeds.len().into(),
             reward_count: 0.into(),
         }
