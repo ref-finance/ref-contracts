@@ -6,7 +6,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId};
 use near_sdk::collections::{LookupMap, UnorderedMap};
-use near_sdk::{env, near_bindgen, AccountId, PanicOnDefault};
+use near_sdk::{env, near_bindgen, Balance, AccountId, PanicOnDefault};
 
 use crate::farm::{Farm, FarmId};
 use crate::farm_seed::{FarmSeed, SeedId};
@@ -40,16 +40,20 @@ near_sdk::setup_alloc!();
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Contract {
+
     // owner of this contract
     owner_id: AccountId,
     
-    // record seeds and the farms
+    // record seeds and the farms under it.
     seeds: UnorderedMap::<SeedId, FarmSeed>,
 
+    // each farmer has a structure to describe
     farmers: LookupMap<AccountId, Farmer>,
+
     // for statistic
     farmer_count: u64,
     farm_count: u64,
+    reward_info: UnorderedMap::<AccountId, Balance>,
 }
 
 #[near_bindgen]
@@ -59,11 +63,11 @@ impl Contract {
         assert!(!env::state_exists(), "Already initialized");
         Self {
             owner_id: owner_id.into(),
-            // farms: Vector::new(b"f".to_vec()),
             seeds: UnorderedMap::new(b"s".to_vec()),
             farmers: LookupMap::new(b"u".to_vec()),
             farmer_count: 0,
             farm_count: 0,
+            reward_info: UnorderedMap::new(b"r".to_vec()),
         }
     }
 }

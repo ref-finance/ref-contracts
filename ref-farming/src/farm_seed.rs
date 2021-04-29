@@ -22,13 +22,15 @@ pub enum SeedType {
 #[derive(BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "test", derive(Clone))]
 pub struct FarmSeed {
-    /// The LP Token this FarmSeed represented for
+    /// The Farming Token this FarmSeed represented for
     pub seed_id: SeedId,
+    /// The seed is a FT or MFT
     pub seed_type: SeedType,
     /// all farms that accepted this seed
-    // pub farms: HashSet<FarmId>,
+    /// may change to HashMap<GlobalIndex, Farm> 
+    /// to enable whole life-circle (especially for removing of farm). 
     pub xfarms: Vec<Farm>,
-    /// total balance of staked LP token
+    /// total (staked) balance of this seed (Farming Token)
     pub amount: Balance,
 }
 

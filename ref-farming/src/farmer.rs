@@ -26,7 +26,7 @@ pub struct Farmer {
     /// Native NEAR amount sent to this contract.
     /// Used for storage.
     pub amount: Balance,
-    /// Amounts of various reward tokens the farmer get.
+    /// Amounts of various reward tokens the farmer claimed.
     pub rewards: HashMap<AccountId, Balance>,
     /// Amounts of various seed tokens the farmer staked.
     pub seeds: HashMap<SeedId, Balance>,

@@ -44,6 +44,8 @@ impl FungibleTokenReceiver for Contract {
             assert_eq!(farm.get_reward_token(), env::predecessor_account_id(), "ERR_INVALID_REWARD_TOKEN");
             if let Some(cur_remain) = farm.add_reward(&amount) {
                 self.seeds.insert(&seed_id, &farm_seed);
+                let old_balance = self.reward_info.get(&env::predecessor_account_id()).unwrap_or(0);
+                self.reward_info.insert(&env::predecessor_account_id(), &(old_balance + amount));
                 env::log(
                     format!(
                         "{} added {} Reward Token, Now has {} left",

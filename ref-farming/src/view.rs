@@ -72,11 +72,11 @@ impl Contract {
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
             owner_id: self.owner_id.clone(),
-            version: String::from("0.1.3"),
+            version: String::from("0.1.4"),
             farmer_count: self.farmer_count.into(),
             farm_count: self.farm_count.into(),
             seed_count: self.seeds.len().into(),
-            reward_count: 0.into(),
+            reward_count: self.reward_info.len().into(),
         }
     }
 
@@ -121,6 +121,18 @@ impl Contract {
         } else {
             None
         }
+    }
+
+    pub fn list_rewards_info(&self, from_index: u64, limit: u64) -> HashMap<AccountId, U128> {
+        let keys = self.reward_info.keys_as_vector();
+        (from_index..std::cmp::min(from_index + limit, keys.len()))
+            .map(|index| 
+                (
+                    keys.get(index).unwrap(),
+                    self.reward_info.get(&keys.get(index).unwrap()).unwrap_or(0).into(),
+                )
+            )
+            .collect()
     }
 
     /// Returns reward token claimed for given user outside of any farms.
