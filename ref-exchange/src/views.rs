@@ -41,6 +41,11 @@ impl From<Pool> for PoolInfo {
 
 #[near_bindgen]
 impl Contract {
+    /// Returns semver of this contract.
+    pub fn version(&self) -> String {
+        env!("CARGO_PKG_VERSION").to_string()
+    }
+
     /// Returns number of pools.
     pub fn get_number_of_pools(&self) -> u64 {
         self.pools.len()
