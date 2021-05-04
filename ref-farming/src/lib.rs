@@ -7,6 +7,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId};
 use near_sdk::collections::{LookupMap, UnorderedMap};
 use near_sdk::{env, near_bindgen, Balance, AccountId, PanicOnDefault};
+// use near_sdk::BorshStorageKey;
 
 use crate::farm::{Farm, FarmId};
 use crate::farm_seed::{FarmSeed, SeedId};
@@ -35,6 +36,14 @@ mod owner;
 
 near_sdk::setup_alloc!();
 
+// wait for main project upgrade to near-sdk 3.1.0
+// #[derive(BorshStorageKey, BorshSerialize)]
+// pub enum StorageKeys {
+//     Seed,
+//     Farmer,
+//     RewardInfo,
+// }
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Contract {
@@ -61,11 +70,14 @@ impl Contract {
         assert!(!env::state_exists(), "Already initialized");
         Self {
             owner_id: owner_id.into(),
-            seeds: UnorderedMap::new(b"s".to_vec()),
-            farmers: LookupMap::new(b"u".to_vec()),
             farmer_count: 0,
             farm_count: 0,
+            seeds: UnorderedMap::new(b"s".to_vec()),
+            farmers: LookupMap::new(b"u".to_vec()),
             reward_info: UnorderedMap::new(b"r".to_vec()),
+            // seeds: UnorderedMap::new(StorageKeys::Seed),
+            // farmers: LookupMap::new(StorageKeys::Farmer),
+            // reward_info: UnorderedMap::new(StorageKeys::RewardInfo),
         }
     }
 }
