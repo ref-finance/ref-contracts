@@ -9,12 +9,6 @@ use crate::errors::*;
 pub const GAS_FOR_FT_TRANSFER: Gas = 10_000_000_000_000;
 pub const MFT_TAG: &str = "@";
 
-// /// Amount of gas used for upgrade function itself.
-// pub const GAS_FOR_UPGRADE_CALL: Gas = 50_000_000_000_000;
-
-// /// Amount of gas for deploy action.
-// pub const GAS_FOR_DEPLOY_CALL: Gas = 5_000_000_000_000;
-
 
 construct_uint! {
     /// 256-bit unsigned integer.
@@ -63,27 +57,27 @@ pub fn assert_one_yocto() {
 }
 
 // return receiver_id, token_id
-pub fn parse_seedid(lpt_id: &str) -> (String, String) {
+pub fn parse_seed_id(lpt_id: &str) -> (String, String) {
     let v: Vec<&str> = lpt_id.split(MFT_TAG).collect();
     if v.len() == 2 { // receiver_id@pool_id
         (v[0].to_string(), v[1].to_string())
     } else if v.len() == 1 { // receiver_id
         (v[0].to_string(), v[0].to_string())
     } else {
-        env::panic("ERR_LPTID_INVALID".as_bytes())
+        env::panic(format!("{}", ERR33_INVALID_SEED_ID).as_bytes())
     }
 }
 
 
-pub fn parse_farmid(farm_id: &FarmId) -> (String, usize) {
+pub fn parse_farm_id(farm_id: &FarmId) -> (String, usize) {
     let v: Vec<&str> = farm_id.split("#").collect();
     if v.len() != 2 {
-        env::panic(format!("{}", ERR42_INVALID_FARMID).as_bytes())
+        env::panic(format!("{}", ERR42_INVALID_FARM_ID).as_bytes())
     }
     (v[0].to_string(), v[1].parse::<usize>().unwrap())
 }
 
-pub fn gen_farmid(seed_id: &SeedId, index: usize) -> FarmId {
+pub fn gen_farm_id(seed_id: &SeedId, index: usize) -> FarmId {
     format!("{}#{}", seed_id, index)
 }
 

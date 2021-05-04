@@ -1,15 +1,16 @@
-//! FarmSeed is information per LPT about balances distribution among users.
+//! FarmSeed stores information per seed about 
+//! staked seed amount and farms under it.
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{env, Balance};
 use crate::errors::*;
 use crate::farm::Farm;
-use crate::simple_farm::SimpleFarmRewardDistribution;
 
 const MAX_ACCOUNT_LENGTH: u128 = 64;
 
-/// The SeedId contains infomation about <exchange_id, pool_id>, 
-/// where exchange_id is ref_exchange in this case.
+/// For MFT, SeedId composes of token_contract_id 
+/// and token's inner_id in that contract. 
+/// For FT, SeedId is the token_contract_id.
 pub(crate) type SeedId = String;
 
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -18,7 +19,7 @@ pub enum SeedType {
     MFT,
 }
 
-/// record LP token's distribution and farms
+
 #[derive(BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "test", derive(Clone))]
 pub struct FarmSeed {
@@ -27,9 +28,9 @@ pub struct FarmSeed {
     /// The seed is a FT or MFT
     pub seed_type: SeedType,
     /// all farms that accepted this seed
-    /// may change to HashMap<GlobalIndex, Farm> 
+    /// Future Work: may change to HashMap<GlobalIndex, Farm> 
     /// to enable whole life-circle (especially for removing of farm). 
-    pub xfarms: Vec<Farm>,
+    pub farms: Vec<Farm>,
     /// total (staked) balance of this seed (Farming Token)
     pub amount: Balance,
 }
@@ -39,18 +40,10 @@ impl FarmSeed {
         Self {
             seed_id: seed_id.clone(),
             seed_type: SeedType::FT,
-            xfarms: Vec::new(),
+            farms: Vec::new(),
             amount: 0,
         }
     }
-
-    // /// all farm that start_at less than cur block height, 
-    // /// should reset the start_at to cur block height.
-    // pub fn first_farmer_in(&mut self) {
-    //     for farm in &mut self.xfarms {
-    //         farm.update_start_at(env::block_index());
-    //     }
-    // }
 
     pub fn add_amount(&mut self, amount: Balance) {
         self.amount += amount;
@@ -63,15 +56,10 @@ impl FarmSeed {
         self.amount
     }
 
-    /// Returns amount of $NEAR necessary to cover storage used by this data structure.
+    /// Returns amount of yocto near necessary to cover storage used by this data structure.
     pub fn storage_usage(&self) -> Balance {
-        (MAX_ACCOUNT_LENGTH + 16) * (self.xfarms.len() as u128)
+        (MAX_ACCOUNT_LENGTH + 16) * (self.farms.len() as u128)
             * env::storage_byte_cost()
     }
 
-    /// for debug
-    pub fn get_farm_dis(&self, index: usize) -> SimpleFarmRewardDistribution {
-        self.xfarms.get(index).unwrap().get_farm_dis()
-    }
 }
-

@@ -1,16 +1,15 @@
-//! Account rewards is information per user about their reward tokens balances.
-//! 
+//! Farmer records a farmer's 
+//! * all claimed reward tokens, 
+//! * all seeds he staked,
+//! * user_rps per farm,
+//! and the deposited near amount prepaid as storage fee
 
 
 use std::collections::HashMap;
-
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{env, AccountId, Balance};
-
 use crate::{SeedId, FarmId};
-
 use crate::errors::*;
-
 
 /// assume the average AccountId length is lower than 64 bytes.
 const MAX_ACCOUNT_LENGTH: u128 = 64;
@@ -31,7 +30,7 @@ pub struct Farmer {
     /// Amounts of various seed tokens the farmer staked.
     pub seeds: HashMap<SeedId, Balance>,
     /// record user_last_rps of farms
-    pub farm_rps: HashMap<FarmId, Balance>,
+    pub user_rps: HashMap<FarmId, Balance>,
 }
 
 impl Farmer {
@@ -48,7 +47,7 @@ impl Farmer {
     /// Subtract from `reward` balance.
     /// if amount == 0, subtract all reward balance.
     /// Panics if `amount` is bigger than the current balance.
-    /// return actural subtract amount
+    /// return actual subtract amount
     pub(crate) fn sub_reward(&mut self, token: &AccountId, amount: Balance) -> Balance {
         let value = *self.rewards.get(token).expect(ERR21_TOKEN_NOT_REG);
         assert!(value >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
@@ -85,20 +84,20 @@ impl Farmer {
     }
 
     pub fn get_rps(&self, farm_id: &FarmId) -> Balance {
-        self.farm_rps.get(farm_id).unwrap_or(&0).clone()
+        self.user_rps.get(farm_id).unwrap_or(&0).clone()
     }
 
     pub fn set_rps(&mut self, farm_id: &FarmId, rps: Balance) {
-        self.farm_rps.insert(farm_id.clone(), rps);
+        self.user_rps.insert(farm_id.clone(), rps);
     }
 
-    /// Returns amount of $NEAR necessary to cover storage used by this data structure.
+    /// Returns amount of yocto near necessary to cover storage used by this data structure.
     pub fn storage_usage(&self) -> Balance {
         (
             MIN_FARMER_LENGTH 
             + self.rewards.len() as u128 * (MAX_ACCOUNT_LENGTH + 16)
             + self.seeds.len() as u128 * (MAX_ACCOUNT_LENGTH + 16)
-            + self.farm_rps.len() as u128 * (MAX_ACCOUNT_LENGTH + 16)
+            + self.user_rps.len() as u128 * (MAX_ACCOUNT_LENGTH + 16)
         )
         * env::storage_byte_cost()
     }

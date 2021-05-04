@@ -1,14 +1,15 @@
-//! FarmSeed is information per LPT about balances distribution among users.
 
 use std::convert::TryInto;
 use near_sdk::json_types::{U128};
 use near_sdk::{AccountId, Balance, PromiseResult};
 
-use crate::utils::{assert_one_yocto, ext_multi_fungible_token, ext_fungible_token, ext_self, parse_seedid, GAS_FOR_FT_TRANSFER};
+use crate::utils::{
+    assert_one_yocto, ext_multi_fungible_token, ext_fungible_token, 
+    ext_self, parse_seed_id, GAS_FOR_FT_TRANSFER
+};
 use crate::errors::*;
 use crate::farm_seed::SeedType;
 use crate::*;
-
 
 
 #[near_bindgen]
@@ -45,7 +46,7 @@ impl Contract {
                 ));
             }
             SeedType::MFT => {
-                let (receiver_id, token_id) = parse_seedid(&seed_id);
+                let (receiver_id, token_id) = parse_seed_id(&seed_id);
                 ext_multi_fungible_token::mft_transfer(
                     token_id,
                     sender_id.clone().try_into().unwrap(),
@@ -93,7 +94,7 @@ impl Contract {
                     .as_bytes(),
                 );
                 // revert withdraw, equal to deposit, claim reward to update user reward_per_seed
-                self.internal_claim_user_reward_by_seedid(&sender_id, &seed_id);
+                self.internal_claim_user_reward_by_seed_id(&sender_id, &seed_id);
                 let mut farm_seed = self.seeds.get(&seed_id).unwrap_or(FarmSeed::new(&seed_id));
                 let mut farmer = self.farmers.get(&sender_id).expect(&format!("{}", ERR10_ACC_NOT_REGISTERED));
 
@@ -140,7 +141,7 @@ impl Contract {
                     .as_bytes(),
                 );
                 // revert withdraw, equal to deposit, claim reward to update user reward_per_seed
-                self.internal_claim_user_reward_by_seedid(&sender_id, &seed_id);
+                self.internal_claim_user_reward_by_seed_id(&sender_id, &seed_id);
                 let mut farm_seed = self.seeds.get(&seed_id).unwrap_or(FarmSeed::new(&seed_id));
                 let mut farmer = self.farmers.get(&sender_id).expect(&format!("{}", ERR10_ACC_NOT_REGISTERED));
 
@@ -176,7 +177,7 @@ impl Contract {
 
         // first claim all reward of the user for this seed farms 
         // to update user reward_per_seed in each farm 
-        self.internal_claim_user_reward_by_seedid(sender_id, seed_id);
+        self.internal_claim_user_reward_by_seed_id(sender_id, seed_id);
 
         let mut farm_seed = self.seeds.get(seed_id).unwrap_or(FarmSeed::new(seed_id));
         farm_seed.seed_type = seed_type;
@@ -186,11 +187,6 @@ impl Contract {
         let mut farmer = self.farmers.get(sender_id).expect(&format!("{}", ERR10_ACC_NOT_REGISTERED));
         farmer.add_seed(&seed_id, amount);
         self.farmers.insert(sender_id, &farmer);
-
-        // // debug
-        // let dbg_user_rps = self.farmers.get(sender_id).unwrap().get_rps(&String::from("bob#0"));
-        // let dbg_dis = self.seeds.get(&String::from("bob")).unwrap().get_farm_dis(0);
-        // println!("farm [rps:{}, rr:{}, user_rps:{}",dbg_dis.rps, dbg_dis.rr, dbg_user_rps);
     }
 
     fn internal_seed_withdraw(
@@ -201,7 +197,7 @@ impl Contract {
         
         // first claim all reward of the user for this seed farms 
         // to update user reward_per_seed in each farm
-        self.internal_claim_user_reward_by_seedid(sender_id, seed_id);
+        self.internal_claim_user_reward_by_seed_id(sender_id, seed_id);
 
         let mut farm_seed = self.seeds.get(seed_id).expect(&format!("{}", ERR31_SEED_NOT_EXIST));
         let mut farmer = self.farmers.get(sender_id).expect(&format!("{}", ERR10_ACC_NOT_REGISTERED));
@@ -212,8 +208,8 @@ impl Contract {
 
         if farmer_seed_remain == 0 {
             // remove farmer rps of relative farm
-            for farm in &mut farm_seed.xfarms {
-                farmer.farm_rps.remove(&farm.get_farm_id());
+            for farm in &mut farm_seed.farms {
+                farmer.user_rps.remove(&farm.get_farm_id());
             }
         }
         self.farmers.insert(sender_id, &farmer);

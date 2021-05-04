@@ -5,7 +5,7 @@
 |word|meaning|notes|
 |-|-|-|
 |Seed|Farming-Token|User stakes seed to this contract for various rewards token back|
-|SeedId|String|Token ctonract_id for ft token, token contract_id + "@" + inner_id for mft token|
+|SeedId|String|Token contract_id for ft token, token contract_id + "@" + inner_id for mft token|
 |FarmId|String|SeedId + "#" + farm_index in that seed|
 |RPS|Reward-Per-Seed|The key concept to distribute rewards between farmers in a farm|
 |RR|Reward Round in block num|the reward are released by round|
@@ -57,7 +57,7 @@ pub struct FarmSeed {
     /// all farms that accepted this seed
     /// may change to HashMap<GlobalIndex, Farm> 
     /// to enable whole life-circle (especially for removing of farm). 
-    pub xfarms: Vec<Farm>,
+    pub farms: Vec<Farm>,
     /// total (staked) balance of this seed (Farming Token)
     pub amount: Balance,
 }
@@ -113,7 +113,7 @@ pub struct SimpleFarm {
 }
 ``` 
 
-As designed that way, we can caculate farmers unclaimed reward like this:  
+As designed that way, we can calculate farmers unclaimed reward like this:  
 
 ```rust
 // 1. get current reward round CRR
@@ -138,7 +138,7 @@ which, based on
 ```rust
 pub(crate) fn try_distribute(&self, total_seeds: &Balance) -> Option<SimpleFarmRewardDistribution>
 ```
-to caculate cur RPS and RR of the farm without modifying the storage (means not really update the farm)
+to calculate cur RPS and RR of the farm without modifying the storage (means not really update the farm)
 
 And when farmer actually claims his reward, the whole logic is sealed in 
 ```rust
@@ -153,7 +153,7 @@ which, based on
 ```rust
 pub(crate) fn distribute(&mut self, total_seeds: &Balance)
 ```
-to caculate and update the farm.
+to calculate and update the farm.
 
 ### When to update the farm
 
@@ -164,7 +164,7 @@ furthermore, in deposit and withdraw seed actions, the farmer's claim_reward act
 
 # Things need to explain
 ## Storage fee in this contract
-As each farmer would have a place to record his rps in each farm he involved, the storage belongs to a farmer may increaed out of his notice.  
+As each farmer would have a place to record his rps in each farm he involved, the storage belongs to a farmer may increase out of his notice.  
 
 For example, when a new farm established and running, which accepts the farmer's seed that has been staked in the contract, then at the following action such as claim_reward, or deposit/withdraw seeds invoked by the farmer, his storage would expand to record the new rps related to that farm.  
 

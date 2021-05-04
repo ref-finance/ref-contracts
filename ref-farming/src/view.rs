@@ -6,7 +6,7 @@ use near_sdk::json_types::{ValidAccountId, U64, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
 
-use crate::utils::parse_farmid;
+use crate::utils::parse_farm_id;
 use crate::farm_seed::SeedType;
 use crate::*;
 
@@ -72,7 +72,7 @@ impl Contract {
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
             owner_id: self.owner_id.clone(),
-            version: String::from("0.1.4"),
+            version: String::from("0.1.5"),
             farmer_count: self.farmer_count.into(),
             farm_count: self.farm_count.into(),
             seed_count: self.seeds.len().into(),
@@ -82,7 +82,7 @@ impl Contract {
 
     /// Returns number of farms.
     pub fn get_number_of_farms(&self) -> u64 {
-        self.seeds.values().fold(0_u64, |acc, farm_seed| acc + farm_seed.xfarms.len() as u64)
+        self.seeds.values().fold(0_u64, |acc, farm_seed| acc + farm_seed.farms.len() as u64)
     }
 
     /// Returns list of farms of given length from given start index.
@@ -102,18 +102,18 @@ impl Contract {
             FarmSeed {
                 seed_id: seed_id.clone(),
                 seed_type: SeedType::FT,
-                xfarms: Vec::new(),
+                farms: Vec::new(),
                 amount: 0,
             })
-            .xfarms.iter().map(|farm| farm.into())
+            .farms.iter().map(|farm| farm.into())
             .collect()
     }
 
     /// Returns information about specified farm.
     pub fn get_farm(&self, farm_id: FarmId) -> Option<FarmInfo> {
-        let (seed_id, index) = parse_farmid(&farm_id);
+        let (seed_id, index) = parse_farm_id(&farm_id);
         if let Some(farm_seed) = self.seeds.get(&seed_id) {
-            if let Some(farm) = farm_seed.xfarms.get(index) {
+            if let Some(farm) = farm_seed.farms.get(index) {
                 Some(farm.into())
             } else {
                 None
@@ -156,11 +156,11 @@ impl Contract {
     }
 
     pub fn get_unclaimed_reward(&self, account_id: ValidAccountId, farm_id: FarmId) -> U128 {
-        let (seed_id, index) = parse_farmid(&farm_id);
+        let (seed_id, index) = parse_farm_id(&farm_id);
 
         if let (Some(farmer), Some(farm_seed)) = 
             (self.farmers.get(account_id.as_ref()), self.seeds.get(&seed_id)) {
-                if let Some(farm) = farm_seed.xfarms.get(index) {
+                if let Some(farm) = farm_seed.farms.get(index) {
                     let reward_amount = farm.view_farmer_unclaimed_reward(
                         &farmer.get_rps(&farm.get_farm_id()),
                         farmer.seeds.get(&seed_id).unwrap_or(&0_u128), 

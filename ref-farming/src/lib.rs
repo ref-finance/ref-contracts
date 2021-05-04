@@ -31,9 +31,7 @@ mod actions_of_seed;
 mod actions_of_reward;
 mod view;
 
-/// sodu module is used to debug and testing,
-/// remove this module in release version
-mod sudo;
+mod owner;
 
 near_sdk::setup_alloc!();
 
@@ -45,7 +43,7 @@ pub struct Contract {
     owner_id: AccountId,
     
     // record seeds and the farms under it.
-    seeds: UnorderedMap::<SeedId, FarmSeed>,
+    seeds: UnorderedMap<SeedId, FarmSeed>,
 
     // each farmer has a structure to describe
     farmers: LookupMap<AccountId, Farmer>,
@@ -53,7 +51,7 @@ pub struct Contract {
     // for statistic
     farmer_count: u64,
     farm_count: u64,
-    reward_info: UnorderedMap::<AccountId, Balance>,
+    reward_info: UnorderedMap<AccountId, Balance>,
 }
 
 #[near_bindgen]
@@ -74,7 +72,6 @@ impl Contract {
 
 #[cfg(test)]
 mod tests {
-    // use std::convert::TryFrom;
 
     use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
     use near_sdk::test_utils::{accounts, VMContextBuilder};
@@ -82,8 +79,6 @@ mod tests {
     use near_sdk::json_types::{ValidAccountId, U64, U128};
     use simple_farm::{HRSimpleFarmTerms};
     use near_contract_standards::storage_management::{StorageBalance, StorageManagement};
-
-    // use near_sdk_sim::to_yocto;
 
     use super::*;
 
@@ -161,7 +156,7 @@ mod tests {
 
     #[test]
     fn test_basics() {
-        // let one_near = 10u128.pow(24);
+
         let (mut context, mut contract) = setup_contract();
 
         let farm_id = create_farm(&mut context, &mut contract,

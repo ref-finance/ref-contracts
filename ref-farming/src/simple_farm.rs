@@ -5,12 +5,14 @@
 //! for storage fee.
 //!   But to enable farming, the creator or someone else should deposit reward 
 //! token to the farm, after it was created.
+
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{U64, U128, ValidAccountId};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{env, AccountId, Balance, BlockHeight};
 
 use crate::{SeedId, FarmId};
+use crate::errors::*;
 use uint::construct_uint;
 
 construct_uint! {
@@ -18,15 +20,15 @@ construct_uint! {
     pub struct U256(4);
 }
 
-// to ensure precision, all reward_per_token value is mulitpled with this DENOM
+// to ensure precision, all reward_per_seed would be multiplied by this DENOM
 const DENOM: u128 = 100_000_000;
 
 ///   The terms defines how the farm works.
 ///   In this version, we distribute reward token with a start height, a reward 
-/// session interval, and reward amount per session as RPS.  
-///   In this way, the farm will take RPS from undistributed reward to unclaimed 
-/// reward each interval. And all farmers would got reward token pro rata of 
-/// their seeds.
+/// session interval, and reward amount per session.  
+///   In this way, the farm will take the amount from undistributed reward to  
+/// unclaimed reward each session. And all farmers would got reward token pro  
+/// rata of their seeds.
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub struct SimpleFarmTerms {
     pub seed_id: SeedId,
@@ -89,8 +91,8 @@ pub struct SimpleFarmRewardDistribution {
     pub rr: u64,
 }
 
-///   Implementation of simple farm, Similar to the design of "synthetix".
-///   Farmer stake there seed to farming on mulitple farm accept that seed.
+///   Implementation of simple farm, Similar to the design of "berry farm".
+///   Farmer stake their seed to farming on multiple farm accept that seed.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct SimpleFarm {
 
@@ -150,17 +152,22 @@ impl SimpleFarm {
         
     }
 
-    /// limit: total_seeds != 0
+
     pub(crate) fn try_distribute(&self, total_seeds: &Balance) -> Option<SimpleFarmRewardDistribution> {
+
+        assert!(
+            total_seeds != &0_u128,
+            "{}", ERR500
+        );
 
         if let SimpleFarmStatus::Running = self.status {
             let mut dis = self.last_distribution.clone();
-            // caculate rr from cur_height
+            // calculate rr according to cur_height
             dis.rr = (env::block_index() - self.terms.start_at) / self.terms.session_interval;
             let mut reward_added = (dis.rr - self.last_distribution.rr) as u128 
                 * self.terms.reward_per_session;
             if self.last_distribution.undistributed < reward_added {
-                // recacualte rr from undistributed
+                // recalculate rr according to undistributed
                 let increased_rr = (self.last_distribution.undistributed 
                     / self.terms.reward_per_session) as u64;
                 dis.rr = self.last_distribution.rr + increased_rr;
@@ -176,7 +183,7 @@ impl SimpleFarm {
             dis.unclaimed += reward_added;
             dis.undistributed -= reward_added;
 
-            // caculate rps
+            // calculate rps
             dis.rps = self.last_distribution.rps + 
             (
                 U256::from(reward_added) 
@@ -203,8 +210,6 @@ impl SimpleFarm {
             return 0;
         }
         if let Some(dis) = self.try_distribute(total_seeds) {
-            // println!("[debug_test] {} read last.RPS {} and last.RR = #{}", self.farm_id, self.last_distribution.rps, self.last_distribution.rr);
-            // println!("[debug_test]user_seeds:{}, rr:{}, rps:{}, user_rps:{}", user_seeds, dis.rr, dis.rps, user_rps);
             (U256::from(*user_seeds) 
             * U256::from(dis.rps - user_rps) 
             / U256::from(DENOM)).as_u128()
@@ -221,8 +226,6 @@ impl SimpleFarm {
         if let Some(dis) = self.try_distribute(total_seeds) {
             if self.last_distribution.rr != dis.rr {
                 self.last_distribution = dis.clone();
-                // println!("[debug_test] {} RPS increased to {} and RR update to #{}", self.farm_id, dis.rps, dis.rr);
-                // println!("[debug_test] {} RPS increased to {} and RR update to #{}", self.farm_id, self.last_distribution.rps, self.last_distribution.rr);
                 env::log(
                     format!(
                         "{} RPS increased to {} and RR update to #{}",
@@ -237,7 +240,8 @@ impl SimpleFarm {
         } 
     }
 
-    /// return (user_rps, reward_amount)
+    /// return the new user reward per seed 
+    /// and amount of reward as (user_rps, reward_amount) 
     pub(crate) fn claim_user_reward(
         &mut self, 
         user_rps: &Balance,
@@ -258,7 +262,7 @@ impl SimpleFarm {
         ).as_u128();
 
         if claimed > 0 {
-            assert!(self.last_distribution.unclaimed >= claimed, "ERR_INTERNAL_ERR");
+            assert!(self.last_distribution.unclaimed >= claimed, "{}", ERR500);
             self.last_distribution.unclaimed -= claimed;
         }
 

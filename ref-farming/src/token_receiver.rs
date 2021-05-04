@@ -2,7 +2,7 @@ use crate::*;
 use crate::errors::*;
 use near_sdk::PromiseOrValue;
 use near_sdk::json_types::{U128};
-use crate::utils::parse_farmid;
+use crate::utils::parse_farm_id;
 use crate::utils::MFT_TAG;
 use crate::farm_seed::SeedType;
 
@@ -34,14 +34,18 @@ impl FungibleTokenReceiver for Contract {
 
         } else {  
             // ****** reward Token deposit in ********
-            let farm_id = msg.parse::<FarmId>().expect(&format!("{}", ERR42_INVALID_FARMID));
-            let (seed_id, index) = parse_farmid(&farm_id);
+            let farm_id = msg.parse::<FarmId>().expect(&format!("{}", ERR42_INVALID_FARM_ID));
+            let (seed_id, index) = parse_farm_id(&farm_id);
 
             let mut farm_seed = self.seeds.get(&seed_id).expect(&format!("{}", ERR41_FARM_NOT_EXIST));
-            let farm = farm_seed.xfarms.get_mut(index).expect(&format!("{}", ERR41_FARM_NOT_EXIST));
+            let farm = farm_seed.farms.get_mut(index).expect(&format!("{}", ERR41_FARM_NOT_EXIST));
 
             // update farm
-            assert_eq!(farm.get_reward_token(), env::predecessor_account_id(), "ERR_INVALID_REWARD_TOKEN");
+            assert_eq!(
+                farm.get_reward_token(), 
+                env::predecessor_account_id(), 
+                "{}", ERR44_INVALID_FARM_REWARD
+            );
             if let Some(cur_remain) = farm.add_reward(&amount) {
                 self.seeds.insert(&seed_id, &farm_seed);
                 let old_balance = self.reward_info.get(&env::predecessor_account_id()).unwrap_or(0);
@@ -55,7 +59,7 @@ impl FungibleTokenReceiver for Contract {
                 );
                 PromiseOrValue::Value(U128(0))
             } else {
-                env::panic("ERR_INVALID_FARM_STATUS".as_bytes())
+                env::panic(format!("{}", ERR43_INVALID_FARM_STATUS).as_bytes())
             }
         }
         
@@ -85,7 +89,7 @@ fn parse_token_id(token_id: String) -> TokenOrPool {
     }
 }
 
-/// transfer LP token to staking
+/// seed token deposit
 #[near_bindgen]
 impl MFTTokenReceiver for Contract {
     /// Callback on receiving tokens by this contract.
@@ -96,7 +100,7 @@ impl MFTTokenReceiver for Contract {
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
-        // let dex_in = env::predecessor_account_id();
+
         self.assert_storage_usage(&sender_id);
  
         let seed_id: String;
@@ -109,14 +113,9 @@ impl MFTTokenReceiver for Contract {
             }
         }
 
-        // let token_in = token_id.clone();
+
         assert!(msg.is_empty(), "ERR_MSG_INCORRECT");
         
-        // TODO: I am afraid that the gas of callback wont be enough
-        // to cover the staking action, cause this action would modify 
-        // multiple state. So, maybe it will split to two actions: 
-        // deposit seed and stake seed. One is a callback and the other 
-        // is invoked by user actively.
         self.internal_seed_deposit(&seed_id, &sender_id, amount.into(), SeedType::MFT);
 
         PromiseOrValue::Value(U128(0))

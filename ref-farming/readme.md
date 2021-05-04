@@ -5,7 +5,7 @@
 |word|meaning|notes|
 |-|-|-|
 |Seed|Farming-Token|User stakes seed to this contract for various rewards token back|
-|SeedId|String|Token ctonract_id for ft token, token contract_id + "@" + inner_id for mft token|
+|SeedId|String|Token contract_id for ft token, token contract_id + "@" + inner_id for mft token|
 |FarmId|String|SeedId + "#" + farm_index in that seed|
 
 
@@ -72,7 +72,7 @@ pub fn get_number_of_farms(&self) -> u64;
 /// they are just reserved for future work.
 pub fn list_farms(&self, from_index: u64, limit: u64) -> Vec<FarmInfo>;
 
-/// The suggested way to batch retrive farm info;
+/// The suggested way to batch get farm info;
 /// Cause farms are organized under Seed(ie. Farming-Token) in the contract
 pub fn list_farms_by_seed(&self, seed_id: SeedId) -> Vec<FarmInfo>;
 
@@ -118,7 +118,7 @@ pub struct StorageBalance {
 }
 
 /// Only farmer need to register for storage, 
-/// the attatched should more than a suggested minimum storage fee, 
+/// the attached should more than a suggested minimum storage fee, 
 /// which can cover storage fee for 5 seeds, 5 rewards and 10 farms, 
 /// registration_only true means to refund exceeded amount back to user. 
 /// Farmer also use this method to add storage fee, with registration_only set to false.
@@ -144,7 +144,7 @@ fn storage_balance_of(&self, account_id: ValidAccountId) -> Option<StorageBalanc
 ```rust
 /// FarmId is like this:
 let farm_id: FarmId = format!("{}#{}", seed_id, index);
-/// creat farm and pay for its storage fee
+/// create farm and pay for its storage fee
 #[payable]
 pub fn create_simple_farm(&mut self, terms: HRSimpleFarmTerms) -> FarmId;
 ```

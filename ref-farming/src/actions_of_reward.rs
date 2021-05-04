@@ -1,11 +1,9 @@
-//! Account rewards is information per user about their reward tokens balances.
-//! 
 
 use std::convert::TryInto;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult};
 
-use crate::utils::{ext_fungible_token, ext_self, GAS_FOR_FT_TRANSFER, parse_farmid};
+use crate::utils::{ext_fungible_token, ext_self, GAS_FOR_FT_TRANSFER, parse_farm_id};
 use crate::errors::*;
 use crate::*;
 
@@ -17,7 +15,7 @@ impl Contract {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
         self.assert_storage_usage(&sender_id);
-        self.internal_claim_user_reward_by_farmid(&sender_id, &farm_id);
+        self.internal_claim_user_reward_by_farm_id(&sender_id, &farm_id);
     }
 
     #[payable]
@@ -25,7 +23,7 @@ impl Contract {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
         self.assert_storage_usage(&sender_id);
-        self.internal_claim_user_reward_by_seedid(&sender_id, &seed_id);
+        self.internal_claim_user_reward_by_seed_id(&sender_id, &seed_id);
     }
 
     /// Withdraws given reward token of given user.
@@ -41,7 +39,7 @@ impl Contract {
 
         let mut rewards = self.get_farmer(&sender_id);
 
-        // Note: subtraction and deregistration will be reverted if the promise fails.
+        // Note: subtraction, will be reverted if the promise fails.
         let amount = rewards.sub_reward(&token_id, amount);
         self.farmers.insert(&sender_id, &rewards);
         ext_fungible_token::ft_transfer(
@@ -104,7 +102,7 @@ fn claim_user_reward_from_farm(
             )
             .as_bytes(),
         );
-        // println!("[debug_test]user_rps@{} increased to {}", farm.get_farm_id(), new_user_rps);
+
         farmer.set_rps(&farm.get_farm_id(), new_user_rps);
         if reward_amount > 0 {
             farmer.add_reward(&farm.get_reward_token(), reward_amount);
@@ -124,18 +122,17 @@ fn claim_user_reward_from_farm(
 
 impl Contract {
 
-    pub(crate) fn internal_claim_user_reward_by_seedid(
+    pub(crate) fn internal_claim_user_reward_by_seed_id(
         &mut self, 
         sender_id: &AccountId,
         seed_id: &SeedId) {
         let mut farmer = self.get_farmer(sender_id);
         if let Some(mut farm_seed) = self.seeds.get(seed_id) {
-            for farm in &mut farm_seed.xfarms {
+            for farm in &mut farm_seed.farms {
                 claim_user_reward_from_farm(
                     farm, 
                     &mut farmer,  
                     &farm_seed.amount);
-                // println!("[debug_test] {} user_rps@{}={}", sender_id, farm.get_farm_id(), farmer.get_rps(&farm.get_farm_id()));
             }
             
             self.seeds.insert(seed_id, &farm_seed);
@@ -143,21 +140,21 @@ impl Contract {
         }
     }
 
-    pub(crate) fn internal_claim_user_reward_by_farmid(
+    pub(crate) fn internal_claim_user_reward_by_farm_id(
         &mut self, 
         sender_id: &AccountId, 
         farm_id: &FarmId) {
         let mut farmer = self.get_farmer(sender_id);
 
-        let (seed_id, index) = parse_farmid(farm_id);
+        let (seed_id, index) = parse_farm_id(farm_id);
 
         if let Some(mut farm_seed) = self.seeds.get(&seed_id) {
-            if let Some(farm) = farm_seed.xfarms.get_mut(index) {
+            if let Some(farm) = farm_seed.farms.get_mut(index) {
                 claim_user_reward_from_farm(
                     farm, 
                     &mut farmer, 
-                    &farm_seed.amount);
-                // println!("[debug_test] {} user_rps@{}={}", sender_id, farm.get_farm_id(), farmer.get_rps(&farm.get_farm_id()));
+                    &farm_seed.amount,
+                );
                 self.seeds.insert(&seed_id, &farm_seed);
                 self.farmers.insert(sender_id, &farmer);
             }

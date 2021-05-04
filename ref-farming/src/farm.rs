@@ -1,7 +1,9 @@
+//! Wrapper of different types of farms 
+
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, Balance};
 
-use crate::simple_farm::{SimpleFarm, SimpleFarmRewardDistribution};
+use crate::simple_farm::SimpleFarm;
 use crate::SeedId;
 
 pub(crate) type FarmId = String;
@@ -30,14 +32,14 @@ impl Farm {
         }
     }
 
-    /// Returns which seed token are accepted.
+    /// Returns seed id this farm accepted.
     pub fn get_seed_id(&self) -> SeedId {
         match self {
             Farm::SimpleFarm(farm) => farm.terms.seed_id.clone(),
         }
     }
 
-    /// Returns which token are rewarded.
+    /// Returns token contract id this farm used for reward.
     pub fn get_reward_token(&self) -> AccountId {
         match self {
             Farm::SimpleFarm(farm) => farm.terms.reward_token.clone(),
@@ -63,13 +65,8 @@ impl Farm {
         }
     }
 
-    // pub fn update_farm_reward(&mut self, total_seeds: &Balance) {
-    //     match self {
-    //         Farm::SimpleFarm(farm) => farm.distribute(total_seeds),
-    //     }
-    // }
-
-    /// return (user_rps, reward_amount) 
+    /// return the new user reward per seed 
+    /// and amount of reward as (user_rps, reward_amount) 
     pub fn claim_user_reward(&mut self, 
         user_rps: &Balance,
         user_seeds: &Balance, 
@@ -80,10 +77,4 @@ impl Farm {
         }
     }
 
-    pub fn get_farm_dis(&self) -> SimpleFarmRewardDistribution {
-        match self {
-            Farm::SimpleFarm(farm) 
-                => farm.last_distribution.clone(),
-        }
-    }
 }

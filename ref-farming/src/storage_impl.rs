@@ -23,7 +23,7 @@ impl StorageManagement for Contract {
         account_id: Option<ValidAccountId>,
         registration_only: Option<bool>,
     ) -> StorageBalance {
-        // TODO: need rewrite
+
         let amount = env::attached_deposit();
         let account_id = account_id
             .map(|a| a.into())
@@ -33,7 +33,7 @@ impl StorageManagement for Contract {
         let (locked, deposited) = self.internal_farmer_storage(&account_id);
         if deposited == 0 {  // new account register
             if amount < Contract::suggested_min_storage_usage() {
-                env::panic(b"ERR_DEPOSIT_LESS_THAN_MIN_STORAGE");
+                env::panic(format!("{}", ERR11_INSUFFICIENT_STORAGE).as_bytes());
             }
             if registration_only {
                 self.internal_register_account(&account_id, Contract::suggested_min_storage_usage());
@@ -44,7 +44,7 @@ impl StorageManagement for Contract {
             } else {
                 self.internal_register_account(&account_id, amount);
             }
-        } else {  // old account to complement
+        } else {  // old account, only can complement storage fee
             if registration_only {
                 log!("ERR_ACC_REGISTERED");
                 if amount > 0 {
@@ -52,7 +52,7 @@ impl StorageManagement for Contract {
                 }
             } else {
                 if amount+deposited < locked {
-                    env::panic(b"ERR_DEPOSIT_LESS_THAN_NEEDED");
+                    env::panic(format!("{}", ERR11_INSUFFICIENT_STORAGE).as_bytes());
                 }
                 self.internal_register_account(&account_id, amount);
             }
@@ -69,14 +69,14 @@ impl StorageManagement for Contract {
         let (locked, deposited) = self.internal_farmer_storage(&account_id);
         if deposited > 0 {
             let amount = amount.map(|a| a.0).unwrap_or(deposited);
-            assert!(deposited >= locked + amount, "ERR_STORAGE_WITHDRAW_TOO_MUCH");
+            assert!(deposited >= locked + amount, "{}", ERR11_INSUFFICIENT_STORAGE);
             Promise::new(account_id.clone()).transfer(amount);
             StorageBalance {
                 total: locked.into(),
                 available: (deposited - amount).into(),
             }
         } else {
-            env::panic("ERR_STORAGE_WITHDRAW_NO_ACCOUNT".as_bytes())
+            env::panic(format!("{}", ERR10_ACC_NOT_REGISTERED).as_bytes());
         }
     }
 
@@ -90,11 +90,11 @@ impl StorageManagement for Contract {
             // TODO: figure out force option logic.
             assert!(
                 farmer.rewards.is_empty(),
-                "ERR_STORAGE_UNREGISTER_REWARDS_NOT_EMPTY"
+                "{}", ERR12_STORAGE_UNREGISTER_REWARDS_NOT_EMPTY
             );
             assert!(
                 farmer.seeds.is_empty(),
-                "ERR_STORAGE_UNREGISTER_SEED_NOT_EMPTY"
+                "{}", ERR13_STORAGE_UNREGISTER_SEED_NOT_EMPTY
             );
             self.farmers.remove(&account_id);
             self.farmer_count -= 1;
@@ -174,7 +174,7 @@ impl Contract {
                 amount: amount,
                 rewards: HashMap::new(),
                 seeds: HashMap::new(),
-                farm_rps: HashMap::new(),
+                user_rps: HashMap::new(),
             });
             self.farmer_count += 1;
         }
