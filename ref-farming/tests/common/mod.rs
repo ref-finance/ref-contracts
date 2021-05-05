@@ -131,7 +131,7 @@ pub(crate) fn mint_token(token: &ContractAccount<TestToken>, user: &UserAccount,
     ).assert_success();
 }
 
-pub(crate) fn show_farminfo(farming: &ContractAccount<Farming>, farm_id: String) {
+pub(crate) fn show_farminfo(farming: &ContractAccount<Farming>, farm_id: String) -> FarmInfo {
     let farm_info = get_farminfo(farming, farm_id);
     println!("Farm Info ===>");
     println!("  ID:{}, Status:{}, Seed:{}, Reward:{}", 
@@ -141,6 +141,8 @@ pub(crate) fn show_farminfo(farming: &ContractAccount<Farming>, farm_id: String)
     println!("  TotalReward:{}, Claimed:{}, Unclaimed:{}, LastRound:{}, CurRound:{}", 
         farm_info.total_reward.0, farm_info.claimed_reward.0, farm_info.unclaimed_reward.0, 
         farm_info.last_round.0, farm_info.cur_round.0);
+    
+    farm_info
 }
 
 pub(crate) fn show_userseeds(farming: &ContractAccount<Farming>, user_id: String) -> HashMap<String, U128> {
