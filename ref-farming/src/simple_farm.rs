@@ -21,7 +21,7 @@ construct_uint! {
 }
 
 // to ensure precision, all reward_per_seed would be multiplied by this DENOM
-const DENOM: u128 = 100_000_000_000_000_000_000_000;
+const DENOM: u128 = 1_000_000_000_000_000_000;
 
 ///   The terms defines how the farm works.
 ///   In this version, we distribute reward token with a start height, a reward 
