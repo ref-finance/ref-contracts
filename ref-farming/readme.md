@@ -181,4 +181,12 @@ pub fn withdraw_reward(&mut self, token_id: ValidAccountId, amount: Option<U128>
 ```
 
 ***Owner methods***  
-This is left to future work, such as upgrade the contract, remove stale farms or withdraw undistributed reward token from farm.
+```rust
+pub fn set_owner(&mut self, owner_id: ValidAccountId);
+/// upgrade the contract
+pub fn upgrade(
+        &self,
+        #[serializer(borsh)] code: Vec<u8>,
+        #[serializer(borsh)] migrate: bool,
+    ) -> Promise;
+```

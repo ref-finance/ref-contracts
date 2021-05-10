@@ -20,6 +20,8 @@ construct_uint! {
     pub struct U256(4);
 }
 
+pub type RPS = [u8; 32];
+
 // to ensure precision, all reward_per_seed would be multiplied by this DENOM
 const DENOM: u128 = 1_000_000_000_000_000_000;
 
@@ -85,7 +87,7 @@ pub struct SimpleFarmRewardDistribution {
     pub unclaimed: Balance,
     /// Reward_Per_Seed
     /// rps(cur) = rps(prev) + distributing_reward / total_seed_staked
-    pub rps: Balance,
+    pub rps: RPS,
     /// Reward_Round
     /// rr = (cur_block_height - start_at) / session_interval
     pub rr: u64,
@@ -184,12 +186,12 @@ impl SimpleFarm {
             dis.undistributed -= reward_added;
 
             // calculate rps
-            dis.rps = self.last_distribution.rps + 
             (
+                U256::from_little_endian(&self.last_distribution.rps) + 
                 U256::from(reward_added) 
                 * U256::from(DENOM) 
                 / U256::from(*total_seeds)
-            ).as_u128();
+            ).to_little_endian(&mut dis.rps);
 
             Some(dis)
         } else {
@@ -202,7 +204,7 @@ impl SimpleFarm {
     /// return (cur_rps - last_user_rps) * user_seeds / DENOM
     pub(crate) fn view_farmer_unclaimed_reward(
         &self,
-        user_rps: &Balance,
+        user_rps: &RPS,
         user_seeds: &Balance,
         total_seeds: &Balance,
     ) -> Balance {
@@ -211,7 +213,7 @@ impl SimpleFarm {
         }
         if let Some(dis) = self.try_distribute(total_seeds) {
             (U256::from(*user_seeds) 
-            * U256::from(dis.rps - user_rps) 
+            * (U256::from_little_endian(&dis.rps) - U256::from_little_endian(user_rps))
             / U256::from(DENOM)).as_u128()
         } else {
             0
@@ -229,7 +231,7 @@ impl SimpleFarm {
                 env::log(
                     format!(
                         "{} RPS increased to {} and RR update to #{}",
-                        self.farm_id, dis.rps, dis.rr,
+                        self.farm_id, U256::from_little_endian(&dis.rps), dis.rr,
                     )
                     .as_bytes(),
                 );
@@ -244,10 +246,10 @@ impl SimpleFarm {
     /// and amount of reward as (user_rps, reward_amount) 
     pub(crate) fn claim_user_reward(
         &mut self, 
-        user_rps: &Balance,
+        user_rps: &RPS,
         user_seeds: &Balance, 
         total_seeds: &Balance
-    ) -> Option<(Balance, Balance)> {
+    ) -> Option<(RPS, Balance)> {
 
         if total_seeds == &0 {
             return None;
@@ -257,7 +259,7 @@ impl SimpleFarm {
 
         let claimed = (
             U256::from(*user_seeds) 
-            * U256::from(self.last_distribution.rps - user_rps) 
+            * (U256::from_little_endian(&self.last_distribution.rps) - U256::from_little_endian(user_rps))
             / U256::from(DENOM)
         ).as_u128();
 

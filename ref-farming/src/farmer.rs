@@ -8,15 +8,13 @@
 use std::collections::HashMap;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{env, AccountId, Balance};
-use crate::{SeedId, FarmId};
+use crate::{SeedId, FarmId, RPS};
 use crate::errors::*;
-
-/// assume the average AccountId length is lower than 64 bytes.
-const MAX_ACCOUNT_LENGTH: u128 = 64;
+use crate::utils::MAX_ACCOUNT_LENGTH;
 /// each entry cost MAX_ACCOUNT_LENGTH bytes, 
 /// amount: Balance cost 16 bytes
 /// each empty hashmap cost 4 bytes
-const MIN_FARMER_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4 * 3;
+pub const MIN_FARMER_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4 * 3;
 
 /// Account deposits information and storage cost.
 #[derive(BorshSerialize, BorshDeserialize, Default)]
@@ -30,7 +28,7 @@ pub struct Farmer {
     /// Amounts of various seed tokens the farmer staked.
     pub seeds: HashMap<SeedId, Balance>,
     /// record user_last_rps of farms
-    pub user_rps: HashMap<FarmId, Balance>,
+    pub user_rps: HashMap<FarmId, RPS>,
 }
 
 impl Farmer {
@@ -83,11 +81,11 @@ impl Farmer {
         cur_balance
     }
 
-    pub fn get_rps(&self, farm_id: &FarmId) -> Balance {
-        self.user_rps.get(farm_id).unwrap_or(&0).clone()
+    pub fn get_rps(&self, farm_id: &FarmId) -> RPS {
+        self.user_rps.get(farm_id).unwrap_or(&RPS::default()).clone()
     }
 
-    pub fn set_rps(&mut self, farm_id: &FarmId, rps: Balance) {
+    pub fn set_rps(&mut self, farm_id: &FarmId, rps: RPS) {
         self.user_rps.insert(farm_id.clone(), rps);
     }
 
@@ -97,7 +95,7 @@ impl Farmer {
             MIN_FARMER_LENGTH 
             + self.rewards.len() as u128 * (MAX_ACCOUNT_LENGTH + 16)
             + self.seeds.len() as u128 * (MAX_ACCOUNT_LENGTH + 16)
-            + self.user_rps.len() as u128 * (MAX_ACCOUNT_LENGTH + 16)
+            + self.user_rps.len() as u128 * (MAX_ACCOUNT_LENGTH + 32)
         )
         * env::storage_byte_cost()
     }

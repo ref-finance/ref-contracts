@@ -3,7 +3,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, Balance};
 
-use crate::simple_farm::SimpleFarm;
+use crate::simple_farm::{SimpleFarm, RPS};
 use crate::SeedId;
 
 pub(crate) type FarmId = String;
@@ -55,7 +55,7 @@ impl Farm {
     /// Returns how many reward tokens can given farmer claim.
     pub fn view_farmer_unclaimed_reward(
         &self,
-        user_rps: &Balance,
+        user_rps: &RPS,
         user_seeds: &Balance,
         total_seeds: &Balance,
     ) -> Balance {
@@ -68,9 +68,9 @@ impl Farm {
     /// return the new user reward per seed 
     /// and amount of reward as (user_rps, reward_amount) 
     pub fn claim_user_reward(&mut self, 
-        user_rps: &Balance,
+        user_rps: &RPS,
         user_seeds: &Balance, 
-        total_seeds: &Balance) -> Option<(Balance, Balance)> {
+        total_seeds: &Balance) -> Option<(RPS, Balance)> {
         match self {
             Farm::SimpleFarm(farm) 
                 => farm.claim_user_reward(user_rps, user_seeds, total_seeds),

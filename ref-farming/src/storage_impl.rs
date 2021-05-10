@@ -10,9 +10,10 @@ use near_sdk::{assert_one_yocto, env, log, near_bindgen, Promise, Balance};
 
 use crate::errors::*;
 use crate::*;
+use crate::farmer::MIN_FARMER_LENGTH;
+use crate::utils::MAX_ACCOUNT_LENGTH;
 
-const MAX_ACCOUNT_LENGTH: u128 = 64;
-const MIN_FARMER_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 8;
+
 
 /// Implements users storage management for the pool.
 #[near_bindgen]
@@ -160,7 +161,7 @@ impl Contract {
         (
             MIN_FARMER_LENGTH 
             + 2_u128 * 5_u128 * (MAX_ACCOUNT_LENGTH + 16)
-            + 10_u128 * (MAX_ACCOUNT_LENGTH + 16)
+            + 10_u128 * (MAX_ACCOUNT_LENGTH + 32)
         ) * env::storage_byte_cost()
     }
 

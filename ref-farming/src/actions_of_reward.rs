@@ -6,6 +6,12 @@ use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseR
 use crate::utils::{ext_fungible_token, ext_self, GAS_FOR_FT_TRANSFER, parse_farm_id};
 use crate::errors::*;
 use crate::*;
+use uint::construct_uint;
+
+construct_uint! {
+    /// 256-bit unsigned integer.
+    pub struct U256(4);
+}
 
 #[near_bindgen]
 impl Contract {
@@ -98,7 +104,7 @@ fn claim_user_reward_from_farm(
         env::log(
             format!(
                 "user_rps@{} increased to {}",
-                farm.get_farm_id(), new_user_rps,
+                farm.get_farm_id(), U256::from_little_endian(&new_user_rps),
             )
             .as_bytes(),
         );

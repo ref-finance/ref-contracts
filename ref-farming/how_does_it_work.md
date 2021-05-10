@@ -37,6 +37,9 @@ pub struct Contract {
     reward_info: UnorderedMap::<AccountId, Balance>,
 }
 
+/// used to store U256 in contract storage
+pub type RPS = [u8; 32];
+
 pub struct Farmer {
     /// Native NEAR amount sent to this contract.
     /// Used for storage.
@@ -46,7 +49,7 @@ pub struct Farmer {
     /// Amounts of various seed tokens the farmer staked.
     pub seeds: HashMap<SeedId, Balance>,
     /// record user_last_rps of farms
-    pub farm_rps: HashMap<FarmId, Balance>,
+    pub farm_rps: HashMap<FarmId, RPS>,
 }
 
 pub struct FarmSeed {
@@ -86,7 +89,7 @@ pub struct SimpleFarmRewardDistribution {
     pub unclaimed: Balance,
     /// Reward_Per_Seed
     /// rps(cur) = rps(prev) + distributing_reward / total_seed_staked
-    pub rps: Balance,
+    pub rps: RPS,
     /// Reward_Round
     /// rr = (cur_block_height - start_at) / session_interval
     pub rr: u64,
@@ -129,7 +132,7 @@ This logic is sealed in
 ```rust
 pub(crate) fn view_farmer_unclaimed_reward(
         &self,
-        user_rps: &Balance,
+        user_rps: &RPS,
         user_seeds: &Balance,
         total_seeds: &Balance,
     ) -> Balance
@@ -144,7 +147,7 @@ And when farmer actually claims his reward, the whole logic is sealed in
 ```rust
 pub(crate) fn claim_user_reward(
         &mut self, 
-        user_rps: &Balance,
+        user_rps: &RPS,
         user_seeds: &Balance, 
         total_seeds: &Balance
     ) -> Option<(Balance, Balance)>
@@ -171,14 +174,14 @@ For example, when a new farm established and running, which accepts the farmer's
 Consider that, and also to improve farmer's user-experience, we have a `suggested_min_storage_usage()` which covers 5 seed, 5 reward and 10 farms as one shot. When farmer register for the first time, we will force him to deposit more or equal to that amount, which is about 1,688 bytes, 0.0134 near. 
 ```rust
 const MAX_ACCOUNT_LENGTH: u128 = 64;
-const MIN_FARMER_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 8;
+const MIN_FARMER_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4 * 3;
 /// Returns minimal storage usage possible.
 /// 5 reward tokens, 5 seed tokens, 10 farms as assumption.
 pub(crate) fn suggested_min_storage_usage() -> Balance {
     (
         MIN_FARMER_LENGTH 
         + 2_u128 * 5_u128 * (MAX_ACCOUNT_LENGTH + 16)
-        + 10_u128 * (MAX_ACCOUNT_LENGTH + 16)
+        + 10_u128 * (MAX_ACCOUNT_LENGTH + 32)
     ) * env::storage_byte_cost()
 }
 ```

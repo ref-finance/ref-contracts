@@ -5,8 +5,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{env, Balance};
 use crate::errors::*;
 use crate::farm::Farm;
-
-const MAX_ACCOUNT_LENGTH: u128 = 64;
+use crate::utils::MAX_ACCOUNT_LENGTH;
 
 /// For MFT, SeedId composes of token_contract_id 
 /// and token's inner_id in that contract. 

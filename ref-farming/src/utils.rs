@@ -5,6 +5,7 @@ use uint::construct_uint;
 use crate::{SeedId, FarmId};
 use crate::errors::*;
 
+pub const MAX_ACCOUNT_LENGTH: u128 = 64;
 /// Amount of gas for fungible token transfers.
 pub const GAS_FOR_FT_TRANSFER: Gas = 10_000_000_000_000;
 /// Amount of gas used for upgrade function itself.

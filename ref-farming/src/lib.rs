@@ -10,6 +10,7 @@ use near_sdk::{env, near_bindgen, Balance, AccountId, PanicOnDefault};
 // use near_sdk::BorshStorageKey;
 
 use crate::farm::{Farm, FarmId};
+use crate::simple_farm::{RPS};
 use crate::farm_seed::{FarmSeed, SeedId};
 use crate::farmer::Farmer;
 
@@ -145,7 +146,7 @@ mod tests {
             .predecessor_account_id(farmer.clone())
             .is_view(false)
             .block_index(height)
-            .attached_deposit(env::storage_byte_cost() * 1688)
+            .attached_deposit(env::storage_byte_cost() * 1852)
             .build());
         contract.storage_deposit(Some(farmer), Some(true))
     }
