@@ -7,7 +7,8 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
-    assert_one_yocto, env, log, near_bindgen, AccountId, PanicOnDefault, Promise, PromiseResult,
+    assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
+    PromiseResult, StorageUsage,
 };
 
 use crate::account_deposit::AccountDeposit;
@@ -112,7 +113,7 @@ impl Contract {
         amounts: Vec<U128>,
         min_amounts: Option<Vec<U128>>,
     ) {
-        assert_one_yocto();
+        let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
@@ -132,12 +133,14 @@ impl Contract {
         }
         self.deposited_amounts.insert(&sender_id, &deposits);
         self.pools.replace(pool_id, &pool);
+        self.internal_check_storage(prev_storage);
     }
 
     /// Remove liquidity from the pool into general pool of liquidity.
     #[payable]
     pub fn remove_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
         assert_one_yocto();
+        let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         let amounts = pool.remove_liquidity(
@@ -155,21 +158,24 @@ impl Contract {
             deposits.add(&tokens[i], amounts[i]);
         }
         self.deposited_amounts.insert(&sender_id, &deposits);
+        // If storage was freed up by this operation. Refund to the user the difference.
+        if prev_storage > env::storage_usage() {
+            Promise::new(sender_id).transfer(
+                (prev_storage - env::storage_usage()) as Balance * env::storage_byte_cost(),
+            );
+        }
     }
 }
 
 /// Internal methods implementation.
 impl Contract {
-    /// Adds given pool to the list and returns it's id.
-    /// If there is not enough attached balance to cover storage, fails.
-    /// If too much attached - refunds it back.
-    fn internal_add_pool(&mut self, pool: Pool) -> u64 {
-        let prev_storage = env::storage_usage();
-        let id = self.pools.len() as u64;
-        self.pools.push(&pool);
-
-        // Check how much storage cost and refund the left over back.
-        let storage_cost = (env::storage_usage() - prev_storage) as u128 * env::storage_byte_cost();
+    /// Check how much storage taken costs and refund the left over back.
+    fn internal_check_storage(&self, prev_storage: StorageUsage) {
+        let storage_cost = env::storage_usage()
+            .checked_sub(prev_storage)
+            .unwrap_or_default() as Balance
+            * env::storage_byte_cost();
+        println!("Used: {}", storage_cost);
         assert!(
             storage_cost <= env::attached_deposit(),
             "ERR_STORAGE_DEPOSIT"
@@ -178,6 +184,16 @@ impl Contract {
         if refund > 0 {
             Promise::new(env::predecessor_account_id()).transfer(refund);
         }
+    }
+
+    /// Adds given pool to the list and returns it's id.
+    /// If there is not enough attached balance to cover storage, fails.
+    /// If too much attached - refunds it back.
+    fn internal_add_pool(&mut self, pool: Pool) -> u64 {
+        let prev_storage = env::storage_usage();
+        let id = self.pools.len() as u64;
+        self.pools.push(&pool);
+        self.internal_check_storage(prev_storage);
         id
     }
 
@@ -286,7 +302,7 @@ mod tests {
         deposit_tokens(context, contract, accounts(3), token_amounts.clone());
         testing_env!(context
             .predecessor_account_id(account_id.clone())
-            .attached_deposit(1)
+            .attached_deposit(to_yocto("0.00067"))
             .build());
         contract.add_liquidity(
             pool_id,
@@ -405,9 +421,10 @@ mod tests {
             .attached_deposit(to_yocto("1"))
             .build());
         let id = contract.add_simple_pool(vec![accounts(1), accounts(2)], 25);
-        testing_env!(context.attached_deposit(1).build());
+        testing_env!(context.attached_deposit(to_yocto("0.00067")).build());
         contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("10"))], None);
         contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("50"))], None);
+        testing_env!(context.attached_deposit(1).build());
         contract.remove_liquidity(id, U128(to_yocto("1")), vec![U128(1), U128(1)]);
 
         // Check that amounts add up to deposits.

@@ -96,6 +96,10 @@ impl SimplePool {
     /// Adds the amounts of tokens to liquidity pool and returns number of shares that this user receives.
     /// Updates amount to amount kept in the pool.
     pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>) -> Balance {
+        assert!(
+            env::attached_deposit() > 0,
+            "Requires attached deposit of at least 1 yoctoNEAR"
+        );
         assert_eq!(
             amounts.len(),
             self.token_account_ids.len(),
@@ -288,9 +292,12 @@ impl SimplePool {
             self.mint_shares(&exchange_id, (numerator / denominator).as_u128());
         }
 
-        // If there is referral, allocate it % of LP rewards.
+        // If there is referral provided and the account already registered LP, allocate it % of LP rewards.
         if let Some(referral_id) = referral_id {
-            if self.referral_fee > 0 && numerator > U256::zero() {
+            if self.referral_fee > 0
+                && numerator > U256::zero()
+                && self.shares.contains_key(referral_id)
+            {
                 let denominator = new_invariant * self.total_fee / self.referral_fee;
                 self.mint_shares(&referral_id, (numerator / denominator).as_u128());
             }
