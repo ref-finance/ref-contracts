@@ -28,41 +28,32 @@ fn test_upgrade() {
         signer_account: root,
         init_method: new(ValidAccountId::try_from(root.account_id.clone()).unwrap(), 4, 1)
     );
-    let args_nomigration = UpgradeArgs {
-        code: EXCHANGE_WASM_BYTES.to_vec(),
-        migrate: false,
-    };
     // Failed upgrade with no permissions.
     let result = test_user
         .call(
             pool.user_account.account_id.clone(),
             "upgrade",
-            &args_nomigration.try_to_vec().unwrap(),
+            &EXCHANGE_WASM_BYTES,
             near_sdk_sim::DEFAULT_GAS,
             0,
         )
         .status();
     assert!(format!("{:?}", result).contains("ERR_NOT_ALLOWED"));
 
-    // Upgrade with calling migration. Should fail as currently migration not implemented
-    let args = UpgradeArgs {
-        code: EXCHANGE_WASM_BYTES.to_vec(),
-        migrate: true,
-    };
     root.call(
         pool.user_account.account_id.clone(),
         "upgrade",
-        &args.try_to_vec().unwrap(),
+        &EXCHANGE_WASM_BYTES,
         near_sdk_sim::DEFAULT_GAS,
         0,
     )
     .assert_success();
 
-    // Upgrade to the same code without migration is successful.
+    // Upgrade to the same code migration is skipped.
     root.call(
         pool.user_account.account_id.clone(),
         "upgrade",
-        &args_nomigration.try_to_vec().unwrap(),
+        &EXCHANGE_WASM_BYTES,
         near_sdk_sim::DEFAULT_GAS,
         0,
     )
