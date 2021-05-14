@@ -1,3 +1,4 @@
+use near_contract_standards::fungible_token::metadata::{FungibleTokenMetadata, FT_METADATA_SPEC};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{ext_contract, near_bindgen, Balance, PromiseOrValue};
 
@@ -214,5 +215,20 @@ impl Contract {
             }
         }
         U128(unused_amount)
+    }
+
+    pub fn mft_metadata(&self, token_id: String) -> FungibleTokenMetadata {
+        match parse_token_id(token_id) {
+            TokenOrPool::Pool(pool_id) => FungibleTokenMetadata {
+                spec: FT_METADATA_SPEC.to_string(),
+                name: format!("ref-pool-{}", pool_id),
+                symbol: format!("REF-POOL-{}", pool_id),
+                icon: None,
+                reference: None,
+                reference_hash: None,
+                decimals: 24,
+            },
+            TokenOrPool::Token(_token_id) => unimplemented!(),
+        }
     }
 }
