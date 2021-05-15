@@ -65,18 +65,17 @@ impl Contract {
             }
             TokenOrPool::Token(token_id) => {
                 let mut sender_account = self
-                    .deposited_amounts
+                    .accounts
                     .get(&sender_id)
                     .expect(ERR10_ACC_NOT_REGISTERED);
                 let mut receiver_account = self
-                    .deposited_amounts
+                    .accounts
                     .get(receiver_id)
                     .expect(ERR10_ACC_NOT_REGISTERED);
-                sender_account.sub(&token_id, amount);
-                receiver_account.add(&token_id, amount);
-                self.deposited_amounts.insert(&sender_id, &sender_account);
-                self.deposited_amounts
-                    .insert(&receiver_id, &receiver_account);
+                sender_account.withdraw(&token_id, amount);
+                receiver_account.deposit(&token_id, amount);
+                self.accounts.insert(&sender_id, &sender_account);
+                self.accounts.insert(&receiver_id, &receiver_account);
                 log!(
                     "Transfer {}: {} from {} to {}",
                     token_id,
@@ -116,6 +115,22 @@ impl Contract {
                 U128(pool.share_total_balance())
             }
             TokenOrPool::Token(_token_id) => unimplemented!(),
+        }
+    }
+
+    /// Register LP token of given pool for given account.
+    /// Fails if token_id is not a pool.
+    #[payable]
+    pub fn mft_register(&mut self, token_id: String, account_id: ValidAccountId) {
+        let prev_storage = env::storage_usage();
+        match parse_token_id(token_id) {
+            TokenOrPool::Token(_) => env::panic(b"ERR_INVALID_REGISTER"),
+            TokenOrPool::Pool(pool_id) => {
+                let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+                pool.share_register(account_id.as_ref());
+                self.pools.replace(pool_id, &pool);
+                self.internal_check_storage(prev_storage);
+            }
         }
     }
 
@@ -206,7 +221,7 @@ impl Contract {
                 let refund_amount = std::cmp::min(receiver_balance, unused_amount);
                 // If sender's account was deleted, we assume that they have also withdrew all the liquidity from pools.
                 // Funds are sent to the owner account.
-                let refund_to = if self.deposited_amounts.get(&sender_id).is_some() {
+                let refund_to = if self.accounts.get(&sender_id).is_some() {
                     sender_id
                 } else {
                     self.owner_id.clone()

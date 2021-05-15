@@ -11,7 +11,7 @@ use near_sdk::{
     PromiseResult, StorageUsage,
 };
 
-use crate::account_deposit::AccountDeposit;
+use crate::account_deposit::Account;
 pub use crate::action::*;
 use crate::errors::*;
 use crate::pool::Pool;
@@ -45,8 +45,8 @@ pub struct Contract {
     referral_fee: u32,
     /// List of all the pools.
     pools: Vector<Pool>,
-    /// Balances of deposited tokens for each account.
-    deposited_amounts: LookupMap<AccountId, AccountDeposit>,
+    /// Accounts registered, keeping track all the amounts deposited, storage and more.
+    accounts: LookupMap<AccountId, Account>,
     /// Set of whitelisted tokens by "owner".
     whitelisted_tokens: UnorderedSet<AccountId>,
 }
@@ -60,7 +60,7 @@ impl Contract {
             exchange_fee,
             referral_fee,
             pools: Vector::new(b"p".to_vec()),
-            deposited_amounts: LookupMap::new(b"d".to_vec()),
+            accounts: LookupMap::new(b"d".to_vec()),
             whitelisted_tokens: UnorderedSet::new(b"w".to_vec()),
         }
     }
@@ -113,6 +113,10 @@ impl Contract {
         amounts: Vec<U128>,
         min_amounts: Option<Vec<U128>>,
     ) {
+        assert!(
+            env::attached_deposit() > 0,
+            "Requires attached deposit of at least 1 yoctoNEAR"
+        );
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
@@ -125,13 +129,13 @@ impl Contract {
                 assert!(amount >= &min_amount.0, "ERR_MIN_AMOUNT");
             }
         }
-        let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
+        let mut deposits = self.accounts.get(&sender_id).unwrap_or_default();
         let tokens = pool.tokens();
         // Subtract updated amounts from deposits. This will fail if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
-            deposits.sub(&tokens[i], amounts[i]);
+            deposits.withdraw(&tokens[i], amounts[i]);
         }
-        self.deposited_amounts.insert(&sender_id, &deposits);
+        self.accounts.insert(&sender_id, &deposits);
         self.pools.replace(pool_id, &pool);
         self.internal_check_storage(prev_storage);
     }
@@ -153,17 +157,16 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
+        let mut deposits = self.accounts.get(&sender_id).unwrap_or_default();
         for i in 0..tokens.len() {
-            deposits.add(&tokens[i], amounts[i]);
+            deposits.deposit(&tokens[i], amounts[i]);
         }
-        self.deposited_amounts.insert(&sender_id, &deposits);
-        // If storage was freed up by this operation. Refund to the user the difference.
+        // Freed up storage balance from LP tokens will be returned to near_balance.
         if prev_storage > env::storage_usage() {
-            Promise::new(sender_id).transfer(
-                (prev_storage - env::storage_usage()) as Balance * env::storage_byte_cost(),
-            );
+            deposits.near_amount +=
+                (prev_storage - env::storage_usage()) as Balance * env::storage_byte_cost();
         }
+        self.accounts.insert(&sender_id, &deposits);
     }
 }
 
@@ -175,12 +178,9 @@ impl Contract {
             .checked_sub(prev_storage)
             .unwrap_or_default() as Balance
             * env::storage_byte_cost();
-        println!("Used: {}", storage_cost);
-        assert!(
-            storage_cost <= env::attached_deposit(),
-            "ERR_STORAGE_DEPOSIT"
-        );
-        let refund = env::attached_deposit() - storage_cost;
+        let refund = env::attached_deposit()
+            .checked_sub(storage_cost)
+            .expect("ERR_STORAGE_DEPOSIT");
         if refund > 0 {
             Promise::new(env::predecessor_account_id()).transfer(refund);
         }
@@ -209,8 +209,8 @@ impl Contract {
         min_amount_out: u128,
         referral_id: &Option<AccountId>,
     ) -> u128 {
-        let mut deposits = self.deposited_amounts.get(&sender_id).unwrap_or_default();
-        deposits.sub(token_in, amount_in);
+        let mut deposits = self.accounts.get(&sender_id).unwrap_or_default();
+        deposits.withdraw(token_in, amount_in);
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         let amount_out = pool.swap(
             token_in,
@@ -220,8 +220,8 @@ impl Contract {
             &self.owner_id,
             referral_id,
         );
-        deposits.add(token_out, amount_out);
-        self.deposited_amounts.insert(&sender_id, &deposits);
+        deposits.deposit(token_out, amount_out);
+        self.accounts.insert(&sender_id, &deposits);
         self.pools.replace(pool_id, &pool);
         amount_out
     }
@@ -379,7 +379,15 @@ mod tests {
         );
         assert_eq!(contract.get_deposit(accounts(1), accounts(2)).0, one_near);
 
-        testing_env!(context.predecessor_account_id(accounts(3)).build());
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(to_yocto("0.0067"))
+            .build());
+        contract.mft_register("0".to_string(), accounts(1));
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(1)
+            .build());
         // transfer 1m shares in pool 0 to acc 1.
         contract.mft_transfer("0".to_string(), accounts(1), U128(1_000_000), None);
 
