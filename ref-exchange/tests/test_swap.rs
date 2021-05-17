@@ -105,7 +105,7 @@ fn test_swap() {
     call!(
         root,
         pool.add_liquidity(0, vec![U128(to_yocto("5")), U128(to_yocto("10"))], None),
-        deposit = 1
+        deposit = to_yocto("0.00067")
     )
     .assert_success();
     assert_eq!(

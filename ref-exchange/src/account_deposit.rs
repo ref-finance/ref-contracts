@@ -16,17 +16,17 @@ const MIN_ACCOUNT_DEPOSIT_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4;
 /// Account deposits information and storage cost.
 #[derive(BorshSerialize, BorshDeserialize, Default)]
 #[cfg_attr(feature = "test", derive(Clone))]
-pub struct AccountDeposit {
-    /// Native amount sent to the exchange.
-    /// Used for storage now, but in future can be used for trading as well.
-    pub amount: Balance,
-    /// Amounts of various tokens in this account.
+pub struct Account {
+    /// Native NEAR amount sent to the exchange.
+    /// Used for storage right now, but in future can be used for trading as well.
+    pub near_amount: Balance,
+    /// Amounts of various tokens deposited to this account.
     pub tokens: HashMap<AccountId, Balance>,
 }
 
-impl AccountDeposit {
-    /// Adds amount to the balance of given token while checking that storage is covered.
-    pub(crate) fn add(&mut self, token: &AccountId, amount: Balance) {
+impl Account {
+    /// Deposit amount to the balance of given token while checking that storage is covered.
+    pub(crate) fn deposit(&mut self, token: &AccountId, amount: Balance) {
         if let Some(x) = self.tokens.get_mut(token) {
             *x = *x + amount;
         } else {
@@ -35,9 +35,9 @@ impl AccountDeposit {
         }
     }
 
-    /// Subtract from `token` balance.
+    /// Withdraw amount of `token` from the internal balance.
     /// Panics if `amount` is bigger than the current balance.
-    pub(crate) fn sub(&mut self, token: &AccountId, amount: Balance) {
+    pub(crate) fn withdraw(&mut self, token: &AccountId, amount: Balance) {
         let value = *self.tokens.get(token).expect(ERR21_TOKEN_NOT_REG);
         assert!(value >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
         self.tokens.insert(token.clone(), value - amount);
@@ -51,13 +51,13 @@ impl AccountDeposit {
 
     /// Returns how much NEAR is available for storage.
     pub fn storage_available(&self) -> Balance {
-        self.amount - self.storage_usage()
+        self.near_amount - self.storage_usage()
     }
 
     /// Asserts there is sufficient amount of $NEAR to cover storage usage.
     pub fn assert_storage_usage(&self) {
         assert!(
-            self.storage_usage() <= self.amount,
+            self.storage_usage() <= self.near_amount,
             "{}",
             ERR11_INSUFFICIENT_STORAGE
         );
@@ -96,7 +96,7 @@ impl Contract {
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.get_account_deposits(&sender_id);
         deposits.register(&token_ids);
-        self.deposited_amounts.insert(&sender_id, &deposits);
+        self.accounts.insert(&sender_id, &deposits);
     }
 
     /// Unregister given token from user's account deposit.
@@ -107,7 +107,7 @@ impl Contract {
         for token_id in token_ids {
             deposits.unregister(token_id.as_ref());
         }
-        self.deposited_amounts.insert(&sender_id, &deposits);
+        self.accounts.insert(&sender_id, &deposits);
     }
 
     /// Withdraws given token from the deposits of given user.
@@ -121,11 +121,11 @@ impl Contract {
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.get_account_deposits(&sender_id);
         // Note: subtraction and deregistration will be reverted if the promise fails.
-        deposits.sub(&token_id, amount);
+        deposits.withdraw(&token_id, amount);
         if unregister == Some(true) {
             deposits.unregister(&token_id);
         }
-        self.deposited_amounts.insert(&sender_id, &deposits);
+        self.accounts.insert(&sender_id, &deposits);
         ext_fungible_token::ft_transfer(
             sender_id.clone().try_into().unwrap(),
             amount.into(),
@@ -163,8 +163,8 @@ impl Contract {
             PromiseResult::Failed => {
                 // This reverts the changes from withdraw function.
                 let mut deposits = self.get_account_deposits(&sender_id);
-                deposits.add(&token_id, amount.0);
-                self.deposited_amounts.insert(&sender_id, &deposits);
+                deposits.deposit(&token_id, amount.0);
+                self.accounts.insert(&sender_id, &deposits);
             }
         };
     }
@@ -175,9 +175,9 @@ impl Contract {
     /// If account already exists, adds amount to it.
     /// This should be used when it's known that storage is prepaid.
     pub(crate) fn internal_register_account(&mut self, account_id: &AccountId, amount: Balance) {
-        let mut deposit_amount = self.deposited_amounts.get(&account_id).unwrap_or_default();
-        deposit_amount.amount += amount;
-        self.deposited_amounts.insert(&account_id, &deposit_amount);
+        let mut deposit_amount = self.accounts.get(&account_id).unwrap_or_default();
+        deposit_amount.near_amount += amount;
+        self.accounts.insert(&account_id, &deposit_amount);
     }
 
     /// Record deposit of some number of tokens to this contract.
@@ -195,16 +195,14 @@ impl Contract {
             "{}",
             ERR12_TOKEN_NOT_WHITELISTED
         );
-        account_deposit.add(token_id, amount);
-        self.deposited_amounts.insert(sender_id, &account_deposit);
+        account_deposit.deposit(token_id, amount);
+        self.accounts.insert(sender_id, &account_deposit);
     }
 
     // Returns `from` AccountDeposit.
     #[inline]
-    pub(crate) fn get_account_deposits(&self, from: &AccountId) -> AccountDeposit {
-        self.deposited_amounts
-            .get(from)
-            .expect(ERR10_ACC_NOT_REGISTERED)
+    pub(crate) fn get_account_deposits(&self, from: &AccountId) -> Account {
+        self.accounts.get(from).expect(ERR10_ACC_NOT_REGISTERED)
     }
 
     /// Returns current balance of given token for given user. If there is nothing recorded, returns 0.
@@ -213,7 +211,7 @@ impl Contract {
         sender_id: &AccountId,
         token_id: &AccountId,
     ) -> Balance {
-        self.deposited_amounts
+        self.accounts
             .get(sender_id)
             .and_then(|d| d.tokens.get(token_id).cloned())
             .unwrap_or_default()
