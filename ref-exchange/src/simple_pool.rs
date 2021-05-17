@@ -5,7 +5,9 @@ use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance};
 
-use crate::errors::{ERR31_ZERO_AMOUNT, ERR32_ZERO_SHARES};
+use crate::errors::{
+    ERR13_LP_NOT_REGISTERED, ERR14_LP_ALREADY_REGISTERED, ERR31_ZERO_AMOUNT, ERR32_ZERO_SHARES,
+};
 use crate::utils::{
     add_to_collection, integer_sqrt, SwapVolume, FEE_DIVISOR, INIT_SHARES_SUPPLY, U256,
 };
@@ -64,6 +66,15 @@ impl SimplePool {
         }
     }
 
+    /// Register given account with 0 balance in shares.
+    /// Storage payment should be checked by caller.
+    pub fn share_register(&mut self, account_id: &AccountId) {
+        if self.shares.contains_key(account_id) {
+            env::panic(ERR14_LP_ALREADY_REGISTERED.as_bytes());
+        }
+        self.shares.insert(account_id, &0);
+    }
+
     /// Transfers shares from predecessor to receiver.
     pub fn share_transfer(&mut self, sender_id: &AccountId, receiver_id: &AccountId, amount: u128) {
         let balance = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
@@ -72,9 +83,10 @@ impl SimplePool {
         } else {
             env::panic(b"ERR_NOT_ENOUGH_SHARES");
         }
-        // TODO: add charging for storage.
-        // TODO: handle returns from callback.
-        let balance_out = self.shares.get(&receiver_id).unwrap_or(0);
+        let balance_out = self
+            .shares
+            .get(&receiver_id)
+            .expect(ERR13_LP_NOT_REGISTERED);
         self.shares.insert(&receiver_id, &(balance_out + amount));
     }
 
@@ -288,9 +300,12 @@ impl SimplePool {
             self.mint_shares(&exchange_id, (numerator / denominator).as_u128());
         }
 
-        // If there is referral, allocate it % of LP rewards.
+        // If there is referral provided and the account already registered LP, allocate it % of LP rewards.
         if let Some(referral_id) = referral_id {
-            if self.referral_fee > 0 && numerator > U256::zero() {
+            if self.referral_fee > 0
+                && numerator > U256::zero()
+                && self.shares.contains_key(referral_id)
+            {
                 let denominator = new_invariant * self.total_fee / self.referral_fee;
                 self.mint_shares(&referral_id, (numerator / denominator).as_u128());
             }
@@ -339,6 +354,7 @@ mod tests {
             pool.share_balance_of(accounts(0).as_ref()),
             INIT_SHARES_SUPPLY
         );
+        pool.share_register(accounts(1).as_ref());
         pool.share_transfer(
             accounts(0).as_ref(),
             accounts(1).as_ref(),

@@ -3,8 +3,10 @@
 pub const ERR10_ACC_NOT_REGISTERED: &str = "E10: account not registered";
 pub const ERR11_INSUFFICIENT_STORAGE: &str = "E11: insufficient $NEAR storage deposit";
 pub const ERR12_TOKEN_NOT_WHITELISTED: &str = "E12: token not whitelisted";
+pub const ERR13_LP_NOT_REGISTERED: &str = "E13: LP not registered";
+pub const ERR14_LP_ALREADY_REGISTERED: &str = "E14: LP already registered";
 
-// Account Deposits //
+// Accounts //
 
 pub const ERR21_TOKEN_NOT_REG: &str = "E21: token not registered";
 pub const ERR22_NOT_ENOUGH_TOKENS: &str = "E22: not enough tokens in deposit";

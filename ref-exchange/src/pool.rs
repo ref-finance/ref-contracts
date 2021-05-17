@@ -111,4 +111,10 @@ impl Pool {
             Pool::SimplePool(pool) => pool.share_transfer(sender_id, receiver_id, amount),
         }
     }
+
+    pub fn share_register(&mut self, account_id: &AccountId) {
+        match self {
+            Pool::SimplePool(pool) => pool.share_register(account_id),
+        }
+    }
 }

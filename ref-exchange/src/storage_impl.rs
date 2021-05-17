@@ -15,7 +15,7 @@ impl StorageManagement for Contract {
             .unwrap_or_else(|| env::predecessor_account_id());
         let registration_only = registration_only.unwrap_or(false);
         let min_balance = self.storage_balance_bounds().min.0;
-        let already_registered = self.deposited_amounts.contains_key(&account_id);
+        let already_registered = self.accounts.contains_key(&account_id);
         if amount < min_balance && !already_registered {
             env::panic(b"ERR_DEPOSIT_LESS_THAN_MIN_STORAGE");
         }
@@ -58,14 +58,14 @@ impl StorageManagement for Contract {
     fn storage_unregister(&mut self, force: Option<bool>) -> bool {
         assert_one_yocto();
         let account_id = env::predecessor_account_id();
-        if let Some(account_deposit) = self.deposited_amounts.get(&account_id) {
+        if let Some(account_deposit) = self.accounts.get(&account_id) {
             // TODO: figure out force option logic.
             assert!(
                 account_deposit.tokens.is_empty(),
                 "ERR_STORAGE_UNREGISTER_TOKENS_NOT_EMPTY"
             );
-            self.deposited_amounts.remove(&account_id);
-            Promise::new(account_id.clone()).transfer(account_deposit.amount);
+            self.accounts.remove(&account_id);
+            Promise::new(account_id.clone()).transfer(account_deposit.near_amount);
             true
         } else {
             false
@@ -74,16 +74,16 @@ impl StorageManagement for Contract {
 
     fn storage_balance_bounds(&self) -> StorageBalanceBounds {
         StorageBalanceBounds {
-            min: AccountDeposit::min_storage_usage().into(),
+            min: Account::min_storage_usage().into(),
             max: None,
         }
     }
 
     fn storage_balance_of(&self, account_id: ValidAccountId) -> Option<StorageBalance> {
-        self.deposited_amounts
+        self.accounts
             .get(account_id.as_ref())
             .map(|deposits| StorageBalance {
-                total: U128(deposits.amount),
+                total: U128(deposits.near_amount),
                 available: U128(deposits.storage_available()),
             })
     }
