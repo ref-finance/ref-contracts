@@ -12,3 +12,5 @@ Cargo.lock
 .idea
 
 neardev
+
+res/ref_exchange_local.wasm

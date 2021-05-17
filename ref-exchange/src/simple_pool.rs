@@ -104,7 +104,7 @@ impl SimplePool {
         let shares = if self.shares_total_supply > 0 {
             let mut fair_supply = U256::max_value();
             for i in 0..self.token_account_ids.len() {
-                assert!(amounts[i] > 0, ERR31_ZERO_AMOUNT);
+                assert!(amounts[i] > 0, "{}", ERR31_ZERO_AMOUNT);
                 fair_supply = min(
                     fair_supply,
                     U256::from(amounts[i]) * U256::from(self.shares_total_supply) / self.amounts[i],
@@ -114,7 +114,7 @@ impl SimplePool {
                 let amount = (U256::from(self.amounts[i]) * fair_supply
                     / U256::from(self.shares_total_supply))
                 .as_u128();
-                assert!(amount > 0, ERR31_ZERO_AMOUNT);
+                assert!(amount > 0, "{}", ERR31_ZERO_AMOUNT);
                 self.amounts[i] += amount;
                 amounts[i] = amount;
             }
@@ -126,7 +126,7 @@ impl SimplePool {
             INIT_SHARES_SUPPLY
         };
         self.mint_shares(&sender_id, shares);
-        assert!(shares > 0, ERR32_ZERO_SHARES);
+        assert!(shares > 0, "{}", ERR32_ZERO_SHARES);
         env::log(
             format!(
                 "Liquidity added {:?}, minted {} shares",

@@ -4,6 +4,7 @@ use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::AccountId;
 use near_sdk_sim::{call, deploy, init_simulator, to_yocto, view, ContractAccount, UserAccount};
 
+use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_sdk_sim::transaction::ExecutionStatus;
 use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
 use std::collections::HashMap;
@@ -116,6 +117,12 @@ fn test_swap() {
             total_fee: 30,
             shares_total_supply: to_yocto("1").into(),
         }
+    );
+    assert_eq!(
+        view!(pool.mft_metadata("0".to_string()))
+            .unwrap_json::<FungibleTokenMetadata>()
+            .name,
+        "ref-pool-0"
     );
     assert_eq!(
         view!(pool.mft_balance_of("0".to_string(), to_va(root.account_id.clone())))
