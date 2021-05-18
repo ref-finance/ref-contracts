@@ -3,7 +3,6 @@ use near_contract_standards::storage_management::{
 };
 
 use std::convert::TryInto;
-use std::collections::HashMap;
 
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{assert_one_yocto, env, log, near_bindgen, Promise, Balance};
@@ -87,19 +86,19 @@ impl StorageManagement for Contract {
         assert_one_yocto();
 
         let account_id = env::predecessor_account_id();
-        if let Some(farmer) = self.farmers.get(&account_id) {
+        if let Some(farmer) = self.get_farmer_wrapped(&account_id) {
             // TODO: figure out force option logic.
             assert!(
-                farmer.rewards.is_empty(),
+                farmer.get_ref().rewards.is_empty(),
                 "{}", ERR12_STORAGE_UNREGISTER_REWARDS_NOT_EMPTY
             );
             assert!(
-                farmer.seeds.is_empty(),
+                farmer.get_ref().seeds.is_empty(),
                 "{}", ERR13_STORAGE_UNREGISTER_SEED_NOT_EMPTY
             );
-            self.farmers.remove(&account_id);
-            self.farmer_count -= 1;
-            Promise::new(account_id.clone()).transfer(farmer.amount);
+            self.data_mut().farmers.remove(&account_id);
+            self.data_mut().farmer_count -= 1;
+            Promise::new(account_id.clone()).transfer(farmer.get_ref().amount);
             true
         } else {
             false
@@ -133,9 +132,9 @@ impl Contract {
         &self, 
         account_id: &AccountId
     ) -> (Balance, Balance) {
-        let farmer = self.farmers.get(account_id);
+        let farmer = self.get_farmer_wrapped(account_id);
         if let Some(farmer) = farmer {
-            (farmer.storage_usage(), farmer.amount)
+            (farmer.get_ref().storage_usage(), farmer.get_ref().amount)
         } else {
            (0, 0)
         }
@@ -167,17 +166,12 @@ impl Contract {
 
     pub(crate) fn internal_register_account(&mut self, account_id: &AccountId, amount: Balance) {
 
-        if let Some(mut farmer) = self.farmers.get(&account_id) {
-            farmer.amount += amount;
-            self.farmers.insert(&account_id, &farmer);
+        if let Some(mut farmer) = self.get_farmer_wrapped(&account_id) {
+            farmer.get_ref_mut().amount += amount;
+            self.data_mut().farmers.insert(&account_id, &farmer);
         } else {
-            self.farmers.insert(&account_id, &Farmer {
-                amount: amount,
-                rewards: HashMap::new(),
-                seeds: HashMap::new(),
-                user_rps: HashMap::new(),
-            });
-            self.farmer_count += 1;
+            self.data_mut().farmers.insert(&account_id, &VersionedFarmer::new(amount));
+            self.data_mut().farmer_count += 1;
         }
     }
 

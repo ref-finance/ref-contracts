@@ -11,8 +11,8 @@ use near_sdk::{env, near_bindgen, Balance, AccountId, PanicOnDefault};
 
 use crate::farm::{Farm, FarmId};
 use crate::simple_farm::{RPS};
-use crate::farm_seed::{FarmSeed, SeedId};
-use crate::farmer::Farmer;
+use crate::farm_seed::{VersionedFarmSeed, SeedId};
+use crate::farmer::{VersionedFarmer, Farmer};
 
 // for simulator test
 pub use crate::simple_farm::HRSimpleFarmTerms;
@@ -45,23 +45,39 @@ near_sdk::setup_alloc!();
 //     RewardInfo,
 // }
 
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
-pub struct Contract {
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct ContractData {
 
     // owner of this contract
     owner_id: AccountId,
     
     // record seeds and the farms under it.
-    seeds: UnorderedMap<SeedId, FarmSeed>,
+    // seeds: UnorderedMap<SeedId, FarmSeed>,
+    seeds: UnorderedMap<SeedId, VersionedFarmSeed>,
 
     // each farmer has a structure to describe
-    farmers: LookupMap<AccountId, Farmer>,
+    // farmers: LookupMap<AccountId, Farmer>,
+    farmers: LookupMap<AccountId, VersionedFarmer>,
 
     // for statistic
     farmer_count: u64,
     farm_count: u64,
     reward_info: UnorderedMap<AccountId, Balance>,
+}
+
+/// Versioned contract data. Allows to easily upgrade contracts.
+#[derive(BorshSerialize, BorshDeserialize)]
+pub enum VersionedContractData {
+    Current(ContractData),
+}
+
+impl VersionedContractData {}
+
+#[near_bindgen]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+pub struct Contract {
+
+    data: VersionedContractData,
 }
 
 #[near_bindgen]
@@ -70,15 +86,31 @@ impl Contract {
     pub fn new(owner_id: ValidAccountId) -> Self {
         assert!(!env::state_exists(), "Already initialized");
         Self {
-            owner_id: owner_id.into(),
-            farmer_count: 0,
-            farm_count: 0,
-            seeds: UnorderedMap::new(b"s".to_vec()),
-            farmers: LookupMap::new(b"u".to_vec()),
-            reward_info: UnorderedMap::new(b"r".to_vec()),
-            // seeds: UnorderedMap::new(StorageKeys::Seed),
-            // farmers: LookupMap::new(StorageKeys::Farmer),
-            // reward_info: UnorderedMap::new(StorageKeys::RewardInfo),
+            data: VersionedContractData::Current(ContractData {
+                owner_id: owner_id.into(),
+                farmer_count: 0,
+                farm_count: 0,
+                seeds: UnorderedMap::new(b"v".to_vec()),
+                farmers: LookupMap::new(b"f".to_vec()),
+                reward_info: UnorderedMap::new(b"r".to_vec()),
+                // seeds: UnorderedMap::new(StorageKeys::Seed),
+                // farmers: LookupMap::new(StorageKeys::Farmer),
+                // reward_info: UnorderedMap::new(StorageKeys::RewardInfo),
+            }),
+        }
+    }
+}
+
+impl Contract {
+    fn data(&self) -> &ContractData {
+        match &self.data {
+            VersionedContractData::Current(data) => data,
+        }
+    }
+
+    fn data_mut(&mut self) -> &mut ContractData {
+        match &mut self.data {
+            VersionedContractData::Current(data) => data,
         }
     }
 }

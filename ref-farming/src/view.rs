@@ -7,7 +7,6 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
 
 use crate::utils::parse_farm_id;
-use crate::farm_seed::SeedType;
 use crate::*;
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -71,18 +70,25 @@ impl From<&Farm> for FarmInfo {
 impl Contract {
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
-            owner_id: self.owner_id.clone(),
-            version: String::from("0.2.0"),
-            farmer_count: self.farmer_count.into(),
-            farm_count: self.farm_count.into(),
-            seed_count: self.seeds.len().into(),
-            reward_count: self.reward_info.len().into(),
+            owner_id: self.data().owner_id.clone(),
+            version: String::from("0.3.0"),
+            farmer_count: self.data().farmer_count.into(),
+            farm_count: self.data().farm_count.into(),
+            seed_count: self.data().seeds.len().into(),
+            reward_count: self.data().reward_info.len().into(),
         }
     }
 
     /// Returns number of farms.
     pub fn get_number_of_farms(&self) -> u64 {
-        self.seeds.values().fold(0_u64, |acc, farm_seed| acc + farm_seed.farms.len() as u64)
+        self.data().seeds.values().fold(0_u64, 
+            |acc, farm_seed| {
+                if farm_seed.need_upgrade() {
+                    acc + farm_seed.upgrade().get_ref().farms.len() as u64
+                } else {
+                    acc + farm_seed.get_ref().farms.len() as u64
+                }
+            })
     }
 
     /// Returns list of farms of given length from given start index.
@@ -90,21 +96,21 @@ impl Contract {
     pub fn list_farms(&self, from_index: u64, limit: u64) -> Vec<FarmInfo> {
         // TODO: how to page that
         let mut res = vec![];
-        for farm_seed in self.seeds.values() {
-            let sf = self.list_farms_by_seed(farm_seed.seed_id);
+        for farm_seed in self.data().seeds.values() {
+            let sf;
+            if farm_seed.need_upgrade() {
+                sf = self.list_farms_by_seed(farm_seed.upgrade().get_ref().seed_id.clone());
+            } else {
+                sf = self.list_farms_by_seed(farm_seed.get_ref().seed_id.clone());
+            }
             res.push(sf);
         }
         res.concat()
     }
 
     pub fn list_farms_by_seed(&self, seed_id: SeedId) -> Vec<FarmInfo> {
-        self.seeds.get(&seed_id).unwrap_or(
-            FarmSeed {
-                seed_id: seed_id.clone(),
-                seed_type: SeedType::FT,
-                farms: Vec::new(),
-                amount: 0,
-            })
+        self.get_seed_default(&seed_id)
+            .get_ref()
             .farms.iter().map(|farm| farm.into())
             .collect()
     }
@@ -112,8 +118,8 @@ impl Contract {
     /// Returns information about specified farm.
     pub fn get_farm(&self, farm_id: FarmId) -> Option<FarmInfo> {
         let (seed_id, index) = parse_farm_id(&farm_id);
-        if let Some(farm_seed) = self.seeds.get(&seed_id) {
-            if let Some(farm) = farm_seed.farms.get(index) {
+        if let Some(farm_seed) = self.get_seed_wrapped(&seed_id) {
+            if let Some(farm) = farm_seed.get_ref().farms.get(index) {
                 Some(farm.into())
             } else {
                 None
@@ -124,12 +130,12 @@ impl Contract {
     }
 
     pub fn list_rewards_info(&self, from_index: u64, limit: u64) -> HashMap<AccountId, U128> {
-        let keys = self.reward_info.keys_as_vector();
+        let keys = self.data().reward_info.keys_as_vector();
         (from_index..std::cmp::min(from_index + limit, keys.len()))
             .map(|index| 
                 (
                     keys.get(index).unwrap(),
-                    self.reward_info.get(&keys.get(index).unwrap()).unwrap_or(0).into(),
+                    self.data().reward_info.get(&keys.get(index).unwrap()).unwrap_or(0).into(),
                 )
             )
             .collect()
@@ -138,15 +144,10 @@ impl Contract {
     /// Returns reward token claimed for given user outside of any farms.
     /// Returns empty list if no rewards claimed.
     pub fn list_rewards(&self, account_id: ValidAccountId) -> HashMap<AccountId, U128> {
-        self.farmers
-            .get(account_id.as_ref())
-            .map(|d| {
-                d.rewards
-                    .into_iter()
-                    .map(|(acc, bal)| (acc, U128(bal)))
-                    .collect()
-            })
-            .unwrap_or_default()
+        self.get_farmer_default(account_id.as_ref())
+            .get().rewards.into_iter()
+            .map(|(acc, bal)| (acc, U128(bal)))
+            .collect()
     }
 
     /// Returns balance of amount of given reward token that ready to withdraw.
@@ -159,12 +160,12 @@ impl Contract {
         let (seed_id, index) = parse_farm_id(&farm_id);
 
         if let (Some(farmer), Some(farm_seed)) = 
-            (self.farmers.get(account_id.as_ref()), self.seeds.get(&seed_id)) {
-                if let Some(farm) = farm_seed.farms.get(index) {
+            (self.get_farmer_wrapped(account_id.as_ref()), self.get_seed_wrapped(&seed_id)) {
+                if let Some(farm) = farm_seed.get_ref().farms.get(index) {
                     let reward_amount = farm.view_farmer_unclaimed_reward(
-                        &farmer.get_rps(&farm.get_farm_id()),
-                        farmer.seeds.get(&seed_id).unwrap_or(&0_u128), 
-                        &farm_seed.amount
+                        &farmer.get_ref().get_rps(&farm.get_farm_id()),
+                        farmer.get_ref().seeds.get(&seed_id).unwrap_or(&0_u128), 
+                        &farm_seed.get_ref().amount
                     );
                     reward_amount.into()
                 } else {
@@ -177,12 +178,12 @@ impl Contract {
 
     /// return all seed and its amount staked in this contract in a hashmap
     pub fn list_seeds(&self, from_index: u64, limit: u64) -> HashMap<SeedId, U128> {
-        let keys = self.seeds.keys_as_vector();
+        let keys = self.data().seeds.keys_as_vector();
         (from_index..std::cmp::min(from_index + limit, keys.len()))
             .map(|index| 
                 (
                     keys.get(index).unwrap(),
-                    self.seeds.get(&keys.get(index).unwrap()).unwrap().amount.into(),
+                    self.get_seed(&keys.get(index).unwrap()).get_ref().amount.into(),
                 )
             )
             .collect()
@@ -190,8 +191,8 @@ impl Contract {
 
     /// return user staked seeds and its amount in a hashmap
     pub fn list_user_seeds(&self, account_id: ValidAccountId) -> HashMap<SeedId, U128> {
-        if let Some(farmer) = self.farmers.get(account_id.as_ref()) {
-            farmer.seeds.into_iter().map(|(seed, bal)| (seed, U128(bal))).collect()
+        if let Some(farmer) = self.get_farmer_wrapped(account_id.as_ref()) {
+            farmer.get().seeds.into_iter().map(|(seed, bal)| (seed.clone(), U128(bal))).collect()
         } else {
             HashMap::new()
         }

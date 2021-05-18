@@ -37,8 +37,8 @@ impl FungibleTokenReceiver for Contract {
             let farm_id = msg.parse::<FarmId>().expect(&format!("{}", ERR42_INVALID_FARM_ID));
             let (seed_id, index) = parse_farm_id(&farm_id);
 
-            let mut farm_seed = self.seeds.get(&seed_id).expect(&format!("{}", ERR41_FARM_NOT_EXIST));
-            let farm = farm_seed.farms.get_mut(index).expect(&format!("{}", ERR41_FARM_NOT_EXIST));
+            let mut farm_seed = self.get_seed(&seed_id);
+            let farm = farm_seed.get_ref_mut().farms.get_mut(index).expect(&format!("{}", ERR41_FARM_NOT_EXIST));
 
             // update farm
             assert_eq!(
@@ -47,9 +47,9 @@ impl FungibleTokenReceiver for Contract {
                 "{}", ERR44_INVALID_FARM_REWARD
             );
             if let Some(cur_remain) = farm.add_reward(&amount) {
-                self.seeds.insert(&seed_id, &farm_seed);
-                let old_balance = self.reward_info.get(&env::predecessor_account_id()).unwrap_or(0);
-                self.reward_info.insert(&env::predecessor_account_id(), &(old_balance + amount));
+                self.data_mut().seeds.insert(&seed_id, &farm_seed);
+                let old_balance = self.data().reward_info.get(&env::predecessor_account_id()).unwrap_or(0);
+                self.data_mut().reward_info.insert(&env::predecessor_account_id(), &(old_balance + amount));
                 env::log(
                     format!(
                         "{} added {} Reward Token, Now has {} left",

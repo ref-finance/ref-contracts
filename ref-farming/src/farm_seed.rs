@@ -12,7 +12,7 @@ use crate::utils::MAX_ACCOUNT_LENGTH;
 /// For FT, SeedId is the token_contract_id.
 pub(crate) type SeedId = String;
 
-#[derive(BorshSerialize, BorshDeserialize)]
+#[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub enum SeedType {
     FT,
     MFT,
@@ -62,3 +62,54 @@ impl FarmSeed {
     }
 
 }
+
+/// Versioned FarmSeed, used for lazy upgrade.
+/// Which means this structure would upgrade automatically when used.
+/// To achieve that, each time the new version comes in, 
+/// each function of this enum should be carefully re-code!
+#[derive(BorshSerialize, BorshDeserialize)]
+pub enum VersionedFarmSeed {
+    V101(FarmSeed),
+}
+
+impl VersionedFarmSeed {
+
+    pub fn new(seed_id: &SeedId) -> Self {
+        VersionedFarmSeed::V101(FarmSeed::new(seed_id))
+    }
+
+    /// Upgrades from other versions to the currently used version.
+    pub fn upgrade(self) -> Self {
+        match self {
+            VersionedFarmSeed::V101(farm_seed) => VersionedFarmSeed::V101(farm_seed),
+        }
+    }
+
+    #[inline]
+    #[allow(unreachable_patterns)]
+    pub fn need_upgrade(&self) -> bool {
+        match self {
+            VersionedFarmSeed::V101(_) => false,
+            _ => true,
+        }
+    }
+
+    #[inline]
+    #[allow(unreachable_patterns)]
+    pub fn get_ref(&self) -> &FarmSeed {
+        match self {
+            VersionedFarmSeed::V101(farm_seed) => farm_seed,
+            _ => unimplemented!(),
+        }
+    }
+
+    #[inline]
+    #[allow(unreachable_patterns)]
+    pub fn get_ref_mut(&mut self) -> &mut FarmSeed {
+        match self {
+            VersionedFarmSeed::V101(farm_seed) => farm_seed,
+            _ => unimplemented!(),
+        }
+    }
+}
+

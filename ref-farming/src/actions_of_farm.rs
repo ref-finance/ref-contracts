@@ -40,19 +40,19 @@ impl Contract {
     /// If too much attached - refunds it back.
     fn internal_add_farm(&mut self, terms: &HRSimpleFarmTerms) -> FarmId {
         
-        let mut farm_seed = self.seeds.get(&terms.seed_id).unwrap_or(FarmSeed::new(&terms.seed_id));
+        let mut farm_seed = self.get_seed_default(&terms.seed_id);
 
-        let farm_id: FarmId = gen_farm_id(&terms.seed_id, farm_seed.farms.len());
+        let farm_id: FarmId = gen_farm_id(&terms.seed_id, farm_seed.get_ref().farms.len());
 
         let farm = Farm::SimpleFarm(SimpleFarm::new(
             farm_id.clone(),
             terms.into(),
         ));
 
-        farm_seed.farms.push(farm);
-        self.seeds.insert(&terms.seed_id, &farm_seed);
+        farm_seed.get_ref_mut().farms.push(farm);
+        self.data_mut().seeds.insert(&terms.seed_id, &farm_seed);
 
-        self.farm_count += 1;
+        self.data_mut().farm_count += 1;
         farm_id
     }
 }

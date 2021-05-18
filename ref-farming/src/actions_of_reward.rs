@@ -43,11 +43,11 @@ impl Contract {
         let sender_id = env::predecessor_account_id();
         self.assert_storage_usage(&sender_id);
 
-        let mut rewards = self.get_farmer(&sender_id);
+        let mut farmer = self.get_farmer(&sender_id);
 
         // Note: subtraction, will be reverted if the promise fails.
-        let amount = rewards.sub_reward(&token_id, amount);
-        self.farmers.insert(&sender_id, &rewards);
+        let amount = farmer.get_ref_mut().sub_reward(&token_id, amount);
+        self.data_mut().farmers.insert(&sender_id, &farmer);
         ext_fungible_token::ft_transfer(
             sender_id.clone().try_into().unwrap(),
             amount.into(),
@@ -84,9 +84,9 @@ impl Contract {
             PromiseResult::Successful(_) => {}
             PromiseResult::Failed => {
                 // This reverts the changes from withdraw function.
-                let mut rewards = self.get_farmer(&sender_id);
-                rewards.add_reward(&token_id, amount.0);
-                self.farmers.insert(&sender_id, &rewards);
+                let mut farmer = self.get_farmer(&sender_id);
+                farmer.get_ref_mut().add_reward(&token_id, amount.0);
+                self.data_mut().farmers.insert(&sender_id, &farmer);
             }
         };
     }
@@ -133,16 +133,16 @@ impl Contract {
         sender_id: &AccountId,
         seed_id: &SeedId) {
         let mut farmer = self.get_farmer(sender_id);
-        if let Some(mut farm_seed) = self.seeds.get(seed_id) {
-            for farm in &mut farm_seed.farms {
+        if let Some(mut farm_seed) = self.get_seed_wrapped(seed_id) {
+            let amount = farm_seed.get_ref().amount;
+            for farm in &mut farm_seed.get_ref_mut().farms {
                 claim_user_reward_from_farm(
                     farm, 
-                    &mut farmer,  
-                    &farm_seed.amount);
+                    farmer.get_ref_mut(),  
+                    &amount);
             }
-            
-            self.seeds.insert(seed_id, &farm_seed);
-            self.farmers.insert(sender_id, &farmer);
+            self.data_mut().seeds.insert(seed_id, &farm_seed);
+            self.data_mut().farmers.insert(sender_id, &farmer);
         }
     }
 
@@ -154,25 +154,54 @@ impl Contract {
 
         let (seed_id, index) = parse_farm_id(farm_id);
 
-        if let Some(mut farm_seed) = self.seeds.get(&seed_id) {
-            if let Some(farm) = farm_seed.farms.get_mut(index) {
+        if let Some(mut farm_seed) = self.get_seed_wrapped(&seed_id) {
+            let amount = farm_seed.get_ref().amount;
+            if let Some(farm) = farm_seed.get_ref_mut().farms.get_mut(index) {
                 claim_user_reward_from_farm(
                     farm, 
-                    &mut farmer, 
-                    &farm_seed.amount,
+                    farmer.get_ref_mut(), 
+                    &amount,
                 );
-                self.seeds.insert(&seed_id, &farm_seed);
-                self.farmers.insert(sender_id, &farmer);
+                self.data_mut().seeds.insert(&seed_id, &farm_seed);
+                self.data_mut().farmers.insert(sender_id, &farmer);
             }
         }
     }
 
-    // Returns `from` AccountDeposit.
+
     #[inline]
-    pub(crate) fn get_farmer(&self, from: &AccountId) -> Farmer {
-        self.farmers
+    pub(crate) fn get_farmer(&self, from: &AccountId) -> VersionedFarmer {
+        let orig = self.data().farmers
             .get(from)
-            .expect(ERR10_ACC_NOT_REGISTERED)
+            .expect(ERR10_ACC_NOT_REGISTERED);
+        if orig.need_upgrade() {
+                orig.upgrade()
+            } else {
+                orig
+            }
+    }
+
+    #[inline]
+    pub(crate) fn get_farmer_default(&self, from: &AccountId) -> VersionedFarmer {
+        let orig = self.data().farmers.get(from).unwrap_or(VersionedFarmer::new(0));
+        if orig.need_upgrade() {
+            orig.upgrade()
+        } else {
+            orig
+        }
+    }
+
+    #[inline]
+    pub(crate) fn get_farmer_wrapped(&self, from: &AccountId) -> Option<VersionedFarmer> {
+        if let Some(farmer) = self.data().farmers.get(from) {
+            if farmer.need_upgrade() {
+                Some(farmer.upgrade())
+            } else {
+                Some(farmer)
+            }
+        } else {
+            None
+        }
     }
 
     /// Returns current balance of given token for given user. 
@@ -182,9 +211,8 @@ impl Contract {
         sender_id: &AccountId,
         token_id: &AccountId,
     ) -> Balance {
-        self.farmers
-            .get(sender_id)
-            .and_then(|d| d.rewards.get(token_id).cloned())
+        self.get_farmer_default(sender_id)
+            .get_ref().rewards.get(token_id).cloned()
             .unwrap_or_default()
     }
 }

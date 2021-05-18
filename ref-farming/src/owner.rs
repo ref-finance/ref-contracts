@@ -9,7 +9,7 @@ impl Contract {
 
         self.assert_owner();
 
-        self.owner_id = owner_id.into();
+        self.data_mut().owner_id = owner_id.into();
     }
 
     /// Upgrades given contract. Only can be called by owner.
@@ -37,6 +37,11 @@ impl Contract {
     /// For next version upgrades, change this function.
     #[init(ignore_state)]
     pub fn migrate() -> Self {
+        assert_eq!(
+            env::predecessor_account_id(),
+            env::current_account_id(),
+            "ERR_NOT_ALLOWED"
+        );
         let contract: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
         contract
     }
@@ -44,7 +49,7 @@ impl Contract {
     pub(crate) fn assert_owner(&self) {
         assert_eq!(
             env::predecessor_account_id(),
-            self.owner_id,
+            self.data().owner_id,
             "ERR_NOT_ALLOWED"
         );
     }

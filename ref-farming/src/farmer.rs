@@ -17,7 +17,7 @@ use crate::utils::MAX_ACCOUNT_LENGTH;
 pub const MIN_FARMER_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4 * 3;
 
 /// Account deposits information and storage cost.
-#[derive(BorshSerialize, BorshDeserialize, Default)]
+#[derive(BorshSerialize, BorshDeserialize)]
 #[cfg_attr(feature = "test", derive(Clone))]
 pub struct Farmer {
     /// Native NEAR amount sent to this contract.
@@ -100,4 +100,69 @@ impl Farmer {
         * env::storage_byte_cost()
     }
 
+}
+
+
+/// Versioned Farmer, used for lazy upgrade.
+/// Which means this structure would upgrade automatically when used.
+/// To achieve that, each time the new version comes in, 
+/// each function of this enum should be carefully re-code!
+#[derive(BorshSerialize, BorshDeserialize)]
+pub enum VersionedFarmer {
+    V101(Farmer),
+}
+
+impl VersionedFarmer {
+
+    pub fn new(amount: Balance) -> Self {
+        VersionedFarmer::V101(Farmer {
+            amount: amount,
+            rewards: HashMap::new(),
+            seeds: HashMap::new(),
+            user_rps: HashMap::new(),
+        })
+    }
+
+    /// Upgrades from other versions to the currently used version.
+    pub fn upgrade(self) -> Self {
+        match self {
+            VersionedFarmer::V101(farmer) => VersionedFarmer::V101(farmer),
+        }
+    }
+
+    #[inline]
+    #[allow(unreachable_patterns)]
+    pub fn need_upgrade(&self) -> bool {
+        match self {
+            VersionedFarmer::V101(_) => false,
+            _ => true,
+        }
+    }
+
+    #[inline]
+    #[allow(unreachable_patterns)]
+    pub fn get_ref(&self) -> &Farmer {
+        match self {
+            VersionedFarmer::V101(farmer) => farmer,
+            _ => unimplemented!(),
+        }
+    }
+
+    #[inline]
+    #[allow(unreachable_patterns)]
+    pub fn get(self) -> Farmer {
+        match self {
+            VersionedFarmer::V101(farmer) => farmer,
+            _ => unimplemented!(),
+        }
+    }
+
+    #[inline]
+    #[allow(unreachable_patterns)]
+    pub fn get_ref_mut(&mut self) -> &mut Farmer {
+        match self {
+            VersionedFarmer::V101(farmer) => farmer,
+            _ => unimplemented!(),
+        }
+    }
 }

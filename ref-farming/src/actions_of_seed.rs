@@ -95,14 +95,14 @@ impl Contract {
                 );
                 // revert withdraw, equal to deposit, claim reward to update user reward_per_seed
                 self.internal_claim_user_reward_by_seed_id(&sender_id, &seed_id);
-                let mut farm_seed = self.seeds.get(&seed_id).unwrap_or(FarmSeed::new(&seed_id));
-                let mut farmer = self.farmers.get(&sender_id).expect(&format!("{}", ERR10_ACC_NOT_REGISTERED));
+                let mut farm_seed = self.get_seed_default(&seed_id);
+                let mut farmer = self.get_farmer(&sender_id);
 
-                farm_seed.seed_type = SeedType::FT;
-                farm_seed.add_amount(amount);
-                farmer.add_seed(&seed_id, amount);
-                self.seeds.insert(&seed_id, &farm_seed);
-                self.farmers.insert(&sender_id, &farmer);
+                farm_seed.get_ref_mut().seed_type = SeedType::FT;
+                farm_seed.get_ref_mut().add_amount(amount);
+                farmer.get_ref_mut().add_seed(&seed_id, amount);
+                self.data_mut().seeds.insert(&seed_id, &farm_seed);
+                self.data_mut().farmers.insert(&sender_id, &farmer);
             },
             PromiseResult::Successful(_) => {
                 env::log(
@@ -142,14 +142,14 @@ impl Contract {
                 );
                 // revert withdraw, equal to deposit, claim reward to update user reward_per_seed
                 self.internal_claim_user_reward_by_seed_id(&sender_id, &seed_id);
-                let mut farm_seed = self.seeds.get(&seed_id).unwrap_or(FarmSeed::new(&seed_id));
-                let mut farmer = self.farmers.get(&sender_id).expect(&format!("{}", ERR10_ACC_NOT_REGISTERED));
+                let mut farm_seed = self.get_seed_default(&seed_id);
+                let mut farmer = self.get_farmer(&sender_id);
 
-                farm_seed.seed_type = SeedType::MFT;
-                farm_seed.add_amount(amount);
-                farmer.add_seed(&seed_id, amount);
-                self.seeds.insert(&seed_id, &farm_seed);
-                self.farmers.insert(&sender_id, &farmer);
+                farm_seed.get_ref_mut().seed_type = SeedType::MFT;
+                farm_seed.get_ref_mut().add_amount(amount);
+                farmer.get_ref_mut().add_seed(&seed_id, amount);
+                self.data_mut().seeds.insert(&seed_id, &farm_seed);
+                self.data_mut().farmers.insert(&sender_id, &farmer);
             },
             PromiseResult::Successful(_) => {
                 env::log(
@@ -168,6 +168,40 @@ impl Contract {
 /// Internal methods implementation.
 impl Contract {
 
+    #[inline]
+    pub(crate) fn get_seed(&self, seed_id: &String) -> VersionedFarmSeed {
+        let orig = self.data().seeds.get(seed_id).expect(&format!("{}", ERR31_SEED_NOT_EXIST));
+        if orig.need_upgrade() {
+            orig.upgrade()
+        } else {
+            orig
+        } 
+    }
+
+    #[inline]
+    pub(crate) fn get_seed_default(&self, seed_id: &String) -> VersionedFarmSeed {
+        let orig = self.data().seeds.get(seed_id).unwrap_or(VersionedFarmSeed::new(seed_id));
+        if orig.need_upgrade() {
+            orig.upgrade()
+        } else {
+            orig
+        }
+    }
+
+    #[inline]
+    pub(crate) fn get_seed_wrapped(&self, seed_id: &String) -> Option<VersionedFarmSeed> {
+        if let Some(farm_seed) = self.data().seeds.get(seed_id) {
+            if farm_seed.need_upgrade() {
+                Some(farm_seed.upgrade())
+            } else {
+                Some(farm_seed)
+            }
+        } else {
+            None
+        }
+    }
+
+
     pub(crate) fn internal_seed_deposit(
         &mut self, 
         seed_id: &String, 
@@ -179,14 +213,15 @@ impl Contract {
         // to update user reward_per_seed in each farm 
         self.internal_claim_user_reward_by_seed_id(sender_id, seed_id);
 
-        let mut farm_seed = self.seeds.get(seed_id).unwrap_or(FarmSeed::new(seed_id));
-        farm_seed.seed_type = seed_type;
-        farm_seed.add_amount(amount);
-        self.seeds.insert(&seed_id, &farm_seed);
+        // **** update seed (new version)
+        let mut farm_seed = self.get_seed_default(seed_id);
+        farm_seed.get_ref_mut().seed_type = seed_type;
+        farm_seed.get_ref_mut().add_amount(amount);
+        self.data_mut().seeds.insert(&seed_id, &farm_seed);
 
-        let mut farmer = self.farmers.get(sender_id).expect(&format!("{}", ERR10_ACC_NOT_REGISTERED));
-        farmer.add_seed(&seed_id, amount);
-        self.farmers.insert(sender_id, &farmer);
+        let mut farmer = self.get_farmer(sender_id);
+        farmer.get_ref_mut().add_seed(&seed_id, amount);
+        self.data_mut().farmers.insert(sender_id, &farmer);
     }
 
     fn internal_seed_withdraw(
@@ -199,21 +234,21 @@ impl Contract {
         // to update user reward_per_seed in each farm
         self.internal_claim_user_reward_by_seed_id(sender_id, seed_id);
 
-        let mut farm_seed = self.seeds.get(seed_id).expect(&format!("{}", ERR31_SEED_NOT_EXIST));
-        let mut farmer = self.farmers.get(sender_id).expect(&format!("{}", ERR10_ACC_NOT_REGISTERED));
+        let mut farm_seed = self.get_seed(seed_id);
+        let mut farmer = self.get_farmer(sender_id);
 
         // Then update user seed and total seed of this LPT
-        let farmer_seed_remain = farmer.sub_seed(seed_id, amount);
-        let _seed_remain = farm_seed.sub_amount(amount);
+        let farmer_seed_remain = farmer.get_ref_mut().sub_seed(seed_id, amount);
+        let _seed_remain = farm_seed.get_ref_mut().sub_amount(amount);
 
         if farmer_seed_remain == 0 {
             // remove farmer rps of relative farm
-            for farm in &mut farm_seed.farms {
-                farmer.user_rps.remove(&farm.get_farm_id());
+            for farm in &mut farm_seed.get_ref_mut().farms {
+                farmer.get_ref_mut().user_rps.remove(&farm.get_farm_id());
             }
         }
-        self.farmers.insert(sender_id, &farmer);
-        self.seeds.insert(seed_id, &farm_seed);
-        farm_seed.seed_type
+        self.data_mut().farmers.insert(sender_id, &farmer);
+        self.data_mut().seeds.insert(seed_id, &farm_seed);
+        farm_seed.get_ref().seed_type.clone()
     }
 }
