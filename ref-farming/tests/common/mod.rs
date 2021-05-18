@@ -14,7 +14,7 @@ use near_sdk::serde_json::Value;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
-    EXCHANGE_WASM_BYTES => "../res/ref_exchange_local.wasm",
+    EXCHANGE_WASM_BYTES => "../res/ref_exchange_release.wasm",
     FARM_WASM_BYTES => "../res/ref_farming_local.wasm",
 }
 
@@ -113,7 +113,7 @@ pub(crate) fn add_liqudity(
     call!(
         user,
         pool.add_liquidity(pool_id, vec![U128(to_yocto("100")), U128(to_yocto("100"))], None),
-        deposit = 1
+        deposit = to_yocto("0.01")
     )
     .assert_success();
 }

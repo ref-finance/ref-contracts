@@ -38,10 +38,15 @@ fn test_one_farm_two_farmers() {
     );
     println!("----->> Liquidity added by farmer2.");
 
+
     // create farm
     let (farming, farm_id) = prepair_farm(&root, &owner, &token1);
     println!("----->> Farm {} is ready.", farm_id.clone());
 
+    // register LP for farming contract
+    call!(root, pool.mft_register("0".to_string(), to_va(farming_id())), deposit = to_yocto("1"))
+    .assert_success();
+    println!("Registered LP 0 for {}.", farming_id());
     // farmer1 register and stake liquidity token
     call!(farmer1, farming.storage_deposit(None, None), deposit = to_yocto("1"))
     .assert_success();
