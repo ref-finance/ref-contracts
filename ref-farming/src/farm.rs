@@ -52,6 +52,12 @@ impl Farm {
         }
     }
 
+    pub fn can_be_removed(&self) -> bool {
+        match self {
+            Farm::SimpleFarm(farm) => farm.can_be_removed(),
+        }
+    }
+
     /// Returns how many reward tokens can given farmer claim.
     pub fn view_farmer_unclaimed_reward(
         &self,

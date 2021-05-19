@@ -42,17 +42,39 @@ impl Contract {
         
         let mut farm_seed = self.get_seed_default(&terms.seed_id);
 
-        let farm_id: FarmId = gen_farm_id(&terms.seed_id, farm_seed.get_ref().farms.len());
+        let farm_id: FarmId = gen_farm_id(&terms.seed_id, farm_seed.get_ref().next_index as usize);
 
         let farm = Farm::SimpleFarm(SimpleFarm::new(
             farm_id.clone(),
             terms.into(),
         ));
 
-        farm_seed.get_ref_mut().farms.push(farm);
+        // farm_seed.get_ref_mut().farms.push(farm);
+        farm_seed.get_ref_mut().farms.insert(farm_id.clone(), farm);
+        farm_seed.get_ref_mut().next_index += 1;
         self.data_mut().seeds.insert(&terms.seed_id, &farm_seed);
 
         self.data_mut().farm_count += 1;
         farm_id
+    }
+
+    /// when farm's status is Ended, and unclaimed reward is 0, 
+    /// the farm can be remove to reduce storage usage
+    pub(crate) fn internal_remove_farm(&mut self, seed_id: &SeedId) {
+
+        let mut farm_seed = self.get_seed(&seed_id);
+        let mut removable_farms: Vec<String> = vec![];
+        for farm in farm_seed.get_ref().farms.values() {
+            if farm.can_be_removed() {
+                removable_farms.push(farm.get_farm_id());
+            }
+        }
+        for farm_id in &removable_farms {
+            farm_seed.get_ref_mut().farms.remove(farm_id);
+        }
+        if removable_farms.len() > 0 {
+            self.data_mut().seeds.insert(&seed_id, &farm_seed);
+        }
+        
     }
 }

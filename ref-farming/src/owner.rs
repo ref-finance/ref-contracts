@@ -12,6 +12,13 @@ impl Contract {
         self.data_mut().owner_id = owner_id.into();
     }
 
+    pub fn clean_farm_by_seed(&mut self, seed_id: String) {
+        self.assert_owner();
+        if let Some(_) = self.get_seed_wrapped(&seed_id) {
+            self.internal_remove_farm(&seed_id);
+        }
+    }
+
     /// Upgrades given contract. Only can be called by owner.
     /// if `migrate` is true, calls `migrate()` function right after deployment.
     /// TODO: consider adding extra grace period in case `owner` got attacked.

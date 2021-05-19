@@ -71,7 +71,7 @@ impl Contract {
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
             owner_id: self.data().owner_id.clone(),
-            version: String::from("0.3.0"),
+            version: String::from("0.4.0"),
             farmer_count: self.data().farmer_count.into(),
             farm_count: self.data().farm_count.into(),
             seed_count: self.data().seeds.len().into(),
@@ -111,15 +111,15 @@ impl Contract {
     pub fn list_farms_by_seed(&self, seed_id: SeedId) -> Vec<FarmInfo> {
         self.get_seed_default(&seed_id)
             .get_ref()
-            .farms.iter().map(|farm| farm.into())
+            .farms.values().map(|farm| farm.into())
             .collect()
     }
 
     /// Returns information about specified farm.
     pub fn get_farm(&self, farm_id: FarmId) -> Option<FarmInfo> {
-        let (seed_id, index) = parse_farm_id(&farm_id);
+        let (seed_id, _) = parse_farm_id(&farm_id);
         if let Some(farm_seed) = self.get_seed_wrapped(&seed_id) {
-            if let Some(farm) = farm_seed.get_ref().farms.get(index) {
+            if let Some(farm) = farm_seed.get_ref().farms.get(&farm_id) {
                 Some(farm.into())
             } else {
                 None
@@ -157,11 +157,11 @@ impl Contract {
     }
 
     pub fn get_unclaimed_reward(&self, account_id: ValidAccountId, farm_id: FarmId) -> U128 {
-        let (seed_id, index) = parse_farm_id(&farm_id);
+        let (seed_id, _) = parse_farm_id(&farm_id);
 
         if let (Some(farmer), Some(farm_seed)) = 
             (self.get_farmer_wrapped(account_id.as_ref()), self.get_seed_wrapped(&seed_id)) {
-                if let Some(farm) = farm_seed.get_ref().farms.get(index) {
+                if let Some(farm) = farm_seed.get_ref().farms.get(&farm_id) {
                     let reward_amount = farm.view_farmer_unclaimed_reward(
                         &farmer.get_ref().get_rps(&farm.get_farm_id()),
                         farmer.get_ref().seeds.get(&seed_id).unwrap_or(&0_u128), 

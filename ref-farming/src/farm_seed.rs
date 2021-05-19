@@ -1,11 +1,12 @@
 //! FarmSeed stores information per seed about 
 //! staked seed amount and farms under it.
 
+use std::collections::HashMap;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{env, Balance};
+use near_sdk::{Balance};
 use crate::errors::*;
-use crate::farm::Farm;
-use crate::utils::MAX_ACCOUNT_LENGTH;
+use crate::farm::{Farm, FarmId};
+
 
 /// For MFT, SeedId composes of token_contract_id 
 /// and token's inner_id in that contract. 
@@ -24,12 +25,12 @@ pub enum SeedType {
 pub struct FarmSeed {
     /// The Farming Token this FarmSeed represented for
     pub seed_id: SeedId,
-    /// The seed is a FT or MFT
+    /// The seed is a FT or MFT, enum size is 2 bytes?
     pub seed_type: SeedType,
     /// all farms that accepted this seed
-    /// Future Work: may change to HashMap<GlobalIndex, Farm> 
-    /// to enable whole life-circle (especially for removing of farm). 
-    pub farms: Vec<Farm>,
+    /// FarmId = {seed_id}#{next_index}
+    pub farms: HashMap<FarmId, Farm>,
+    pub next_index: u32,
     /// total (staked) balance of this seed (Farming Token)
     pub amount: Balance,
 }
@@ -39,7 +40,9 @@ impl FarmSeed {
         Self {
             seed_id: seed_id.clone(),
             seed_type: SeedType::FT,
-            farms: Vec::new(),
+            // farms: Vec::new(),
+            farms: HashMap::new(),
+            next_index: 0,
             amount: 0,
         }
     }
@@ -53,12 +56,6 @@ impl FarmSeed {
         assert!(self.amount >= amount, "{}", ERR500);
         self.amount -= amount;
         self.amount
-    }
-
-    /// Returns amount of yocto near necessary to cover storage used by this data structure.
-    pub fn storage_usage(&self) -> Balance {
-        (MAX_ACCOUNT_LENGTH + 16) * (self.farms.len() as u128)
-            * env::storage_byte_cost()
     }
 
 }

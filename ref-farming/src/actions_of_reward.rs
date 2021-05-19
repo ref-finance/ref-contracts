@@ -21,6 +21,7 @@ impl Contract {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
         self.assert_storage_usage(&sender_id);
+        self.remove_unused_rps(&sender_id);
         self.internal_claim_user_reward_by_farm_id(&sender_id, &farm_id);
     }
 
@@ -29,6 +30,7 @@ impl Contract {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
         self.assert_storage_usage(&sender_id);
+        self.remove_unused_rps(&sender_id);
         self.internal_claim_user_reward_by_seed_id(&sender_id, &seed_id);
     }
 
@@ -42,6 +44,8 @@ impl Contract {
 
         let sender_id = env::predecessor_account_id();
         self.assert_storage_usage(&sender_id);
+        
+        self.remove_unused_rps(&sender_id);
 
         let mut farmer = self.get_farmer(&sender_id);
 
@@ -128,6 +132,23 @@ fn claim_user_reward_from_farm(
 
 impl Contract {
 
+    pub(crate) fn remove_unused_rps(&mut self, sender_id: &AccountId) {
+        let mut farmer = self.get_farmer(sender_id);
+        let mut changed = false;
+        let farm_ids: Vec<String> = farmer.get_ref().user_rps.keys().map(|x| x.clone()).collect();
+        for farm_id in farm_ids {
+            let (seed_id, _) = parse_farm_id(&farm_id);
+            let farm_seed = self.get_seed(&seed_id);
+            if !farm_seed.get_ref().farms.contains_key(&farm_id) {
+                farmer.get_ref_mut().user_rps.remove(&farm_id);
+                changed = true;
+            }
+        }
+        if changed {
+            self.data_mut().farmers.insert(sender_id, &farmer);
+        }
+    }
+
     pub(crate) fn internal_claim_user_reward_by_seed_id(
         &mut self, 
         sender_id: &AccountId,
@@ -135,7 +156,7 @@ impl Contract {
         let mut farmer = self.get_farmer(sender_id);
         if let Some(mut farm_seed) = self.get_seed_wrapped(seed_id) {
             let amount = farm_seed.get_ref().amount;
-            for farm in &mut farm_seed.get_ref_mut().farms {
+            for farm in &mut farm_seed.get_ref_mut().farms.values_mut() {
                 claim_user_reward_from_farm(
                     farm, 
                     farmer.get_ref_mut(),  
@@ -152,11 +173,11 @@ impl Contract {
         farm_id: &FarmId) {
         let mut farmer = self.get_farmer(sender_id);
 
-        let (seed_id, index) = parse_farm_id(farm_id);
+        let (seed_id, _) = parse_farm_id(farm_id);
 
         if let Some(mut farm_seed) = self.get_seed_wrapped(&seed_id) {
             let amount = farm_seed.get_ref().amount;
-            if let Some(farm) = farm_seed.get_ref_mut().farms.get_mut(index) {
+            if let Some(farm) = farm_seed.get_ref_mut().farms.get_mut(farm_id) {
                 claim_user_reward_from_farm(
                     farm, 
                     farmer.get_ref_mut(), 

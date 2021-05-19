@@ -21,6 +21,8 @@ impl Contract {
         let sender_id = env::predecessor_account_id();
         self.assert_storage_usage(&sender_id);
 
+        self.remove_unused_rps(&sender_id);
+
         let amount: Balance = amount.into();
 
         // update inner state
@@ -243,7 +245,7 @@ impl Contract {
 
         if farmer_seed_remain == 0 {
             // remove farmer rps of relative farm
-            for farm in &mut farm_seed.get_ref_mut().farms {
+            for farm in &mut farm_seed.get_ref_mut().farms.values_mut() {
                 farmer.get_ref_mut().user_rps.remove(&farm.get_farm_id());
             }
         }

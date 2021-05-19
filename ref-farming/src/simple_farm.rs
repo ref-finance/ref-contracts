@@ -273,5 +273,17 @@ impl SimpleFarm {
         Some((self.last_distribution.rps, claimed))
     }
 
+    pub fn can_be_removed(&self) -> bool {
+        if let SimpleFarmStatus::Ended = self.status {
+            if self.amount_of_claimed == self.amount_of_reward {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
 }
 

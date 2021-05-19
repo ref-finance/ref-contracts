@@ -24,6 +24,7 @@ impl FungibleTokenReceiver for Contract {
         let amount: u128 = amount.into();
         if msg.is_empty() {
             // ****** seed Token deposit in ********
+            self.remove_unused_rps(&sender);
             self.internal_seed_deposit(
                 &env::predecessor_account_id(), 
                 &sender, 
@@ -35,10 +36,10 @@ impl FungibleTokenReceiver for Contract {
         } else {  
             // ****** reward Token deposit in ********
             let farm_id = msg.parse::<FarmId>().expect(&format!("{}", ERR42_INVALID_FARM_ID));
-            let (seed_id, index) = parse_farm_id(&farm_id);
+            let (seed_id, _) = parse_farm_id(&farm_id);
 
             let mut farm_seed = self.get_seed(&seed_id);
-            let farm = farm_seed.get_ref_mut().farms.get_mut(index).expect(&format!("{}", ERR41_FARM_NOT_EXIST));
+            let farm = farm_seed.get_ref_mut().farms.get_mut(&farm_id).expect(&format!("{}", ERR41_FARM_NOT_EXIST));
 
             // update farm
             assert_eq!(
@@ -102,6 +103,8 @@ impl MFTTokenReceiver for Contract {
     ) -> PromiseOrValue<U128> {
 
         self.assert_storage_usage(&sender_id);
+
+        self.remove_unused_rps(&sender_id);
  
         let seed_id: String;
         match parse_token_id(token_id.clone()) {
