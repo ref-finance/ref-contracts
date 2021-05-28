@@ -26,6 +26,13 @@ impl Contract {
         self.data_mut().whitelist.remove(token_id.as_ref())
     }
 
+    pub fn repay_failure_payment(&mut self) {
+        self.assert_owner();
+        if let Some(item) = self.data_mut().failed_payments.pop() {
+            self.handle_payment(&item.token_id, &item.receiver_id, item.amount);
+        }
+    }
+
     /// Upgrades given contract. Only can be called by owner.
     /// if `migrate` is true, calls `migrate()` function right after deployment.
     /// TODO: consider adding extra grace period in case `owner` got attacked.

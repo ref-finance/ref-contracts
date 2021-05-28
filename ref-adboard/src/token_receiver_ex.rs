@@ -1,3 +1,5 @@
+/// this file is reserved for future work
+
 use crate::*;
 use near_sdk::{ext_contract, PromiseOrValue, PromiseResult};
 use near_sdk::json_types::{U128};

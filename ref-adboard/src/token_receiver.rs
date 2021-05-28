@@ -94,23 +94,25 @@ impl MFTTokenReceiver for Contract {
             / U256::from(FEE_DIVISOR)
         ).as_u128();
 
-        ext_multi_fungible_token::mft_transfer(
-            metadata.token_id.clone(),
-            metadata.owner.clone(),
-            (amount - fee).into(),
-            None,
-            &AMM_CONTRACT.to_string(),
-            1,  // one yocto near
-            XCC_GAS,
-        )
-        .then(ext_self::on_payment(
-            metadata.token_id.clone(),
-            metadata.owner.clone(),
-            (amount - fee).into(),
-            &env::current_account_id(),
-            NO_DEPOSIT,
-            XCC_GAS,
-        ));
+        self.handle_payment(&metadata.token_id, &metadata.owner, amount - fee);
+
+        // ext_multi_fungible_token::mft_transfer(
+        //     metadata.token_id.clone(),
+        //     metadata.owner.clone(),
+        //     (amount - fee).into(),
+        //     None,
+        //     &AMM_CONTRACT.to_string(),
+        //     1,  // one yocto near
+        //     XCC_GAS,
+        // )
+        // .then(ext_self::on_payment(
+        //     metadata.token_id.clone(),
+        //     metadata.owner.clone(),
+        //     (amount - fee).into(),
+        //     &env::current_account_id(),
+        //     NO_DEPOSIT,
+        //     XCC_GAS,
+        // ));
 
         // update metadata
         metadata.owner = sender_id.clone();
@@ -126,6 +128,28 @@ impl MFTTokenReceiver for Contract {
 
 #[near_bindgen]
 impl Contract {
+
+    pub fn handle_payment(&mut self, token_id: &String, receiver_id: &AccountId, amount: u128) {
+        ext_multi_fungible_token::mft_transfer(
+            token_id.clone(),
+            receiver_id.clone(),
+            amount.into(),
+            None,
+            &AMM_CONTRACT.to_string(),
+            1,  // one yocto near
+            XCC_GAS,
+        )
+        .then(ext_self::on_payment(
+            token_id.clone(),
+            receiver_id.clone(),
+            amount.into(),
+            &env::current_account_id(),
+            NO_DEPOSIT,
+            XCC_GAS,
+        ));
+    }
+
+
     #[private]
     pub fn on_payment(
         &mut self,

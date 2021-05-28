@@ -2,6 +2,23 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::json_types::{U64, U128};
 use crate::*;
 
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub struct HumanReadablePaymentItem {
+    pub amount: U128,
+    pub token_id: AccountId,
+    pub receiver_id: AccountId,
+}
+
+impl From<&PaymentItem> for HumanReadablePaymentItem {
+    fn from(item: &PaymentItem) -> Self {
+        Self {
+            amount: item.amount.into(),
+            token_id: item.token_id.clone(),
+            receiver_id: item.receiver_id.clone(),
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(crate = "near_sdk::serde")]
@@ -65,6 +82,15 @@ impl Contract {
             .map(|index| 
                 self.data().frames_data.get(&(index as u16))
                 .unwrap_or(DEFAULT_DATA.to_string())
+            ).collect()
+    }
+
+    pub fn list_failed_payments(&self, from_index: u64, limit: u64) ->Vec<HumanReadablePaymentItem> {
+        (from_index..std::cmp::min(from_index + limit, self.data().failed_payments.len()))
+            .map(|index| {
+                    let item = self.data().failed_payments.get(index).unwrap();
+                    (&item).into()
+                }
             ).collect()
     }
 
