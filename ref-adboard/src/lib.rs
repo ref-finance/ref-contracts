@@ -150,8 +150,8 @@ impl Contract {
 mod tests {
 
     use near_sdk::test_utils::{accounts, VMContextBuilder};
-    use near_sdk::{testing_env, Balance, MockedBlockchain, BlockHeight};
-    use near_sdk::json_types::{ValidAccountId, U64, U128};
+    use near_sdk::{testing_env, MockedBlockchain};
+    use near_sdk::json_types::{U128};
 
     use super::*;
 
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn test_owner_actions() {
-        let (mut context, mut contract) = setup_contract();
+        let (_, mut contract) = setup_contract();
         
         let metadata = contract.get_metadata();
         assert_eq!(metadata.version, "0.1.0".to_string());
@@ -226,7 +226,7 @@ mod tests {
         assert_eq!(frame_metadata.unwrap().token_id, "charlie".to_string());
         let frame_metadata = contract.get_frame_metadata(500);
         assert!(frame_metadata.is_none());
-        contract.expend_frames(10);
+        contract.expand_frames(10);
         let frame_metadata = contract.get_frame_metadata(500);
         assert_eq!(frame_metadata.unwrap().token_id, "charlie".to_string());
         let frame_metadata = contract.get_frame_metadata(510);

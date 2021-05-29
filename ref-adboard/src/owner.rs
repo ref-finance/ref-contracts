@@ -29,7 +29,7 @@ impl Contract {
         self.data_mut().trading_fee = trading_fee;
     }
 
-    pub fn expend_frames(&mut self, expend_count: u16) {
+    pub fn expand_frames(&mut self, expend_count: u16) {
         self.assert_owner();
         self.data_mut().frame_count += expend_count;
     }

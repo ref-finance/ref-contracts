@@ -8,6 +8,18 @@ This is a RUST version of adboard AssemblyScript contract by Daniel.
 ### Interface Structure
 
 ```rust
+/// metadata of the contract
+pub struct ContractMetadata {
+    pub version: String,
+    pub owner_id: AccountId,
+    pub amm_id: AccountId,
+    pub default_token_id: AccountId,
+    pub default_sell_balance: U128,
+    pub protected_period: u16,
+    pub frame_count: u16,
+    pub trading_fee: u16,
+}
+
 /// metadata of one frame
 pub struct HumanReadableFrameMetadata {
     pub token_price: U128,
@@ -28,6 +40,8 @@ pub struct HumanReadablePaymentItem {
 
 ***view functions***  
 ```rust
+
+pub fn get_metadata(&self) -> ContractMetadata;
 
 /// tokens that permitted in this contract
 pub fn get_whitelist(&self) -> Vec<String>;
@@ -70,6 +84,10 @@ pub fn edit_frame(&mut self, frame_id: FrameId, frame_data: String);
 ```
 
 ***owner functions***  
+The owner of this contract is suggested to be some DAO. It can adjust parameters, such as trading fee, protected period, token whitelist, and etc.  
+A regular operation for the owner is to repay failure payments. Those payments are generated through frame trading process. It's the last step of the process that the contract would pay prev-sell_balance in prev-frame_token of the trading frame to the prev-owner. But in some rare conditions, this payment would fail. Then it will be recorded in a special vector called failed_payments.  
+The ```repay_failure_payment``` interface gives owner the right to handle those payments.
+
 ```rust
 /// transfer ownership
 pub fn set_owner(&mut self, owner_id: ValidAccountId);
@@ -82,4 +100,19 @@ pub fn remove_token_from_whitelist(&mut self, token_id: ValidAccountId) -> bool;
  
 /// handle one failed payment at one call.
 pub fn repay_failure_payment(&mut self);
+
+/// owner can change amm account id.
+pub fn set_amm(&mut self, amm_id: ValidAccountId);
+
+/// owner can change protected period from being sold after a frame complete trading.
+pub fn set_protected_period(&mut self, protected_period: u16);
+
+/// owner can adjust trading fee, the unit is bps, that means a 10,000 denominator. 
+pub fn set_trading_fee(&mut self, trading_fee: u16);
+
+/// owner can expand total frames, the new generate frame would have default values.
+pub fn expand_frames(&mut self, expend_count: u16);
+
+/// owner can change the default values a frame initially use.
+pub fn set_default_token(&mut self, token_id: ValidAccountId, sell_balance: U128);
 ```
