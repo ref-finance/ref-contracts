@@ -91,7 +91,7 @@ impl Contract {
         default_sell_balance: U128,
         protected_period: u16,
         frame_count: u16, 
-        trading_fee: u16
+        trading_fee: u16,
     ) -> Self {
         assert!(!env::state_exists(), "Already initialized");
         Self {
@@ -196,16 +196,6 @@ mod tests {
         let frame_data = contract.get_frame_data(frame_id).expect("NO_DATA");
         assert_eq!(frame_data, "TEST_STRINGS".to_string(), "ERR_DATA");
 
-        // let farm_id = create_farm(&mut context, &mut contract,
-        //     accounts(1), accounts(2), 5000, 60);
-        // assert_eq!(farm_id, String::from("bob#0"));
-        // let farm_info = contract.get_farm(farm_id.clone()).expect("Error");
-        // assert_eq!(farm_info.farm_kind, String::from("SIMPLE_FARM"));
-        // assert_eq!(farm_info.farm_status, String::from("Created"));
-        // assert_eq!(farm_info.seed_id, String::from("bob"));
-        // assert_eq!(farm_info.reward_token, String::from("charlie"));
-        // assert_eq!(farm_info.reward_per_session, U128(5000));
-        // assert_eq!(farm_info.session_interval, U64(60));
     }
 
     #[test]

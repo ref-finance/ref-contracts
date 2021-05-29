@@ -4,6 +4,27 @@
 
 This is a RUST version of adboard AssemblyScript contract by Daniel.
 
+### Init
+When initialize the adboard, we should set following params:  
+
+* owner_id: the owner of this contract, has the right to call owner methods,
+* amm_id: the ref main contract, play a role of contract of all whitelisted tokens,
+* default_token_id and defalut_sell_balance: the initial status of frames, usually wnear's contract, which is wrap.near on mainnet and wrap.testnet on testnet. And the sell_balance is usually set to 1 wnear, which is 10**24. 
+* protected_period: the seconds that a frame can not be traded after previous trading.
+* frame_count: the total frame counts in this contract.
+* trading_fee: in bps, which means a 10,000 denominator.
+
+```rust
+pub fn new(
+        owner_id: ValidAccountId, 
+        amm_id: ValidAccountId, 
+        default_token_id: ValidAccountId,
+        default_sell_balance: U128,
+        protected_period: u16,
+        frame_count: u16, 
+        trading_fee: u16
+    ) -> Self;
+```
 
 ### Interface Structure
 
