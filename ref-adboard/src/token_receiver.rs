@@ -69,7 +69,7 @@ impl MFTTokenReceiver for Contract {
  
         assert_eq!(
             env::predecessor_account_id(),
-            AMM_CONTRACT.to_string(),
+            self.data().amm_id,
             "ERR_ONLY_CAN_BE_CALLED_BY_REF"
         );
 
@@ -78,7 +78,14 @@ impl MFTTokenReceiver for Contract {
         let params = msg.parse::<BuyFrameParams>().expect(&format!("ERR_MSG_INCORRECT"));
         
         self.assert_valid_frame_id(params.frame_id);
-        let mut metadata = self.data().frames.get(&params.frame_id).unwrap_or_default();
+        let mut metadata = self.data().frames.get(&params.frame_id).unwrap_or(
+            FrameMetadata {
+                token_price: self.data().default_sell_balance,
+                token_id: self.data().default_token_id.clone(),
+                owner: self.data().owner_id.clone(),
+                protected_ts: 0,
+            }
+        );
         let cur_ts = env::block_timestamp();
         if metadata.protected_ts > 0 && metadata.protected_ts < cur_ts {
             env::panic(b"Frame is currently protected")
@@ -96,29 +103,11 @@ impl MFTTokenReceiver for Contract {
 
         self.handle_payment(&metadata.token_id, &metadata.owner, amount - fee);
 
-        // ext_multi_fungible_token::mft_transfer(
-        //     metadata.token_id.clone(),
-        //     metadata.owner.clone(),
-        //     (amount - fee).into(),
-        //     None,
-        //     &AMM_CONTRACT.to_string(),
-        //     1,  // one yocto near
-        //     XCC_GAS,
-        // )
-        // .then(ext_self::on_payment(
-        //     metadata.token_id.clone(),
-        //     metadata.owner.clone(),
-        //     (amount - fee).into(),
-        //     &env::current_account_id(),
-        //     NO_DEPOSIT,
-        //     XCC_GAS,
-        // ));
-
         // update metadata
         metadata.owner = sender_id.clone();
         metadata.token_id = params.token_id.clone();
         metadata.token_price = params.sell_balance;
-        metadata.protected_ts = env::block_timestamp() + PROTECTED_TIMER;
+        metadata.protected_ts = env::block_timestamp() + to_nanoseconds(self.data().protected_period);
         self.data_mut().frames.insert(&params.frame_id, &metadata);
 
         PromiseOrValue::Value(U128(0))
@@ -135,7 +124,7 @@ impl Contract {
             receiver_id.clone(),
             amount.into(),
             None,
-            &AMM_CONTRACT.to_string(),
+            &self.data().amm_id,
             1,  // one yocto near
             XCC_GAS,
         )

@@ -8,17 +8,16 @@ construct_uint! {
     pub struct U256(4);
 }
 
-pub const FEE_DIVISOR: u32 = 10_000;
 pub type FrameId = u16;
-pub const ONE_NEAR: u128 = 1_000_000_000_000_000_000_000_000;
+pub const FEE_DIVISOR: u32 = 10_000;
 pub const XCC_GAS: Gas = 30_000_000_000_000;
 pub const NO_DEPOSIT: u128 = 0;
-pub const CONTRACT_SELF: &str = "ref-adboard.near";
-pub const AMM_CONTRACT: &str = "ref-playground.near";
-pub const WRAPPED_NEAR_CONTRACT: &str = "wrap.near";
-pub const PROTECTED_TIMER: u64 = 60 * 60 * 1000 * 1000 * 1000; //15 minutes
+
 pub const DEFAULT_DATA: &str = "WzIzNCzfBN8E1AQ23wTfBMkE31DfBN9Q3wTfBN9Q3wTfUN8o3wTfUN8E31DfUN8E31DfBN8E31DfBN9Q3wTfBN9Q3wTfUN8o3wTfUN8E31DfUN8E31DfBN8E31DfBN9Q3wTfBN9Q3wTfUN8E3wTPBF0";
 
+pub(crate) fn to_nanoseconds(seconds: u16) -> u64 {
+    seconds as u64 * 1000 * 1000 * 1000
+}
 
 impl Contract {
 

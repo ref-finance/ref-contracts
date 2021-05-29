@@ -10,10 +10,34 @@ pub const GAS_FOR_DEPLOY_CALL: Gas = 20_000_000_000_000;
 #[near_bindgen]
 impl Contract {
     pub fn set_owner(&mut self, owner_id: ValidAccountId) {
-
         self.assert_owner();
-
         self.data_mut().owner_id = owner_id.into();
+    }
+
+    pub fn set_amm(&mut self, amm_id: ValidAccountId) {
+        self.assert_owner();
+        self.data_mut().amm_id = amm_id.into();
+    }
+
+    pub fn set_protected_period(&mut self, protected_period: u16) {
+        self.assert_owner();
+        self.data_mut().protected_period = protected_period;
+    }
+
+    pub fn set_trading_fee(&mut self, trading_fee: u16) {
+        self.assert_owner();
+        self.data_mut().trading_fee = trading_fee;
+    }
+
+    pub fn expend_frames(&mut self, expend_count: u16) {
+        self.assert_owner();
+        self.data_mut().frame_count += expend_count;
+    }
+
+    pub fn set_default_token(&mut self, token_id: ValidAccountId, sell_balance: U128) {
+        self.assert_owner();
+        self.data_mut().default_token_id = token_id.into();
+        self.data_mut().default_sell_balance = sell_balance.into();
     }
 
     pub fn add_token_to_whitelist(&mut self, token_id: ValidAccountId) -> bool {

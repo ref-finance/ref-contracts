@@ -2,6 +2,36 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::json_types::{U64, U128};
 use crate::*;
 
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct ContractMetadata {
+    pub version: String,
+    pub owner_id: AccountId,
+    pub amm_id: AccountId,
+    pub default_token_id: AccountId,
+    pub default_sell_balance: U128,
+    pub protected_period: u16,
+    pub frame_count: u16,
+    pub trading_fee: u16,
+}
+
+impl From<&Contract> for ContractMetadata {
+    fn from(contract: &Contract) -> Self {
+        Self {
+            version: "0.1.0".to_string(),
+            owner_id: contract.data().owner_id.clone(),
+            amm_id: contract.data().amm_id.clone(),
+            default_token_id: contract.data().default_token_id.clone(),
+            default_sell_balance: contract.data().default_sell_balance.into(),
+            protected_period: contract.data().protected_period,
+            frame_count: contract.data().frame_count,
+            trading_fee: contract.data().trading_fee,
+        }
+    }
+}
+
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct HumanReadablePaymentItem {
@@ -42,6 +72,11 @@ impl From<&FrameMetadata> for HumanReadableFrameMetadata {
 
 #[near_bindgen]
 impl Contract {
+
+    pub fn get_metadata(&self) -> ContractMetadata {
+        self.into()
+    }
+
     pub fn get_whitelist(&self) -> Vec<String> {
         self.data().whitelist.to_vec()
     }
@@ -50,7 +85,14 @@ impl Contract {
         if index >= self.data().frame_count {
             None
         } else {
-            let metadata = self.data().frames.get(&index).unwrap_or_default();
+            let metadata = self.data().frames.get(&index).unwrap_or(
+                FrameMetadata {
+                    token_price: self.data().default_sell_balance,
+                    token_id: self.data().default_token_id.clone(),
+                    owner: self.data().owner_id.clone(),
+                    protected_ts: 0,
+                }
+            );
             Some((&metadata).into())
         }
     }
@@ -59,7 +101,14 @@ impl Contract {
         (from_index..std::cmp::min(from_index + limit, self.data().frame_count as u64))
             .map(
                 |index| {
-                    let metadata = self.data().frames.get(&(index as u16)).unwrap_or_default();
+                    let metadata = self.data().frames.get(&(index as u16)).unwrap_or(
+                        FrameMetadata {
+                            token_price: self.data().default_sell_balance,
+                            token_id: self.data().default_token_id.clone(),
+                            owner: self.data().owner_id.clone(),
+                            protected_ts: 0,
+                        }
+                    );
                     (&metadata).into()
                 }
             ).collect()
