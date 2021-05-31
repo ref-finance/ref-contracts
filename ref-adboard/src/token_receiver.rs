@@ -87,7 +87,7 @@ impl MFTTokenReceiver for Contract {
             }
         );
         let cur_ts = env::block_timestamp();
-        if metadata.protected_ts > 0 && metadata.protected_ts < cur_ts {
+        if metadata.protected_ts > 0 && metadata.protected_ts > cur_ts {
             env::panic(b"Frame is currently protected")
         }
         assert_eq!(token_id, metadata.token_id, "Invalid token id");
@@ -109,6 +109,14 @@ impl MFTTokenReceiver for Contract {
         metadata.token_price = params.sell_balance;
         metadata.protected_ts = env::block_timestamp() + to_nanoseconds(self.data().protected_period);
         self.data_mut().frames.insert(&params.frame_id, &metadata);
+
+        env::log(
+            format!(
+                "Frame {} got new owner {} with sell balance {} on token {}.",
+                params.frame_id, sender_id.clone(), params.sell_balance, params.token_id.clone(),
+            )
+            .as_bytes(),
+        );
 
         PromiseOrValue::Value(U128(0))
     }
