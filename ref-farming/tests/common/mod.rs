@@ -53,7 +53,7 @@ pub(crate) fn prepair_farm(
             start_at: U64(0),
             reward_per_session: to_yocto("1").into(),
             session_interval: U64(60),
-        }),
+        }, Some(U128(1000000000000000000))),
         deposit = to_yocto("1")
     );
     out_come.assert_success();

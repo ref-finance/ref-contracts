@@ -7,6 +7,7 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
 
 use crate::utils::parse_farm_id;
+use crate::farm_seed::SeedInfo;
 use crate::*;
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -71,7 +72,7 @@ impl Contract {
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
             owner_id: self.data().owner_id.clone(),
-            version: String::from("0.4.0"),
+            version: String::from("0.4.1"),
             farmer_count: self.data().farmer_count.into(),
             farm_count: self.data().farm_count.into(),
             seed_count: self.data().seeds.len().into(),
@@ -109,7 +110,7 @@ impl Contract {
     }
 
     pub fn list_farms_by_seed(&self, seed_id: SeedId) -> Vec<FarmInfo> {
-        self.get_seed_default(&seed_id)
+        self.get_seed(&seed_id)
             .get_ref()
             .farms.values().map(|farm| farm.into())
             .collect()
@@ -196,5 +197,25 @@ impl Contract {
         } else {
             HashMap::new()
         }
+    }
+
+    pub fn get_seed_info(&self, seed_id: SeedId) -> Option<SeedInfo> {
+        if let Some(farm_seed) = self.get_seed_wrapped(&seed_id) {
+            Some(farm_seed.get_ref().into())
+        } else {
+            None
+        }
+    }
+
+    pub fn list_seeds_info(&self, from_index: u64, limit: u64) -> HashMap<SeedId, SeedInfo> {
+        let keys = self.data().seeds.keys_as_vector();
+        (from_index..std::cmp::min(from_index + limit, keys.len()))
+            .map(|index| 
+                (
+                    keys.get(index).unwrap(),
+                    self.get_seed(&keys.get(index).unwrap()).get_ref().into(),
+                )
+            )
+            .collect()
     }
 }
