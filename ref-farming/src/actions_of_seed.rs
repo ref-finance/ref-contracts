@@ -180,16 +180,6 @@ impl Contract {
         } 
     }
 
-    // #[inline]
-    // pub(crate) fn get_seed_default(&self, seed_id: &String, min_deposit: Balance) -> VersionedFarmSeed {
-    //     let orig = self.data().seeds.get(seed_id).unwrap_or(VersionedFarmSeed::new(seed_id, min_deposit));
-    //     if orig.need_upgrade() {
-    //         orig.upgrade()
-    //     } else {
-    //         orig
-    //     }
-    // }
-
     #[inline]
     pub(crate) fn get_seed_wrapped(&self, seed_id: &String) -> Option<VersionedFarmSeed> {
         if let Some(farm_seed) = self.data().seeds.get(seed_id) {
@@ -202,7 +192,6 @@ impl Contract {
             None
         }
     }
-
 
     pub(crate) fn internal_seed_deposit(
         &mut self, 

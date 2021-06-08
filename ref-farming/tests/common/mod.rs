@@ -1,6 +1,7 @@
 use std::convert::TryFrom;
 
 use near_sdk::json_types::{ValidAccountId, U128, U64};
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{AccountId, Balance};
 use near_sdk_sim::{call, deploy, to_yocto, view, ContractAccount, UserAccount};
 
@@ -143,6 +144,25 @@ pub(crate) fn show_farminfo(farming: &ContractAccount<Farming>, farm_id: String)
         farm_info.last_round.0, farm_info.cur_round.0);
     
     farm_info
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub struct SeedInfo {
+    pub seed_id: String,
+    pub seed_type: String,
+    pub farms: Vec<String>,
+    pub next_index: u32,
+    pub amount: U128,
+    pub min_deposit: U128,
+}
+
+pub(crate) fn show_seedsinfo(farming: &ContractAccount<Farming>) -> HashMap<String, SeedInfo> {
+    let ret = view!(farming.list_seeds_info(0, 100)).unwrap_json::<HashMap<String, SeedInfo>>();
+    for (k, v) in &ret {
+        println!("FarmSeed=>  {}: {:#?}", k, v);
+    }
+    ret
 }
 
 pub(crate) fn show_userseeds(farming: &ContractAccount<Farming>, user_id: String) -> HashMap<String, U128> {

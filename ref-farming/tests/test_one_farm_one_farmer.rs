@@ -30,6 +30,7 @@ fn test_one_farm_one_farmers() {
 
     // create farm
     let (farming, farm_id) = prepair_farm(&root, &owner, &token1);
+    show_seedsinfo(&farming);
     println!("----->> Farm {} is ready.", farm_id.clone());
 
     // register LP for farming contract
@@ -55,6 +56,7 @@ fn test_one_farm_one_farmers() {
     assert_eq!(user_seeds.get(&String::from("swap@0")).unwrap().0, to_yocto("1"));
     let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone());
     assert_eq!(unclaim.0, 0_u128);
+    show_seedsinfo(&farming);
     println!("----->> Farmer1 staked liquidity at #{}.", root.borrow_runtime().current_block().block_height);
 
     // chain goes for 60 blocks

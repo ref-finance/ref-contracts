@@ -81,8 +81,23 @@ impl Contract {
         );
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(_) => {}
+            PromiseResult::Successful(_) => {
+                env::log(
+                    format!(
+                        "{} withdraw reward {} amount {}, Succeed.",
+                        sender_id, token_id, amount.0,
+                    )
+                    .as_bytes(),
+                );
+            }
             PromiseResult::Failed => {
+                env::log(
+                    format!(
+                        "{} withdraw reward {} amount {}, Callback Failed.",
+                        sender_id, token_id, amount.0,
+                    )
+                    .as_bytes(),
+                );
                 // This reverts the changes from withdraw function.
                 let mut farmer = self.get_farmer(&sender_id);
                 farmer.get_ref_mut().add_reward(&token_id, amount.0);
@@ -128,6 +143,9 @@ fn claim_user_reward_from_farm(
 
 impl Contract {
 
+    /// When a farm is removed, each farmer can free storage used by user_rps,
+    /// which takes a key (farm_id as max 64 bytes) and a U256 (user_rps as 32 bytes),
+    /// this clean method would be invoked in claim reward interface called by farmer.
     pub(crate) fn remove_unused_rps(&mut self, sender_id: &AccountId) {
         let mut farmer = self.get_farmer(sender_id);
         let mut changed = false;
