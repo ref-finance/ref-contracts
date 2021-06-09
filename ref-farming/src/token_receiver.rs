@@ -46,6 +46,13 @@ impl FungibleTokenReceiver for Contract {
                 amount.into(), 
                 SeedType::FT
             );
+            env::log(
+                format!(
+                    "{} deposit FT seed {} with amount {}.",
+                    sender, env::predecessor_account_id(), amount,
+                )
+                .as_bytes(),
+            );
             PromiseOrValue::Value(U128(0))
 
         } else {  
@@ -148,6 +155,14 @@ impl MFTTokenReceiver for Contract {
         }
         
         self.internal_seed_deposit(&seed_id, &sender_id, amount, SeedType::MFT);
+
+        env::log(
+            format!(
+                "{} deposit MFT seed {} with amount {}.",
+                sender_id, seed_id, amount,
+            )
+            .as_bytes(),
+        );
 
         PromiseOrValue::Value(U128(0))
     }
