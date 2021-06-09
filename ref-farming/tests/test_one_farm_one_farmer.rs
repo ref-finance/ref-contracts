@@ -1,11 +1,14 @@
 use near_sdk_sim::{call, init_simulator, to_yocto, view};
 use near_sdk::json_types::{U128};
-use crate::common::*;
+
+use crate::common::utils::*;
+use crate::common::views::*;
+use crate::common::actions::*;
 
 mod common;
 
 #[test]
-fn test_one_farm_one_farmers() {
+fn test_one_farm_one_farmer() {
     let root = init_simulator(None);
 
     // prepair users
