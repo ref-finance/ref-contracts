@@ -8,6 +8,7 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::json_types::{U128};
 use crate::errors::*;
 use crate::farm::{Farm, FarmId};
+use crate::utils::parse_seed_id;
 
 
 /// For MFT, SeedId composes of token_contract_id 
@@ -40,10 +41,16 @@ pub struct FarmSeed {
 
 impl FarmSeed {
     pub fn new(seed_id: &SeedId, min_deposit: Balance) -> Self {
+        let (token_id, token_index) = parse_seed_id(seed_id);
+        let seed_type: SeedType;
+        if token_id == token_index {
+            seed_type = SeedType::FT;
+        } else {
+            seed_type = SeedType::MFT;
+        }
         Self {
             seed_id: seed_id.clone(),
-            seed_type: SeedType::FT,
-            // farms: Vec::new(),
+            seed_type,
             farms: HashMap::new(),
             next_index: 0,
             amount: 0,
