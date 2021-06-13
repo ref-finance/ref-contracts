@@ -1,18 +1,34 @@
+use std::collections::HashMap;
 use std::convert::TryFrom;
 
+use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::AccountId;
-use near_sdk_sim::{call, deploy, init_simulator, to_yocto, view, ContractAccount, UserAccount};
-
-use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_sdk_sim::transaction::ExecutionStatus;
+use near_sdk_sim::{
+    call, deploy, init_simulator, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
+};
+
 use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
-use std::collections::HashMap;
 use test_token::ContractContract as TestToken;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange_local.wasm",
+}
+
+pub fn should_fail(r: ExecutionResult) {
+    println!("{:?}", r.status());
+    match r.status() {
+        ExecutionStatus::Failure(_) => {}
+        _ => panic!("Should fail"),
+    }
+}
+
+pub fn show_promises(r: ExecutionResult) {
+    for promise in r.promise_results() {
+        println!("{:?}", promise);
+    }
 }
 
 fn test_token(
@@ -43,6 +59,12 @@ fn test_token(
     t
 }
 
+fn balance_of(token: &ContractAccount<TestToken>, account_id: &AccountId) -> u128 {
+    view!(token.ft_balance_of(to_va(account_id.clone())))
+        .unwrap_json::<U128>()
+        .0
+}
+
 fn dai() -> AccountId {
     "dai".to_string()
 }
@@ -59,8 +81,13 @@ fn to_va(a: AccountId) -> ValidAccountId {
     ValidAccountId::try_from(a).unwrap()
 }
 
-#[test]
-fn test_swap() {
+fn setup_pool_with_liquidity() -> (
+    UserAccount,
+    UserAccount,
+    ContractAccount<Exchange>,
+    ContractAccount<TestToken>,
+    ContractAccount<TestToken>,
+) {
     let root = init_simulator(None);
     let owner = root.create_user("owner".to_string(), to_yocto("100"));
     let pool = deploy!(
@@ -91,6 +118,13 @@ fn test_swap() {
     .assert_success();
 
     call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
         root,
         token1.ft_transfer_call(to_va(swap()), to_yocto("105").into(), None, "".to_string()),
         deposit = 1
@@ -108,6 +142,12 @@ fn test_swap() {
         deposit = to_yocto("0.00067")
     )
     .assert_success();
+    (root, owner, pool, token1, token2)
+}
+
+#[test]
+fn test_swap() {
+    let (root, _owner, pool, token1, token2) = setup_pool_with_liquidity();
     assert_eq!(
         view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
         PoolInfo {
@@ -281,4 +321,61 @@ fn test_withdraw_failure() {
     let balances_after = view!(pool.get_deposits(to_va(root.account_id.clone())))
         .unwrap_json::<HashMap<AccountId, U128>>();
     assert_eq!(balances_after.get(&dai()).unwrap(), &to_yocto("105").into());
+}
+
+/// Test swap without deposit/withdraw.
+#[test]
+fn test_direct_swap() {
+    let (root, owner, pool, token1, token2) = setup_pool_with_liquidity();
+    let new_user = root.create_user("new_user".to_string(), to_yocto("1"));
+    call!(
+        new_user,
+        token1.mint(to_va(new_user.account_id.clone()), U128(to_yocto("10")))
+    )
+    .assert_success();
+
+    // Test wrong format and that it returns all tokens back.
+    call!(
+        new_user,
+        token1.ft_transfer_call(to_va(swap()), to_yocto("10").into(), None, "{}".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("10"));
+    assert_eq!(balance_of(&token2, &new_user.account_id), to_yocto("0"));
+
+    // Test that if non-force and account doesn't exist for this user, it fails on swap and returns everything.
+    call!(
+        new_user,
+        token1.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("10").into(),
+            None,
+            "{\"type\": \"Swap\", \"force\": 0, \"pool_id\": 0, \"token_out\": \"eth\", \"min_amount_out\": \"1\"}".to_string()
+        ),
+        deposit = 1
+    )
+    .assert_success();
+    assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("10"));
+    assert_eq!(balance_of(&token2, &new_user.account_id), to_yocto("0"));
+
+    // Test that if force and token2 account doesn't exist, the balance of token1 is taken, owner received token2.
+    call!(
+        new_user,
+        token1.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("1").into(),
+            None,
+            "{\"type\": \"Swap\", \"force\": 1, \"pool_id\": 0, \"token_out\": \"eth\", \"min_amount_out\": \"1\"}".to_string()
+        ),
+        deposit = 1
+    ).assert_success();
+    assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("9"));
+    assert_eq!(balance_of(&token2, &new_user.account_id), to_yocto("0"));
+    assert_eq!(
+        view!(pool.mft_balance_of(token2.account_id(), to_va(owner.account_id.clone())))
+            .unwrap_json::<U128>()
+            .0,
+        1662497915624478906119726
+    );
 }

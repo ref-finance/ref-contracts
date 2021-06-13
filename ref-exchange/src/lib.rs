@@ -104,15 +104,17 @@ impl Contract {
                 .amount_in
                 .map(|value| value.0)
                 .unwrap_or_else(|| prev_amount.expect("ERR_FIRST_SWAP_MISSING_AMOUNT"));
-            prev_amount = Some(self.internal_swap(
-                &mut account,
+            account.withdraw(&action.token_in, amount_in);
+            let amount_out = self.internal_swap(
                 action.pool_id,
                 &action.token_in,
                 amount_in,
                 &action.token_out,
                 action.min_amount_out.0,
                 &referral_id,
-            ));
+            );
+            account.deposit(&action.token_out, amount_out);
+            prev_amount = Some(amount_out);
         }
         self.accounts.insert(&sender_id, &account);
         U128(prev_amount.expect("ERR_AT_LEAST_ONE_SWAP"))
@@ -214,7 +216,6 @@ impl Contract {
     /// Should be at least min_amount_out or swap will fail (prevents front running and other slippage issues).
     fn internal_swap(
         &mut self,
-        account: &mut Account,
         pool_id: u64,
         token_in: &AccountId,
         amount_in: u128,
@@ -222,7 +223,6 @@ impl Contract {
         min_amount_out: u128,
         referral_id: &Option<AccountId>,
     ) -> u128 {
-        account.withdraw(token_in, amount_in);
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         let amount_out = pool.swap(
             token_in,
@@ -232,7 +232,6 @@ impl Contract {
             &self.owner_id,
             referral_id,
         );
-        account.deposit(token_out, amount_out);
         self.pools.replace(pool_id, &pool);
         amount_out
     }

@@ -1,13 +1,13 @@
 //! Account deposit is information per user about their balances in the exchange.
 
 use std::collections::HashMap;
-use std::convert::TryInto;
 
+use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult};
 
-use crate::utils::{ext_fungible_token, ext_self, GAS_FOR_FT_TRANSFER};
+use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER};
 use crate::*;
 
 const MAX_ACCOUNT_LENGTH: u128 = 64;
@@ -116,7 +116,12 @@ impl Contract {
     /// Optional unregister will try to remove record of this token from AccountDeposit for given user.
     /// Unregister will fail if the left over balance is non 0.
     #[payable]
-    pub fn withdraw(&mut self, token_id: ValidAccountId, amount: U128, unregister: Option<bool>) {
+    pub fn withdraw(
+        &mut self,
+        token_id: ValidAccountId,
+        amount: U128,
+        unregister: Option<bool>,
+    ) -> Promise {
         assert_one_yocto();
         let token_id: AccountId = token_id.into();
         let amount: u128 = amount.into();
@@ -128,22 +133,7 @@ impl Contract {
             deposits.unregister(&token_id);
         }
         self.accounts.insert(&sender_id, &deposits);
-        ext_fungible_token::ft_transfer(
-            sender_id.clone().try_into().unwrap(),
-            amount.into(),
-            None,
-            &token_id,
-            1,
-            GAS_FOR_FT_TRANSFER,
-        )
-        .then(ext_self::exchange_callback_post_withdraw(
-            token_id,
-            sender_id,
-            amount.into(),
-            &env::current_account_id(),
-            0,
-            GAS_FOR_FT_TRANSFER,
-        ));
+        self.internal_send_tokens(&sender_id, &token_id, amount)
     }
 
     #[private]
@@ -163,10 +153,22 @@ impl Contract {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {}
             PromiseResult::Failed => {
-                // This reverts the changes from withdraw function.
-                let mut deposits = self.get_account_deposits(&sender_id);
-                deposits.deposit(&token_id, amount.0);
-                self.accounts.insert(&sender_id, &deposits);
+                // This reverts the changes from withdraw function. If account doesn't exit, deposits to the owner's account.
+                if let Some(mut account) = self.accounts.get(&sender_id) {
+                    account.deposit(&token_id, amount.0);
+                    self.accounts.insert(&sender_id, &account);
+                } else {
+                    env::log(
+                        format!(
+                            "Account {} is not registered. Depositing to owner.",
+                            sender_id
+                        )
+                        .as_bytes(),
+                    );
+                    let mut owner_account = self.get_account_deposits(&self.owner_id);
+                    owner_account.deposit(&token_id, amount.0);
+                    self.accounts.insert(&self.owner_id, &owner_account);
+                }
             }
         };
     }
@@ -217,5 +219,31 @@ impl Contract {
             .get(sender_id)
             .and_then(|d| d.tokens.get(token_id).cloned())
             .unwrap_or_default()
+    }
+
+    /// Sends given amount to given user and if it fails, returns it back to user's balance.
+    /// Tokens must already be subtracted from internal balance.
+    pub(crate) fn internal_send_tokens(
+        &self,
+        sender_id: &AccountId,
+        token_id: &AccountId,
+        amount: Balance,
+    ) -> Promise {
+        ext_fungible_token::ft_transfer(
+            sender_id.clone(),
+            U128(amount),
+            None,
+            token_id,
+            1,
+            GAS_FOR_FT_TRANSFER,
+        )
+        .then(ext_self::exchange_callback_post_withdraw(
+            token_id.clone(),
+            sender_id.clone(),
+            U128(amount),
+            &env::current_account_id(),
+            0,
+            GAS_FOR_FT_TRANSFER,
+        ))
     }
 }
