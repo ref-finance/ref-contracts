@@ -11,12 +11,6 @@ near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EXCHANGE_WASM_BYTES => "../res/ref_exchange_local.wasm",
 }
 
-#[derive(BorshSerialize)]
-struct UpgradeArgs {
-    code: Vec<u8>,
-    migrate: bool,
-}
-
 #[test]
 fn test_upgrade() {
     let root = init_simulator(None);

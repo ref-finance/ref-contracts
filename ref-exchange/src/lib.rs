@@ -12,7 +12,8 @@ use near_sdk::{
 };
 
 use crate::account_deposit::Account;
-pub use crate::action::*;
+pub use crate::action::SwapAction;
+use crate::action::{Action, ActionResult};
 use crate::errors::*;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
@@ -79,45 +80,52 @@ impl Contract {
         )))
     }
 
-    /// Execute set of swap actions between pools.
+    /// Executes generic set of actions.
     /// If referrer provided, pays referral_fee to it.
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
-    #[payable]
-    pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
+    pub fn execute_actions(
+        &mut self,
+        actions: Vec<Action>,
+        referral_id: Option<ValidAccountId>,
+    ) -> ActionResult {
         let sender_id = env::predecessor_account_id();
         let mut account = self.get_account_deposits(&sender_id);
         // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
         if env::attached_deposit() == 0 {
             for action in &actions {
-                assert!(
-                    account.tokens.contains_key(&action.token_out)
-                        || self.whitelisted_tokens.contains(&action.token_out),
-                    "{}",
-                    ERR26_ACCESS_KEY_NOT_ALLOWED
-                );
+                for token in action.tokens() {
+                    assert!(
+                        account.tokens.contains_key(&token)
+                            || self.whitelisted_tokens.contains(&token),
+                        "{}",
+                        ERR26_ACCESS_KEY_NOT_ALLOWED
+                    );
+                }
             }
         }
-        let mut prev_amount = None;
         let referral_id = referral_id.map(|r| r.into());
-        for action in actions {
-            let amount_in = action
-                .amount_in
-                .map(|value| value.0)
-                .unwrap_or_else(|| prev_amount.expect("ERR_FIRST_SWAP_MISSING_AMOUNT"));
-            account.withdraw(&action.token_in, amount_in);
-            let amount_out = self.internal_swap(
-                action.pool_id,
-                &action.token_in,
-                amount_in,
-                &action.token_out,
-                action.min_amount_out.0,
-                &referral_id,
-            );
-            account.deposit(&action.token_out, amount_out);
-            prev_amount = Some(amount_out);
-        }
-        self.accounts.insert(&sender_id, &account);
-        U128(prev_amount.expect("ERR_AT_LEAST_ONE_SWAP"))
+        let result =
+            self.internal_execute_actions(&mut account, &referral_id, &actions, ActionResult::None);
+        self.internal_save_account(&sender_id, account);
+        result
+    }
+
+    /// Execute set of swap actions between pools.
+    /// If referrer provided, pays referral_fee to it.
+    /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
+    #[payable]
+    pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
+        assert_ne!(actions.len(), 0, "ERR_AT_LEAST_ONE_SWAP");
+        U128(
+            self.execute_actions(
+                actions
+                    .into_iter()
+                    .map(|swap_action| Action::Swap(swap_action))
+                    .collect(),
+                referral_id,
+            )
+            .to_amount(),
+        )
     }
 
     /// Add liquidity from already deposited amounts to given pool.
@@ -150,7 +158,7 @@ impl Contract {
         for i in 0..tokens.len() {
             deposits.withdraw(&tokens[i], amounts[i]);
         }
-        self.accounts.insert(&sender_id, &deposits);
+        self.internal_save_account(&sender_id, deposits);
         self.pools.replace(pool_id, &pool);
         self.internal_check_storage(prev_storage);
     }
@@ -181,7 +189,7 @@ impl Contract {
             deposits.near_amount +=
                 (prev_storage - env::storage_usage()) as Balance * env::storage_byte_cost();
         }
-        self.accounts.insert(&sender_id, &deposits);
+        self.internal_save_account(&sender_id, deposits);
     }
 }
 
@@ -212,9 +220,54 @@ impl Contract {
         id
     }
 
+    /// Execute sequence of actions on given account. Modifies passed account.
+    /// Returns result of the last action.
+    fn internal_execute_actions(
+        &mut self,
+        account: &mut Account,
+        referral_id: &Option<AccountId>,
+        actions: &[Action],
+        prev_result: ActionResult,
+    ) -> ActionResult {
+        let mut result = prev_result;
+        for action in actions {
+            result = self.internal_execute_action(account, referral_id, action, result);
+        }
+        result
+    }
+
+    /// Executes single action on given account. Modifies passed account. Returns a result based on type of action.
+    fn internal_execute_action(
+        &mut self,
+        account: &mut Account,
+        referral_id: &Option<AccountId>,
+        action: &Action,
+        prev_result: ActionResult,
+    ) -> ActionResult {
+        match action {
+            Action::Swap(swap_action) => {
+                let amount_in = swap_action
+                    .amount_in
+                    .map(|value| value.0)
+                    .unwrap_or_else(|| prev_result.to_amount());
+                account.withdraw(&swap_action.token_in, amount_in);
+                let amount_out = self.internal_pool_swap(
+                    swap_action.pool_id,
+                    &swap_action.token_in,
+                    amount_in,
+                    &swap_action.token_out,
+                    swap_action.min_amount_out.0,
+                    referral_id,
+                );
+                account.deposit(&swap_action.token_out, amount_out);
+                ActionResult::Amount(amount_out)
+            }
+        }
+    }
+
     /// Swaps given amount_in of token_in into token_out via given pool.
     /// Should be at least min_amount_out or swap will fail (prevents front running and other slippage issues).
-    fn internal_swap(
+    fn internal_pool_swap(
         &mut self,
         pool_id: u64,
         token_in: &AccountId,

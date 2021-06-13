@@ -14,8 +14,7 @@ const MAX_ACCOUNT_LENGTH: u128 = 64;
 const MIN_ACCOUNT_DEPOSIT_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4;
 
 /// Account deposits information and storage cost.
-#[derive(BorshSerialize, BorshDeserialize, Default)]
-#[cfg_attr(feature = "test", derive(Clone))]
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
 pub struct Account {
     /// Native NEAR amount sent to the exchange.
     /// Used for storage right now, but in future can be used for trading as well.
@@ -25,13 +24,12 @@ pub struct Account {
 }
 
 impl Account {
-    /// Deposit amount to the balance of given token while checking that storage is covered.
+    /// Deposit amount to the balance of given token.
     pub(crate) fn deposit(&mut self, token: &AccountId, amount: Balance) {
         if let Some(x) = self.tokens.get_mut(token) {
             *x = *x + amount;
         } else {
             self.tokens.insert(token.clone(), amount);
-            self.assert_storage_usage();
         }
     }
 
@@ -77,7 +75,6 @@ impl Account {
                 self.tokens.insert(t.clone(), 0);
             }
         }
-        self.assert_storage_usage();
     }
 
     /// Unregisters `token_id` from this account balance.
@@ -97,7 +94,7 @@ impl Contract {
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.get_account_deposits(&sender_id);
         deposits.register(&token_ids);
-        self.accounts.insert(&sender_id, &deposits);
+        self.internal_save_account(&sender_id, deposits);
     }
 
     /// Unregister given token from user's account deposit.
@@ -109,7 +106,7 @@ impl Contract {
         for token_id in token_ids {
             deposits.unregister(token_id.as_ref());
         }
-        self.accounts.insert(&sender_id, &deposits);
+        self.internal_save_account(&sender_id, deposits);
     }
 
     /// Withdraws given token from the deposits of given user.
@@ -132,7 +129,7 @@ impl Contract {
         if unregister == Some(true) {
             deposits.unregister(&token_id);
         }
-        self.accounts.insert(&sender_id, &deposits);
+        self.internal_save_account(&sender_id, deposits);
         self.internal_send_tokens(&sender_id, &token_id, amount)
     }
 
@@ -156,18 +153,18 @@ impl Contract {
                 // This reverts the changes from withdraw function. If account doesn't exit, deposits to the owner's account.
                 if let Some(mut account) = self.accounts.get(&sender_id) {
                     account.deposit(&token_id, amount.0);
-                    self.accounts.insert(&sender_id, &account);
+                    self.internal_save_account(&sender_id, account);
                 } else {
                     env::log(
                         format!(
-                            "Account {} is not registered. Depositing to owner.",
+                            "Account {} is not registered or not enough storage. Depositing to owner.",
                             sender_id
                         )
                         .as_bytes(),
                     );
                     let mut owner_account = self.get_account_deposits(&self.owner_id);
                     owner_account.deposit(&token_id, amount.0);
-                    self.accounts.insert(&self.owner_id, &owner_account);
+                    self.internal_save_account(&self.owner_id.clone(), owner_account);
                 }
             }
         };
@@ -175,13 +172,20 @@ impl Contract {
 }
 
 impl Contract {
+    /// Checks that account has enough storage to be stored and saves it into collection.
+    /// This should be only place to directly use `self.accounts`.
+    pub(crate) fn internal_save_account(&mut self, account_id: &AccountId, account: Account) {
+        account.assert_storage_usage();
+        self.accounts.insert(&account_id, &account);
+    }
+
     /// Registers account in deposited amounts with given amount of $NEAR.
     /// If account already exists, adds amount to it.
     /// This should be used when it's known that storage is prepaid.
     pub(crate) fn internal_register_account(&mut self, account_id: &AccountId, amount: Balance) {
-        let mut deposit_amount = self.accounts.get(&account_id).unwrap_or_default();
-        deposit_amount.near_amount += amount;
-        self.accounts.insert(&account_id, &deposit_amount);
+        let mut account = self.accounts.get(&account_id).unwrap_or_default();
+        account.near_amount += amount;
+        self.internal_save_account(&account_id, account);
     }
 
     /// Record deposit of some number of tokens to this contract.
@@ -192,15 +196,14 @@ impl Contract {
         token_id: &AccountId,
         amount: Balance,
     ) {
-        let mut account_deposit = self.get_account_deposits(sender_id);
+        let mut account = self.get_account_deposits(sender_id);
         assert!(
-            self.whitelisted_tokens.contains(token_id)
-                || account_deposit.tokens.contains_key(token_id),
+            self.whitelisted_tokens.contains(token_id) || account.tokens.contains_key(token_id),
             "{}",
             ERR12_TOKEN_NOT_WHITELISTED
         );
-        account_deposit.deposit(token_id, amount);
-        self.accounts.insert(sender_id, &account_deposit);
+        account.deposit(token_id, amount);
+        self.internal_save_account(&sender_id, account);
     }
 
     // Returns `from` AccountDeposit.

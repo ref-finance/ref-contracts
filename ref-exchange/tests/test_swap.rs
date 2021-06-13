@@ -340,11 +340,10 @@ fn direct_swap(user: &UserAccount, contract: &ContractAccount<TestToken>, force:
             to_va(swap()),
             to_yocto("1").into(),
             None,
-            format!("{{\"type\": \"Swap\", \"force\": {}, \"pool_id\": 0, \"token_out\": \"eth\", \"min_amount_out\": \"1\"}}", force)
+            format!("{{\"force\": {}, \"actions\": [{{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"eth\", \"min_amount_out\": \"1\"}}]}}", force)
         ),
         deposit = 1
-    )
-        .assert_success();
+    ).assert_success();
 }
 
 /// Test swap without deposit/withdraw.
