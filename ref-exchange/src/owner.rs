@@ -25,9 +25,11 @@ impl Contract {
     }
 
     /// Remove whitelisted token. Only can be called by owner.
-    pub fn remove_whitelisted_token(&mut self, token: ValidAccountId) {
+    pub fn remove_whitelisted_tokens(&mut self, tokens: Vec<ValidAccountId>) {
         self.assert_owner();
-        self.whitelisted_tokens.remove(token.as_ref());
+        for token in tokens {
+            self.whitelisted_tokens.remove(token.as_ref());
+        }
     }
 
     /// Migration function from v2 to v2.
