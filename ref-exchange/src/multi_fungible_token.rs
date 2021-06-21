@@ -74,8 +74,8 @@ impl Contract {
                     .expect(ERR10_ACC_NOT_REGISTERED);
                 sender_account.withdraw(&token_id, amount);
                 receiver_account.deposit(&token_id, amount);
-                self.accounts.insert(&sender_id, &sender_account);
-                self.accounts.insert(&receiver_id, &receiver_account);
+                self.internal_save_account(&sender_id, sender_account);
+                self.internal_save_account(&receiver_id, receiver_account);
                 log!(
                     "Transfer {}: {} from {} to {}",
                     token_id,
