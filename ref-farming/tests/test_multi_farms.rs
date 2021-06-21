@@ -31,7 +31,7 @@ fn multi_farm_in_single_seed() {
     println!("----->> Liquidity added by farmer.");
 
     // create farm with token1
-    let (farming, farm_ids) = prepair_multi_farms(&root, &owner, &token1, to_yocto("10"), 50);
+    let (farming, farm_ids) = prepair_multi_farms(&root, &owner, &token1, to_yocto("10"), 10);
     let farm_id = farm_ids[farm_ids.len() - 1].clone();
     println!("----->> Farm till {} is ready.", farm_id.clone());
 
@@ -81,13 +81,25 @@ fn multi_farm_in_single_seed() {
         deposit = 0
     );
     out_come.assert_success();
-    let farm_info = show_farminfo(&farming, farm_id.clone(), true);
+    // println!("{:#?}", out_come.promise_results());
+    // println!(
+    //     "profile_data: {:#?} \n\ntokens_burnt: {} Near", 
+    //     out_come.profile_data(), 
+    //     (out_come.tokens_burnt()) as f64 / 1e24
+    // );
+    println!("\ntokens_burnt: {} Near", (out_come.tokens_burnt()) as f64 / 1e24);
+    println!("Gas_burnt: {} TGas \n", (out_come.gas_burnt()) as f64 / 1e12);
+    // make sure the total gas is less then 100T
+    assert!(out_come.gas_burnt() < 100 * u64::pow(10, 12));
+
+    // println!("profile_data: {:#?} \n", out_come.profile_data());
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
     assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 1, 1, to_yocto("1"), 0);
     let unclaim = show_unclaim(&farming, farmer.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, 0_u128);
     println!("----->> Farmer claimed reward at #{}.", root.borrow_runtime().current_block().block_height);
 
-    let farms_info = show_farms_by_seed(&farming, String::from("swap@0"), true);
+    let farms_info = show_farms_by_seed(&farming, String::from("swap@0"), false);
 
     // // chain goes for 60 blocks
     // if root.borrow_runtime_mut().produce_blocks(60).is_ok() {

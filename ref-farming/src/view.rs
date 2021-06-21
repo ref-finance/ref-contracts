@@ -8,6 +8,7 @@ use near_sdk::{near_bindgen, AccountId};
 
 use crate::farm_seed::SeedInfo;
 use crate::utils::parse_farm_id;
+use crate::simple_farm::DENOM;
 use crate::*;
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -45,7 +46,7 @@ impl From<&Farm> for FarmInfo {
         let farm_kind = farm.kind();
         match farm {
             Farm::SimpleFarm(farm) => {
-                if let Some(dis) = farm.try_distribute(&100_000_000) {
+                if let Some(dis) = farm.try_distribute(&DENOM) {
                     let mut farm_status: String = (&farm.status).into();
                     if farm_status == "Running".to_string()
                         && dis.undistributed < farm.terms.reward_per_session
