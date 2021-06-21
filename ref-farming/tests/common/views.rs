@@ -17,6 +17,36 @@ pub struct SeedInfo {
     pub min_deposit: U128,
 }
 
+pub(crate) fn show_farms_by_seed(
+    farming: &ContractAccount<Farming>,
+    seed_id: String,
+    show_print: bool,
+) -> Vec<FarmInfo> {
+    let farms_info = view!(farming.list_farms_by_seed(seed_id)).unwrap_json::<Vec<FarmInfo>>();
+    if show_print {
+        println!("Farms Info has {} farms ===>", farms_info.len());
+        for farm_info in farms_info.iter() {
+            println!(
+                "  ID:{}, Status:{}, Seed:{}, Reward:{}",
+                farm_info.farm_id, farm_info.farm_status, farm_info.seed_id, farm_info.reward_token
+            );
+            println!(
+                "  StartAt:{}, SessionReward:{}, SessionInterval:{}",
+                farm_info.start_at.0, farm_info.reward_per_session.0, farm_info.session_interval.0
+            );
+            println!(
+                "  TotalReward:{}, Claimed:{}, Unclaimed:{}, LastRound:{}, CurRound:{}",
+                farm_info.total_reward.0,
+                farm_info.claimed_reward.0,
+                farm_info.unclaimed_reward.0,
+                farm_info.last_round.0,
+                farm_info.cur_round.0
+            );
+        }
+    }
+    farms_info
+}
+
 pub(crate) fn show_farminfo(
     farming: &ContractAccount<Farming>,
     farm_id: String,

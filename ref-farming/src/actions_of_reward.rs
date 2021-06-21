@@ -111,29 +111,34 @@ fn claim_user_reward_from_farm(
     farm: &mut Farm, 
     farmer: &mut Farmer, 
     total_seeds: &Balance,
+    silent: bool,
 ) -> bool {
     let user_seeds = farmer.seeds.get(&farm.get_seed_id()).unwrap_or(&0_u128);
     let user_rps = farmer.get_rps(&farm.get_farm_id());
     if let Some((new_user_rps, reward_amount)) = 
-        farm.claim_user_reward(&user_rps, user_seeds, total_seeds) {
-        env::log(
-            format!(
-                "user_rps@{} increased to {}",
-                farm.get_farm_id(), U256::from_little_endian(&new_user_rps),
-            )
-            .as_bytes(),
-        );
-
-        farmer.set_rps(&farm.get_farm_id(), new_user_rps);
-        if reward_amount > 0 {
-            farmer.add_reward(&farm.get_reward_token(), reward_amount);
+        farm.claim_user_reward(&user_rps, user_seeds, total_seeds, silent) {
+        if !silent {
             env::log(
                 format!(
-                    "claimed {} {} as reward from {}",
-                    reward_amount, farm.get_reward_token() , farm.get_farm_id(),
+                    "user_rps@{} increased to {}",
+                    farm.get_farm_id(), U256::from_little_endian(&new_user_rps),
                 )
                 .as_bytes(),
             );
+        }
+        
+        farmer.set_rps(&farm.get_farm_id(), new_user_rps);
+        if reward_amount > 0 {
+            farmer.add_reward(&farm.get_reward_token(), reward_amount);
+            if !silent {
+                env::log(
+                    format!(
+                        "claimed {} {} as reward from {}",
+                        reward_amount, farm.get_reward_token() , farm.get_farm_id(),
+                    )
+                    .as_bytes(),
+                );
+            }
         }
         true
     } else {
@@ -174,7 +179,9 @@ impl Contract {
                 claim_user_reward_from_farm(
                     farm, 
                     farmer.get_ref_mut(),  
-                    &amount);
+                    &amount,
+                    true,
+                );
             }
             self.data_mut().seeds.insert(seed_id, &farm_seed);
             self.data_mut().farmers.insert(sender_id, &farmer);
@@ -196,6 +203,7 @@ impl Contract {
                     farm, 
                     farmer.get_ref_mut(), 
                     &amount,
+                    false,
                 );
                 self.data_mut().seeds.insert(&seed_id, &farm_seed);
                 self.data_mut().farmers.insert(sender_id, &farmer);
