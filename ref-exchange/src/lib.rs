@@ -81,10 +81,22 @@ impl Contract {
 
     /// Execute set of swap actions between pools.
     /// If referrer provided, pays referral_fee to it.
+    /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
     #[payable]
     pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
-        assert_one_yocto();
         let sender_id = env::predecessor_account_id();
+        let mut account = self.get_account_deposits(&sender_id);
+        // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
+        if env::attached_deposit() == 0 {
+            for action in &actions {
+                assert!(
+                    account.tokens.contains_key(&action.token_out)
+                        || self.whitelisted_tokens.contains(&action.token_out),
+                    "{}",
+                    ERR26_ACCESS_KEY_NOT_ALLOWED
+                );
+            }
+        }
         let mut prev_amount = None;
         let referral_id = referral_id.map(|r| r.into());
         for action in actions {
@@ -93,7 +105,7 @@ impl Contract {
                 .map(|value| value.0)
                 .unwrap_or_else(|| prev_amount.expect("ERR_FIRST_SWAP_MISSING_AMOUNT"));
             prev_amount = Some(self.internal_swap(
-                &sender_id,
+                &mut account,
                 action.pool_id,
                 &action.token_in,
                 amount_in,
@@ -102,6 +114,7 @@ impl Contract {
                 &referral_id,
             ));
         }
+        self.accounts.insert(&sender_id, &account);
         U128(prev_amount.expect("ERR_AT_LEAST_ONE_SWAP"))
     }
 
@@ -201,7 +214,7 @@ impl Contract {
     /// Should be at least min_amount_out or swap will fail (prevents front running and other slippage issues).
     fn internal_swap(
         &mut self,
-        sender_id: &AccountId,
+        account: &mut Account,
         pool_id: u64,
         token_in: &AccountId,
         amount_in: u128,
@@ -209,8 +222,7 @@ impl Contract {
         min_amount_out: u128,
         referral_id: &Option<AccountId>,
     ) -> u128 {
-        let mut deposits = self.accounts.get(&sender_id).unwrap_or_default();
-        deposits.withdraw(token_in, amount_in);
+        account.withdraw(token_in, amount_in);
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         let amount_out = pool.swap(
             token_in,
@@ -220,8 +232,7 @@ impl Contract {
             &self.owner_id,
             referral_id,
         );
-        deposits.deposit(token_out, amount_out);
-        self.accounts.insert(&sender_id, &deposits);
+        account.deposit(token_out, amount_out);
         self.pools.replace(pool_id, &pool);
         amount_out
     }
@@ -267,6 +278,7 @@ mod tests {
             .iter()
             .map(|(token_id, _)| token_id.clone().into())
             .collect();
+        testing_env!(context.attached_deposit(1).build());
         contract.register_tokens(tokens);
         for (token_id, amount) in token_amounts {
             testing_env!(context
@@ -312,6 +324,27 @@ mod tests {
         pool_id
     }
 
+    fn swap(
+        contract: &mut Contract,
+        pool_id: u64,
+        token_in: ValidAccountId,
+        amount_in: Balance,
+        token_out: ValidAccountId,
+    ) -> Balance {
+        contract
+            .swap(
+                vec![SwapAction {
+                    pool_id,
+                    token_in: token_in.into(),
+                    amount_in: Some(U128(amount_in)),
+                    token_out: token_out.into(),
+                    min_amount_out: U128(1),
+                }],
+                None,
+            )
+            .0
+    }
+
     #[test]
     fn test_basics() {
         let one_near = 10u128.pow(24);
@@ -355,17 +388,8 @@ mod tests {
             .predecessor_account_id(accounts(3))
             .attached_deposit(1)
             .build());
-        let amount_out = contract.swap(
-            vec![SwapAction {
-                pool_id: 0,
-                token_in: accounts(1).into(),
-                amount_in: Some(one_near.into()),
-                token_out: accounts(2).into(),
-                min_amount_out: U128(1),
-            }],
-            None,
-        );
-        assert_eq!(amount_out, expected_out);
+        let amount_out = swap(&mut contract, 0, accounts(1), one_near, accounts(2));
+        assert_eq!(amount_out, expected_out.0);
         assert_eq!(
             contract.get_deposit(accounts(3), accounts(1)).0,
             99 * one_near
@@ -375,7 +399,7 @@ mod tests {
         contract.mft_transfer(accounts(2).to_string(), accounts(1), U128(one_near), None);
         assert_eq!(
             contract.get_deposit(accounts(3), accounts(2)).0,
-            99 * one_near + amount_out.0
+            99 * one_near + amount_out
         );
         assert_eq!(contract.get_deposit(accounts(1), accounts(2)).0, one_near);
 
@@ -512,6 +536,7 @@ mod tests {
             .attached_deposit(to_yocto("1"))
             .build());
         contract.storage_deposit(None, None);
+        testing_env!(context.attached_deposit(1).build());
         contract.register_tokens(vec![custom_token.clone()]);
         testing_env!(context.predecessor_account_id(custom_token.clone()).build());
         contract.ft_on_transfer(acc.clone(), U128(1_000), "".to_string());
@@ -572,8 +597,34 @@ mod tests {
     #[should_panic(expected = "ERR_AT_LEAST_ONE_SWAP")]
     fn test_fail_swap_no_actions() {
         let (mut context, mut contract) = setup_contract();
+        testing_env!(context.attached_deposit(to_yocto("1")).build());
+        contract.storage_deposit(None, None);
         testing_env!(context.attached_deposit(1).build());
         contract.swap(vec![], None);
+    }
+
+    /// Check that can not swap non whitelisted tokens when attaching 0 deposit (access key).
+    #[test]
+    #[should_panic(expected = "E26: access key not allowed")]
+    fn test_fail_swap_not_whitelisted() {
+        let (mut context, mut contract) = setup_contract();
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            accounts(0),
+            vec![(accounts(1), 2_000_000), (accounts(2), 1_000_000)],
+        );
+        create_pool_with_liquidity(
+            &mut context,
+            &mut contract,
+            accounts(0),
+            vec![(accounts(1), 1_000_000), (accounts(2), 1_000_000)],
+        );
+        contract.remove_whitelisted_tokens(vec![accounts(2)]);
+        testing_env!(context.attached_deposit(1).build());
+        contract.unregister_tokens(vec![accounts(2)]);
+        testing_env!(context.attached_deposit(0).build());
+        swap(&mut contract, 0, accounts(1), 10, accounts(2));
     }
 
     #[test]

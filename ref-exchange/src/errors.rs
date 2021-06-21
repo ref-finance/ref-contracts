@@ -14,6 +14,7 @@ pub const ERR22_NOT_ENOUGH_TOKENS: &str = "E22: not enough tokens in deposit";
 pub const ERR24_NON_ZERO_TOKEN_BALANCE: &str = "E24: non-zero token balance";
 pub const ERR25_CALLBACK_POST_WITHDRAW_INVALID: &str =
     "E25: expected 1 promise result from withdraw";
+pub const ERR26_ACCESS_KEY_NOT_ALLOWED: &str = "E26: access key not allowed";
 
 // Liquidity operations //
 
