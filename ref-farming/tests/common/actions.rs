@@ -37,14 +37,16 @@ pub(crate) fn prepair_farm(
     root: &UserAccount, 
     owner: &UserAccount,
     token: &ContractAccount<TestToken>,
+    total_reward: Balance,
 ) -> (ContractAccount<Farming>, String) {
     // create farm
+    
     let farming = deploy_farming(&root, farming_id(), owner.account_id());
     let out_come = call!(
         root,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", swap()),
-            reward_token: to_va(dai()),
+            reward_token: to_va(token.account_id()),
             start_at: U64(0),
             reward_per_session: to_yocto("1").into(),
             session_interval: U64(60),
@@ -58,7 +60,7 @@ pub(crate) fn prepair_farm(
     } else {
         farm_id = String::from("N/A");
     }
-    println!("Farm {} created at Height#{}", farm_id.clone(), root.borrow_runtime().current_block().block_height);
+    println!("    Farm {} created at Height#{}", farm_id.clone(), root.borrow_runtime().current_block().block_height);
     
     // deposit reward token
     call!(
@@ -69,11 +71,11 @@ pub(crate) fn prepair_farm(
     .assert_success();
     call!(
         root,
-        token.ft_transfer_call(to_va(farming_id()), to_yocto("500").into(), None, farm_id.clone()),
+        token.ft_transfer_call(to_va(farming_id()), total_reward.into(), None, farm_id.clone()),
         deposit = 1
     )
     .assert_success();
-    println!("Farm running at Height#{}", root.borrow_runtime().current_block().block_height);
+    println!("    Farm running at Height#{}", root.borrow_runtime().current_block().block_height);
 
     (farming, farm_id)
 }

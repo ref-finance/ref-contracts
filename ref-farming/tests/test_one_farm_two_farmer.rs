@@ -42,7 +42,7 @@ fn test_one_farm_two_farmers() {
 
 
     // create farm
-    let (farming, farm_id) = prepair_farm(&root, &owner, &token1);
+    let (farming, farm_id) = prepair_farm(&root, &owner, &token1, to_yocto("500"));
     println!("----->> Farm {} is ready.", farm_id.clone());
 
     // register LP for farming contract
@@ -59,14 +59,14 @@ fn test_one_farm_two_farmers() {
     );
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
-    let farm_info = show_farminfo(&farming, farm_id.clone());
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
     assert_eq!(farm_info.cur_round.0, 0_u64);
     assert_eq!(farm_info.last_round.0, 0_u64);
     assert_eq!(farm_info.claimed_reward.0, 0_u128);
     assert_eq!(farm_info.unclaimed_reward.0, 0_u128);
-    let user_seeds = show_userseeds(&farming, farmer1.account_id());
+    let user_seeds = show_userseeds(&farming, farmer1.account_id(), false);
     assert_eq!(user_seeds.get(&String::from("swap@0")).unwrap().0, to_yocto("1"));
-    let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone());
+    let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, 0_u128);
     println!("----->> Farmer1 staked liquidity at #{}.", root.borrow_runtime().current_block().block_height);
 
@@ -76,7 +76,7 @@ fn test_one_farm_two_farmers() {
         println!("*** Chain goes for 60 blocks *** now height: {}", 
             root.borrow_runtime().current_block().block_height,
         );
-        let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone());
+        let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
         assert_eq!(unclaim.0, to_yocto("1"));
     }
 
@@ -90,16 +90,16 @@ fn test_one_farm_two_farmers() {
     );
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
-    let farm_info = show_farminfo(&farming, farm_id.clone());
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
     assert_eq!(farm_info.cur_round.0, 1_u64);
     assert_eq!(farm_info.last_round.0, 1_u64);
     assert_eq!(farm_info.claimed_reward.0, 0_u128);
     assert_eq!(farm_info.unclaimed_reward.0, to_yocto("1"));
-    let user_seeds = show_userseeds(&farming, farmer2.account_id());
+    let user_seeds = show_userseeds(&farming, farmer2.account_id(), false);
     assert_eq!(user_seeds.get(&String::from("swap@0")).unwrap().0, to_yocto("1"));
-    let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone());
+    let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, to_yocto("1"));
-    let unclaim = show_unclaim(&farming, farmer2.account_id(), farm_id.clone());
+    let unclaim = show_unclaim(&farming, farmer2.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, 0_u128);
     println!("----->> Farmer2 staked liquidity at #{}.", root.borrow_runtime().current_block().block_height);
 
@@ -109,9 +109,9 @@ fn test_one_farm_two_farmers() {
         println!("*** Chain goes for 60 blocks *** now height: {}", 
             root.borrow_runtime().current_block().block_height
         );
-        let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone());
+        let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
         assert_eq!(unclaim.0, to_yocto("1.5"));
-        let unclaim = show_unclaim(&farming, farmer2.account_id(), farm_id.clone());
+        let unclaim = show_unclaim(&farming, farmer2.account_id(), farm_id.clone(), false);
         assert_eq!(unclaim.0, to_yocto("0.5"));
     }
 
@@ -124,14 +124,14 @@ fn test_one_farm_two_farmers() {
         deposit = 0
     );
     out_come.assert_success();
-    let farm_info = show_farminfo(&farming, farm_id.clone());
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
     assert_eq!(farm_info.cur_round.0, 2_u64);
     assert_eq!(farm_info.last_round.0, 2_u64);
     assert_eq!(farm_info.claimed_reward.0, to_yocto("1.5"));
     assert_eq!(farm_info.unclaimed_reward.0, to_yocto("0.5"));
-    let user_seeds = show_userseeds(&farming, farmer1.account_id());
+    let user_seeds = show_userseeds(&farming, farmer1.account_id(), false);
     assert_eq!(user_seeds.get(&String::from("swap@0")).unwrap().0, to_yocto("1"));
-    let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone());
+    let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, 0_u128);
     let claimed = show_reward(&farming, farmer1.account_id(), dai());
     assert_eq!(claimed.0, to_yocto("1.5"));
@@ -143,9 +143,9 @@ fn test_one_farm_two_farmers() {
         println!("*** Chain goes for 60 blocks *** now height: {}", 
             root.borrow_runtime().current_block().block_height
         );
-        let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone());
+        let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
         assert_eq!(unclaim.0, to_yocto("0.5"));
-        let unclaim = show_unclaim(&farming, farmer2.account_id(), farm_id.clone());
+        let unclaim = show_unclaim(&farming, farmer2.account_id(), farm_id.clone(), false);
         assert_eq!(unclaim.0, to_yocto("1"));
     }
 
@@ -159,11 +159,11 @@ fn test_one_farm_two_farmers() {
     );
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
-    let user_seeds = show_userseeds(&farming, farmer1.account_id());
+    let user_seeds = show_userseeds(&farming, farmer1.account_id(), false);
     assert!(user_seeds.is_empty());
-    let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone());
+    let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, 0_u128);
-    let unclaim = show_unclaim(&farming, farmer2.account_id(), farm_id.clone());
+    let unclaim = show_unclaim(&farming, farmer2.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, to_yocto("1"));
     let claimed = show_reward(&farming, farmer1.account_id(), dai());
     assert_eq!(claimed.0, to_yocto("2"));
@@ -175,9 +175,9 @@ fn test_one_farm_two_farmers() {
         println!("*** Chain goes for 60 blocks *** now height: {}", 
             root.borrow_runtime().current_block().block_height, 
         );
-        let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone());
+        let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
         assert_eq!(unclaim.0, 0_u128);
-        let unclaim = show_unclaim(&farming, farmer2.account_id(), farm_id.clone());
+        let unclaim = show_unclaim(&farming, farmer2.account_id(), farm_id.clone(), false);
         assert_eq!(unclaim.0, to_yocto("2"));
     }
 
