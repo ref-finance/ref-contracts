@@ -45,12 +45,6 @@ impl Default for SwapVolume {
     }
 }
 
-/// TODO: this should be in the near_standard_contracts
-#[ext_contract(ext_fungible_token)]
-pub trait FungibleToken {
-    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
-}
-
 #[ext_contract(ext_self)]
 pub trait RefExchange {
     fn exchange_callback_post_withdraw(
