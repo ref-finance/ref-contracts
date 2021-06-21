@@ -1,6 +1,5 @@
 use std::convert::TryFrom;
 
-use near_sdk::borsh::{self, BorshSerialize};
 use near_sdk::json_types::ValidAccountId;
 use near_sdk_sim::{deploy, init_simulator, to_yocto};
 
