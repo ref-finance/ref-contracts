@@ -5,7 +5,7 @@
 |word|meaning|notes|
 |-|-|-|
 |Seed|Farming-Token|User stakes seed to this contract for various rewards token back|
-|SeedId|String|Token contract_id for ft token, token contract_id + "@" + inner_id for mft token|
+|SeedId|String|Token contract_id for ft token, token contract_id + "@" + token_id for mft token|
 |FarmId|String|SeedId + "#" + farm_index in that seed|
 
 
@@ -22,6 +22,16 @@ pub struct Metadata {
     pub reward_count: U64,
 }
 
+/// seed info
+pub struct SeedInfo {
+    pub seed_id: SeedId,
+    pub seed_type: String, // FT, MFT
+    pub farms: Vec<FarmId>,
+    pub next_index: u32,
+    pub amount: U128,
+    pub min_deposit: U128,
+}
+
 /// used to create a farm
 pub struct HRSimpleFarmTerms {
     pub seed_id: SeedId,
@@ -35,7 +45,7 @@ pub struct HRSimpleFarmTerms {
 pub struct FarmInfo {
     pub farm_id: FarmId,
     pub farm_kind: String,
-    pub farm_status: String,
+    pub farm_status: String,  // Created, Running, Ended
     pub seed_id: SeedId,
     pub reward_token: AccountId,
     pub start_at: U64,
@@ -67,12 +77,7 @@ pub fn get_metadata(&self) -> Metadata;
 /// total number of farms.
 pub fn get_number_of_farms(&self) -> u64;
 
-/// get all farms info in a vector. 
-/// Note that the from_index and limit are useless for this version,
-/// they are just reserved for future work.
-pub fn list_farms(&self, from_index: u64, limit: u64) -> Vec<FarmInfo>;
-
-/// The suggested way to batch get farm info;
+/// batch get farm info by seed;
 /// Cause farms are organized under Seed(ie. Farming-Token) in the contract
 pub fn list_farms_by_seed(&self, seed_id: SeedId) -> Vec<FarmInfo>;
 
@@ -99,14 +104,16 @@ pub fn get_unclaimed_reward(&self, account_id: ValidAccountId, farm_id: FarmId) 
 //*********** about Seeds ***********
 //***********************************
 
-/// all staked seeds and its total amount
-pub fn list_seeds(&self, from_index: u64, limit: u64) -> HashMap<SeedId, U128>;
+/// all staked seeds and its info
+pub fn get_seed_info(&self, seed_id: SeedId) -> Option<SeedInfo>;
 
 /// all staked seeds of given user
-pub fn list_user_seeds(&self, account_id: ValidAccountId) -> HashMap<SeedId, U128>;
+pub fn list_seeds_info(&self, from_index: u64, limit: u64) -> HashMap<SeedId, SeedInfo>;
+
 ```
 
 ***Storage functions***  
+User of farming contract should register first and keep their storage fee valid.  
 ```rust
 
 /// total can bigger than available, which means farmer owes storage fee, 
@@ -145,8 +152,13 @@ fn storage_balance_of(&self, account_id: ValidAccountId) -> Option<StorageBalanc
 /// FarmId is like this:
 let farm_id: FarmId = format!("{}#{}", seed_id, index);
 /// create farm and pay for its storage fee
+/// terms defines farm rules in type of HRSimpleFarmTerms,
+/// min_deposit will set the minimum stake balance of seed token 
+/// if this farm is the first farm in that seed, and 
+/// if None is given, the default MIN_SEED_DEPOSIT will be used, 
+/// that is 10**24.
 #[payable]
-pub fn create_simple_farm(&mut self, terms: HRSimpleFarmTerms) -> FarmId;
+pub fn create_simple_farm(&mut self, terms: HRSimpleFarmTerms, min_deposit: Option<U128>) -> FarmId;
 ```
 
 ***Manage seeds***  
@@ -183,6 +195,14 @@ pub fn withdraw_reward(&mut self, token_id: ValidAccountId, amount: Option<U128>
 ***Owner methods***  
 ```rust
 pub fn set_owner(&mut self, owner_id: ValidAccountId);
+
+/// those farm with Ended status and zero unclaimed reward, 
+/// can be cleaned to save storage.
+pub fn clean_farm_by_seed(&mut self, seed_id: String);
+
+/// owner can modify min_deposit of given seed.
+pub fn modify_seed_min_deposit(&mut self, seed_id: String, min_deposit: Balance);
+
 /// upgrade the contract
 pub fn upgrade(
         &self,
