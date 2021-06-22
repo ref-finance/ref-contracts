@@ -153,7 +153,7 @@ mod tests {
             start_at: U64(0),
             reward_per_session: U128(session_amount),
             session_interval: U64(session_interval),
-        })
+        }, Some(U128(10)))
     }
 
     fn deposit_reward(

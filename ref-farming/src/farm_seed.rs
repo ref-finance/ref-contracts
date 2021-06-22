@@ -4,8 +4,11 @@
 use std::collections::HashMap;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{Balance};
+use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::json_types::{U128};
 use crate::errors::*;
 use crate::farm::{Farm, FarmId};
+use crate::utils::parse_seed_id;
 
 
 /// For MFT, SeedId composes of token_contract_id 
@@ -33,17 +36,25 @@ pub struct FarmSeed {
     pub next_index: u32,
     /// total (staked) balance of this seed (Farming Token)
     pub amount: Balance,
+    pub min_deposit: Balance,
 }
 
 impl FarmSeed {
-    pub fn new(seed_id: &SeedId,) -> Self {
+    pub fn new(seed_id: &SeedId, min_deposit: Balance) -> Self {
+        let (token_id, token_index) = parse_seed_id(seed_id);
+        let seed_type: SeedType;
+        if token_id == token_index {
+            seed_type = SeedType::FT;
+        } else {
+            seed_type = SeedType::MFT;
+        }
         Self {
             seed_id: seed_id.clone(),
-            seed_type: SeedType::FT,
-            // farms: Vec::new(),
+            seed_type,
             farms: HashMap::new(),
             next_index: 0,
             amount: 0,
+            min_deposit,
         }
     }
 
@@ -71,8 +82,8 @@ pub enum VersionedFarmSeed {
 
 impl VersionedFarmSeed {
 
-    pub fn new(seed_id: &SeedId) -> Self {
-        VersionedFarmSeed::V101(FarmSeed::new(seed_id))
+    pub fn new(seed_id: &SeedId, min_deposit: Balance) -> Self {
+        VersionedFarmSeed::V101(FarmSeed::new(seed_id, min_deposit))
     }
 
     /// Upgrades from other versions to the currently used version.
@@ -110,3 +121,32 @@ impl VersionedFarmSeed {
     }
 }
 
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub struct SeedInfo {
+    pub seed_id: SeedId,
+    pub seed_type: String,
+    pub farms: Vec<FarmId>,
+    pub next_index: u32,
+    pub amount: U128,
+    pub min_deposit: U128,
+}
+
+impl From<&FarmSeed> for SeedInfo {
+    fn from(fs: &FarmSeed) -> Self {
+
+        let seed_type = match fs.seed_type {
+            SeedType::FT => "FT".to_string(),
+            SeedType::MFT => "MFT".to_string(),
+        };
+        Self {
+            seed_id: fs.seed_id.clone(),
+            seed_type,
+            next_index: fs.next_index,
+            amount: fs.amount.into(),
+            min_deposit: fs.min_deposit.into(),
+            farms: fs.farms.keys().map(|key| key.clone()).collect(),
+        }
+    }
+}

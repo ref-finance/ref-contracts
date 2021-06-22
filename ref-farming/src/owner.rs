@@ -19,6 +19,12 @@ impl Contract {
         }
     }
 
+    pub fn modify_seed_min_deposit(&mut self, seed_id: String, min_deposit: Balance) {
+        self.assert_owner();
+        let mut farm_seed = self.get_seed(&seed_id);
+        farm_seed.get_ref_mut().min_deposit = min_deposit;
+    }
+
     /// Upgrades given contract. Only can be called by owner.
     /// if `migrate` is true, calls `migrate()` function right after deployment.
     /// TODO: consider adding extra grace period in case `owner` got attacked.

@@ -76,10 +76,12 @@ impl Farm {
     pub fn claim_user_reward(&mut self, 
         user_rps: &RPS,
         user_seeds: &Balance, 
-        total_seeds: &Balance) -> Option<(RPS, Balance)> {
+        total_seeds: &Balance, 
+        silent: bool,
+    ) -> Option<(RPS, Balance)> {
         match self {
             Farm::SimpleFarm(farm) 
-                => farm.claim_user_reward(user_rps, user_seeds, total_seeds),
+                => farm.claim_user_reward(user_rps, user_seeds, total_seeds, silent),
         }
     }
 

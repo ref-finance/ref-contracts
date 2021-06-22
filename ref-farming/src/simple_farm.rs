@@ -24,7 +24,7 @@ pub type RPS = [u8; 32];
 
 // to ensure precision, all reward_per_seed would be multiplied by this DENOM
 // this value should be carefully choosen, now is 10**24.
-const DENOM: u128 = 1_000_000_000_000_000_000_000_000;
+pub const DENOM: u128 = 1_000_000_000_000_000_000_000_000;
 
 ///   The terms defines how the farm works.
 ///   In this version, we distribute reward token with a start height, a reward 
@@ -175,13 +175,13 @@ impl SimpleFarm {
                     / self.terms.reward_per_session) as u64;
                 dis.rr = self.last_distribution.rr + increased_rr;
                 reward_added = increased_rr as u128 * self.terms.reward_per_session;
-                env::log(
-                    format!(
-                        "Farm ends at Round #{}, unclaimed reward: {}.",
-                        dis.rr, reward_added + dis.unclaimed
-                    )
-                    .as_bytes(),
-                );
+                // env::log(
+                //     format!(
+                //         "Farm ends at Round #{}, unclaimed reward: {}.",
+                //         dis.rr, reward_added + dis.unclaimed
+                //     )
+                //     .as_bytes(),
+                // );
             }
             dis.unclaimed += reward_added;
             dis.undistributed -= reward_added;
@@ -221,7 +221,7 @@ impl SimpleFarm {
         }
     }
 
-    pub(crate) fn distribute(&mut self, total_seeds: &Balance) {
+    pub(crate) fn distribute(&mut self, total_seeds: &Balance, silent: bool) {
         if total_seeds == &0 {
             return;
         }
@@ -229,13 +229,16 @@ impl SimpleFarm {
         if let Some(dis) = self.try_distribute(total_seeds) {
             if self.last_distribution.rr != dis.rr {
                 self.last_distribution = dis.clone();
-                env::log(
-                    format!(
-                        "{} RPS increased to {} and RR update to #{}",
-                        self.farm_id, U256::from_little_endian(&dis.rps), dis.rr,
-                    )
-                    .as_bytes(),
-                );
+                if !silent {
+                    env::log(
+                        format!(
+                            "{} RPS increased to {} and RR update to #{}",
+                            self.farm_id, U256::from_little_endian(&dis.rps), dis.rr,
+                        )
+                        .as_bytes(),
+                    );
+                }
+                
             }
             if self.last_distribution.undistributed < self.terms.reward_per_session {
                 self.status = SimpleFarmStatus::Ended;
@@ -249,14 +252,15 @@ impl SimpleFarm {
         &mut self, 
         user_rps: &RPS,
         user_seeds: &Balance, 
-        total_seeds: &Balance
+        total_seeds: &Balance, 
+        silent: bool,
     ) -> Option<(RPS, Balance)> {
 
         if total_seeds == &0 {
             return None;
         }
 
-        self.distribute(total_seeds);
+        self.distribute(total_seeds, silent);
 
         let claimed = (
             U256::from(*user_seeds) 

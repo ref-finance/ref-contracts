@@ -6,6 +6,7 @@ use crate::utils::parse_farm_id;
 use crate::utils::MFT_TAG;
 use crate::farm_seed::SeedType;
 
+
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 
 #[near_bindgen]
@@ -24,12 +25,33 @@ impl FungibleTokenReceiver for Contract {
         let amount: u128 = amount.into();
         if msg.is_empty() {
             // ****** seed Token deposit in ********
+            
+            // if seed not exist, it will panic
+            let seed_farm = self.get_seed(&env::predecessor_account_id());
+            if amount < seed_farm.get_ref().min_deposit {
+                env::panic(
+                    format!(
+                        "{} {}", 
+                        ERR34_BELOW_MIN_SEED_DEPOSITED, 
+                        seed_farm.get_ref().min_deposit
+                    )
+                    .as_bytes()
+                )
+            }
+
             self.remove_unused_rps(&sender);
             self.internal_seed_deposit(
                 &env::predecessor_account_id(), 
                 &sender, 
                 amount.into(), 
                 SeedType::FT
+            );
+            env::log(
+                format!(
+                    "{} deposit FT seed {} with amount {}.",
+                    sender, env::predecessor_account_id(), amount,
+                )
+                .as_bytes(),
             );
             PromiseOrValue::Value(U128(0))
 
@@ -116,10 +138,31 @@ impl MFTTokenReceiver for Contract {
             }
         }
 
-
         assert!(msg.is_empty(), "ERR_MSG_INCORRECT");
+
+        // if seed not exist, it will panic
+        let amount: u128 = amount.into();
+        let seed_farm = self.get_seed(&seed_id);
+        if amount < seed_farm.get_ref().min_deposit {
+            env::panic(
+                format!(
+                    "{} {}", 
+                    ERR34_BELOW_MIN_SEED_DEPOSITED, 
+                    seed_farm.get_ref().min_deposit
+                )
+                .as_bytes()
+            )
+        }
         
-        self.internal_seed_deposit(&seed_id, &sender_id, amount.into(), SeedType::MFT);
+        self.internal_seed_deposit(&seed_id, &sender_id, amount, SeedType::MFT);
+
+        env::log(
+            format!(
+                "{} deposit MFT seed {} with amount {}.",
+                sender_id, seed_id, amount,
+            )
+            .as_bytes(),
+        );
 
         PromiseOrValue::Value(U128(0))
     }
