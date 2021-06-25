@@ -6,6 +6,7 @@ use near_contract_standards::storage_management::{
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
     PromiseResult, StorageUsage,
@@ -35,15 +36,22 @@ mod views;
 
 near_sdk::setup_alloc!();
 
+#[derive(Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct FeeRational {
+    /// Portion (bps) of the fee going to exchange in total fee.
+    pub exchange_fee: u32,
+    /// Portion (bps) of the fee going to referral in total fee.
+    pub referral_fee: u32,
+}
+
 #[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 pub struct Contract {
     /// Account of the owner.
     owner_id: AccountId,
-    /// Exchange fee, that goes to exchange itself (managed by governance).
-    exchange_fee: u32,
-    /// Referral fee, that goes to referrer in the call.
-    referral_fee: u32,
+    /// Exchange fee and referral_fee (managed by governance).
+    fee_policy: FeeRational,
     /// List of all the pools.
     pools: Vector<Pool>,
     /// Accounts registered, keeping track all the amounts deposited, storage and more.
@@ -55,11 +63,10 @@ pub struct Contract {
 #[near_bindgen]
 impl Contract {
     #[init]
-    pub fn new(owner_id: ValidAccountId, exchange_fee: u32, referral_fee: u32) -> Self {
+    pub fn new(owner_id: ValidAccountId, fee_policy: FeeRational) -> Self {
         Self {
             owner_id: owner_id.as_ref().clone(),
-            exchange_fee,
-            referral_fee,
+            fee_policy,
             pools: Vector::new(b"p".to_vec()),
             accounts: LookupMap::new(b"d".to_vec()),
             whitelisted_tokens: UnorderedSet::new(b"w".to_vec()),
@@ -74,9 +81,9 @@ impl Contract {
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
             tokens,
-            fee + self.exchange_fee + self.referral_fee,
-            self.exchange_fee,
-            self.referral_fee,
+            fee,
+            0,
+            0,
         )))
     }
 
