@@ -1,6 +1,9 @@
 //! Implement all the relevant logic for owner of this contract.
 
 use crate::*;
+use crate::utils::FEE_DIVISOR;
+use crate::legacy::OldContract;
+
 
 #[near_bindgen]
 impl Contract {
@@ -32,12 +35,31 @@ impl Contract {
         }
     }
 
-    /// Migration function from v2 to v2.
+    /// Set fee policy.
+    pub fn set_fee_policy(&mut self, fee_policy: FeeRational) {
+        self.assert_owner();
+        assert!(
+            fee_policy.exchange_fee + fee_policy.referral_fee <= FEE_DIVISOR,
+            "ERR_FEE_TOO_LARGE"
+        );
+        self.fee_policy = fee_policy;
+    }
+
+    /// Migration function from v2 to v3.
     /// For next version upgrades, change this function.
     #[init(ignore_state)]
     pub fn migrate() -> Self {
-        let contract: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
-        contract
+        let old_contract: OldContract = env::state_read().expect("ERR_NOT_INITIALIZED");
+        Contract {
+            owner_id: old_contract.owner_id,
+            fee_policy: FeeRational {
+                exchange_fee: 1500,
+                referral_fee: 300,
+            },
+            pools: old_contract.pools,
+            accounts: old_contract.accounts,
+            whitelisted_tokens: old_contract.whitelisted_tokens,
+        }
     }
 
     pub(crate) fn assert_owner(&self) {

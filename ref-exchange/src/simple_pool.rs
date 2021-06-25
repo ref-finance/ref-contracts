@@ -4,6 +4,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance};
+use crate::FeeRational;
 
 use crate::errors::{
     ERR13_LP_NOT_REGISTERED, ERR14_LP_ALREADY_REGISTERED, ERR31_ZERO_AMOUNT, ERR32_ZERO_SHARES,
@@ -27,9 +28,9 @@ pub struct SimplePool {
     pub volumes: Vec<SwapVolume>,
     /// Fee charged for swap (gets divided by FEE_DIVISOR).
     pub total_fee: u32,
-    /// Portion of the fee going to exchange.
+    /// obsolete, not used in any logic, reserved for storage integrity
     pub exchange_fee: u32,
-    /// Portion of the fee going to referral.
+    /// obsolete, not used in any logic, reserved for storage integrity
     pub referral_fee: u32,
     /// Shares of the pool by liquidity providers.
     pub shares: LookupMap<AccountId, Balance>,
@@ -42,11 +43,9 @@ impl SimplePool {
         id: u32,
         token_account_ids: Vec<ValidAccountId>,
         total_fee: u32,
-        exchange_fee: u32,
-        referral_fee: u32,
     ) -> Self {
         assert!(
-            total_fee < FEE_DIVISOR && (exchange_fee + referral_fee) <= total_fee,
+            total_fee < FEE_DIVISOR,
             "ERR_FEE_TOO_LARGE"
         );
         assert_ne!(token_account_ids.len(), 1, "ERR_NOT_ENOUGH_TOKENS");
@@ -59,8 +58,8 @@ impl SimplePool {
             amounts: vec![0u128; token_account_ids.len()],
             volumes: vec![SwapVolume::default(); token_account_ids.len()],
             total_fee,
-            exchange_fee,
-            referral_fee,
+            exchange_fee: 0,
+            referral_fee: 0,
             shares: LookupMap::new(format!("s{}", id).into_bytes()),
             shares_total_supply: 0,
         }
@@ -267,6 +266,7 @@ impl SimplePool {
         min_amount_out: Balance,
         exchange_id: &AccountId,
         referral_id: &Option<AccountId>,
+        fee_policy: &FeeRational,
     ) -> Balance {
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
@@ -295,18 +295,18 @@ impl SimplePool {
         let numerator = (new_invariant - prev_invariant) * U256::from(self.shares_total_supply);
 
         // Allocate exchange fee as fraction of total fee by issuing LP shares proportionally.
-        if self.exchange_fee > 0 && numerator > U256::zero() {
-            let denominator = new_invariant * self.total_fee / self.exchange_fee;
+        if fee_policy.exchange_fee > 0 && numerator > U256::zero() {
+            let denominator = new_invariant * FEE_DIVISOR / fee_policy.exchange_fee;
             self.mint_shares(&exchange_id, (numerator / denominator).as_u128());
         }
 
         // If there is referral provided and the account already registered LP, allocate it % of LP rewards.
         if let Some(referral_id) = referral_id {
-            if self.referral_fee > 0
+            if fee_policy.referral_fee > 0
                 && numerator > U256::zero()
                 && self.shares.contains_key(referral_id)
             {
-                let denominator = new_invariant * self.total_fee / self.referral_fee;
+                let denominator = new_invariant * FEE_DIVISOR / fee_policy.referral_fee;
                 self.mint_shares(&referral_id, (numerator / denominator).as_u128());
             }
         }

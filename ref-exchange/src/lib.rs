@@ -36,7 +36,7 @@ mod views;
 
 near_sdk::setup_alloc!();
 
-#[derive(Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize)]
+#[derive(Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct FeeRational {
     /// Portion (bps) of the fee going to exchange in total fee.
@@ -82,8 +82,6 @@ impl Contract {
             self.pools.len() as u32,
             tokens,
             fee,
-            0,
-            0,
         )))
     }
 
@@ -291,6 +289,7 @@ impl Contract {
             min_amount_out,
             &self.owner_id,
             referral_id,
+            &self.fee_policy,
         );
         self.pools.replace(pool_id, &pool);
         amount_out
