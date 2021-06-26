@@ -36,7 +36,7 @@ impl Contract {
     }
 
     /// Set fee policy.
-    pub fn set_fee_policy(&mut self, fee_policy: FeeRational) {
+    pub fn set_fee_policy(&mut self, fee_policy: InternalFeesRatio) {
         self.assert_owner();
         assert!(
             fee_policy.exchange_fee + fee_policy.referral_fee <= FEE_DIVISOR,
@@ -52,7 +52,7 @@ impl Contract {
         let old_contract: OldContract = env::state_read().expect("ERR_NOT_INITIALIZED");
         Contract {
             owner_id: old_contract.owner_id,
-            fee_policy: FeeRational {
+            fee_policy: InternalFeesRatio {
                 exchange_fee: 2000,
                 referral_fee: 500,
             },

@@ -47,7 +47,7 @@ pub struct Metadata {
     pub owner_id: AccountId,
     pub pool_count: U64,
     pub whitelist_count: U64,
-    pub fee_policy: FeeRational,
+    pub fee_policy: InternalFeesRatio,
 }
 
 

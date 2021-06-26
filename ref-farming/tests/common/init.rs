@@ -5,7 +5,7 @@ use near_sdk::{AccountId};
 use near_sdk_sim::{call, deploy, to_yocto, ContractAccount, UserAccount};
 
 // use near_sdk_sim::transaction::ExecutionStatus;
-use ref_exchange::{ContractContract as TestRef, FeeRational};
+use ref_exchange::{ContractContract as TestRef, InternalFeesRatio};
 
 use test_token::ContractContract as TestToken;
 use ref_farming::{ContractContract as Farming};
@@ -36,7 +36,7 @@ pub fn deploy_pool(root: &UserAccount, contract_id: AccountId, owner_id: Account
         signer_account: root,
         init_method: new(
             to_va(owner_id), 
-            FeeRational {
+            InternalFeesRatio {
                 exchange_fee: 2000, 
                 referral_fee: 500,
             }

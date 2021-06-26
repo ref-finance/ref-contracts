@@ -4,7 +4,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance};
-use crate::FeeRational;
+use crate::InternalFeesRatio;
 
 use crate::errors::{
     ERR13_LP_NOT_REGISTERED, ERR14_LP_ALREADY_REGISTERED, ERR31_ZERO_AMOUNT, ERR32_ZERO_SHARES,
@@ -266,7 +266,7 @@ impl SimplePool {
         min_amount_out: Balance,
         exchange_id: &AccountId,
         referral_id: &Option<AccountId>,
-        fee_policy: &FeeRational,
+        fee_policy: &InternalFeesRatio,
     ) -> Balance {
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
@@ -349,7 +349,7 @@ mod tests {
             1,
             accounts(3).as_ref(),
             &None,
-            &FeeRational {
+            &InternalFeesRatio {
                 exchange_fee: 0,
                 referral_fee: 0,
             }
@@ -399,7 +399,7 @@ mod tests {
             1,
             accounts(3).as_ref(),
             &None,
-            &FeeRational {
+            &InternalFeesRatio {
                 exchange_fee: 10000,
                 referral_fee: 0,
             }

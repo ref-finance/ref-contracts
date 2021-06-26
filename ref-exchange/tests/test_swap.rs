@@ -9,7 +9,7 @@ use near_sdk_sim::{
     call, deploy, init_simulator, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
 
-use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction, FeeRational};
+use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction, InternalFeesRatio};
 use test_token::ContractContract as TestToken;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
@@ -105,7 +105,7 @@ fn setup_pool_with_liquidity() -> (
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va("owner".to_string()), FeeRational {
+        init_method: new(to_va("owner".to_string()), InternalFeesRatio {
             exchange_fee: 2000,
             referral_fee: 500,
         })
@@ -243,7 +243,7 @@ fn test_withdraw_failure() {
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va("owner".to_string()), FeeRational {
+        init_method: new(to_va("owner".to_string()), InternalFeesRatio {
             exchange_fee: 2000,
             referral_fee: 500,
         })

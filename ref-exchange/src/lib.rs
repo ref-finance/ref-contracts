@@ -38,7 +38,7 @@ near_sdk::setup_alloc!();
 
 #[derive(Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
-pub struct FeeRational {
+pub struct InternalFeesRatio {
     /// Portion (bps) of the fee going to exchange in total fee.
     pub exchange_fee: u32,
     /// Portion (bps) of the fee going to referral in total fee.
@@ -51,7 +51,7 @@ pub struct Contract {
     /// Account of the owner.
     owner_id: AccountId,
     /// Exchange fee and referral_fee (managed by governance).
-    fee_policy: FeeRational,
+    fee_policy: InternalFeesRatio,
     /// List of all the pools.
     pools: Vector<Pool>,
     /// Accounts registered, keeping track all the amounts deposited, storage and more.
@@ -63,7 +63,7 @@ pub struct Contract {
 #[near_bindgen]
 impl Contract {
     #[init]
-    pub fn new(owner_id: ValidAccountId, fee_policy: FeeRational) -> Self {
+    pub fn new(owner_id: ValidAccountId, fee_policy: InternalFeesRatio) -> Self {
         Self {
             owner_id: owner_id.as_ref().clone(),
             fee_policy,
@@ -313,7 +313,7 @@ mod tests {
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let contract = Contract::new(
             accounts(0), 
-            FeeRational {
+            InternalFeesRatio {
                 exchange_fee: 2000, 
                 referral_fee: 500,
             }

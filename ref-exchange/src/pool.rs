@@ -3,7 +3,7 @@ use near_sdk::{AccountId, Balance};
 
 use crate::simple_pool::SimplePool;
 use crate::utils::SwapVolume;
-use crate::FeeRational;
+use crate::InternalFeesRatio;
 
 /// Generic Pool, providing wrapper around different implementations of swap pools.
 /// Allows to add new types of pools just by adding extra item in the enum without needing to migrate the storage.
@@ -82,7 +82,7 @@ impl Pool {
         min_amount_out: Balance,
         exchange_id: &AccountId,
         referral_id: &Option<AccountId>,
-        fee_policy: &FeeRational,
+        fee_policy: &InternalFeesRatio,
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.swap(
