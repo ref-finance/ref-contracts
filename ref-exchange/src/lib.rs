@@ -6,6 +6,7 @@ use near_contract_standards::storage_management::{
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
     PromiseResult, StorageUsage,
@@ -35,15 +36,22 @@ mod views;
 
 near_sdk::setup_alloc!();
 
+#[derive(Debug, Serialize, Deserialize, BorshSerialize, BorshDeserialize, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub struct InternalFeesRatio {
+    /// Portion (bps) of the fee going to exchange in total fee.
+    pub exchange_fee: u32,
+    /// Portion (bps) of the fee going to referral in total fee.
+    pub referral_fee: u32,
+}
+
 #[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 pub struct Contract {
     /// Account of the owner.
     owner_id: AccountId,
-    /// Exchange fee, that goes to exchange itself (managed by governance).
-    exchange_fee: u32,
-    /// Referral fee, that goes to referrer in the call.
-    referral_fee: u32,
+    /// Exchange fee and referral_fee (managed by governance).
+    fee_policy: InternalFeesRatio,
     /// List of all the pools.
     pools: Vector<Pool>,
     /// Accounts registered, keeping track all the amounts deposited, storage and more.
@@ -55,11 +63,10 @@ pub struct Contract {
 #[near_bindgen]
 impl Contract {
     #[init]
-    pub fn new(owner_id: ValidAccountId, exchange_fee: u32, referral_fee: u32) -> Self {
+    pub fn new(owner_id: ValidAccountId, fee_policy: InternalFeesRatio) -> Self {
         Self {
             owner_id: owner_id.as_ref().clone(),
-            exchange_fee,
-            referral_fee,
+            fee_policy,
             pools: Vector::new(b"p".to_vec()),
             accounts: LookupMap::new(b"d".to_vec()),
             whitelisted_tokens: UnorderedSet::new(b"w".to_vec()),
@@ -74,9 +81,7 @@ impl Contract {
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
             tokens,
-            fee + self.exchange_fee + self.referral_fee,
-            self.exchange_fee,
-            self.referral_fee,
+            fee,
         )))
     }
 
@@ -284,6 +289,7 @@ impl Contract {
             min_amount_out,
             &self.owner_id,
             referral_id,
+            &self.fee_policy,
         );
         self.pools.replace(pool_id, &pool);
         amount_out
@@ -305,7 +311,13 @@ mod tests {
     fn setup_contract() -> (VMContextBuilder, Contract) {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let contract = Contract::new(accounts(0), 4, 1);
+        let contract = Contract::new(
+            accounts(0), 
+            InternalFeesRatio {
+                exchange_fee: 2000, 
+                referral_fee: 500,
+            }
+        );
         (context, contract)
     }
 
@@ -357,7 +369,7 @@ mod tests {
             .predecessor_account_id(account_id.clone())
             .attached_deposit(env::storage_byte_cost() * 300)
             .build());
-        let pool_id = contract.add_simple_pool(tokens, 25);
+        let pool_id = contract.add_simple_pool(tokens, 30);
         testing_env!(context
             .predecessor_account_id(account_id.clone())
             .attached_deposit(to_yocto("0.03"))
@@ -476,7 +488,7 @@ mod tests {
         // Exchange fees left in the pool as liquidity + 1m from transfer.
         assert_eq!(
             contract.get_pool_total_shares(0).0,
-            33337501041992301475 + 1_000_000
+            50006251562988452212 + 1_000_000
         );
 
         contract.withdraw(
@@ -718,7 +730,7 @@ mod tests {
             ],
             None,
         );
-        // Roundtrip returns almost everything except 0.3% fee.
+        // Roundtrip returns almost everything except 0.25% fee.
         assert_eq!(contract.get_deposit(acc, accounts(1)).0, 1_000_000 - 7);
     }
 }

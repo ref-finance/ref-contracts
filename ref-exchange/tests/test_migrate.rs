@@ -4,6 +4,7 @@ use near_sdk::json_types::ValidAccountId;
 use near_sdk_sim::{deploy, init_simulator, to_yocto};
 
 use ref_exchange::ContractContract as Exchange;
+use ref_exchange::InternalFeesRatio;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_local.wasm",
@@ -19,7 +20,11 @@ fn test_upgrade() {
         contract_id: "swap".to_string(),
         bytes: &PREV_EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(ValidAccountId::try_from(root.account_id.clone()).unwrap(), 4, 1)
+        init_method: new(ValidAccountId::try_from(root.account_id.clone()).unwrap(), 
+        InternalFeesRatio {
+            exchange_fee: 2000,
+            referral_fee: 500,
+        })
     );
     // Failed upgrade with no permissions.
     let result = test_user

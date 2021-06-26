@@ -9,7 +9,7 @@ use near_sdk_sim::{
     call, deploy, init_simulator, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
 
-use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
+use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction, InternalFeesRatio};
 use test_token::ContractContract as TestToken;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
@@ -105,7 +105,10 @@ fn setup_pool_with_liquidity() -> (
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va("owner".to_string()), 4, 1)
+        init_method: new(to_va("owner".to_string()), InternalFeesRatio {
+            exchange_fee: 2000,
+            referral_fee: 500,
+        })
     );
     let token1 = test_token(&root, dai(), vec![swap()]);
     let token2 = test_token(&root, eth(), vec![swap()]);
@@ -115,7 +118,7 @@ fn setup_pool_with_liquidity() -> (
     );
     call!(
         root,
-        pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 25),
+        pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 30),
         deposit = to_yocto("1")
     )
     .assert_success();
@@ -240,7 +243,10 @@ fn test_withdraw_failure() {
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va("owner".to_string()), 4, 1)
+        init_method: new(to_va("owner".to_string()), InternalFeesRatio {
+            exchange_fee: 2000,
+            referral_fee: 500,
+        })
     );
     // Deploy DAI and wETH fungible tokens
     let dai_contract = test_token(&root, dai(), vec![swap()]);
