@@ -334,7 +334,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
-        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 30, 0, 0);
+        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 20);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
@@ -349,6 +349,10 @@ mod tests {
             1,
             accounts(3).as_ref(),
             &None,
+            &FeeRational {
+                exchange_fee: 0,
+                referral_fee: 0,
+            }
         );
         assert_eq!(
             pool.share_balance_of(accounts(0).as_ref()),
@@ -380,7 +384,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
-        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 100, 100, 0);
+        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 100);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
@@ -395,6 +399,10 @@ mod tests {
             1,
             accounts(3).as_ref(),
             &None,
+            &FeeRational {
+                exchange_fee: 10000,
+                referral_fee: 0,
+            }
         );
         assert_eq!(
             pool.share_balance_of(accounts(0).as_ref()),

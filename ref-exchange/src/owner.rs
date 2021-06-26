@@ -53,8 +53,8 @@ impl Contract {
         Contract {
             owner_id: old_contract.owner_id,
             fee_policy: FeeRational {
-                exchange_fee: 1500,
-                referral_fee: 300,
+                exchange_fee: 2000,
+                referral_fee: 500,
             },
             pools: old_contract.pools,
             accounts: old_contract.accounts,
