@@ -89,6 +89,7 @@ impl Account {
 impl Contract {
     /// Registers given token in the user's account deposit.
     /// Fails if not enough balance on this account to cover storage.
+    #[payable]
     pub fn register_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
@@ -99,6 +100,7 @@ impl Contract {
 
     /// Unregister given token from user's account deposit.
     /// Panics if the balance of any given token is non 0.
+    #[payable]
     pub fn unregister_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
