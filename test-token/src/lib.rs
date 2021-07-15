@@ -6,6 +6,10 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{near_bindgen, AccountId, PanicOnDefault, PromiseOrValue};
 
+
+#[cfg(target_arch = "wasm32")]
+use near_sdk::env;
+
 near_sdk::setup_alloc!();
 
 #[near_bindgen]

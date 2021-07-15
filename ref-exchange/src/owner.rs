@@ -51,12 +51,8 @@ impl Contract {
 
 #[cfg(target_arch = "wasm32")]
 mod upgrade {
-    use near_sdk::env::BLOCKCHAIN_INTERFACE;
     use near_sdk::Gas;
-
     use super::*;
-
-    const BLOCKCHAIN_INTERFACE_NOT_SET_ERR: &str = "Blockchain interface not set.";
 
     /// Gas for calling migration call.
     pub const GAS_FOR_MIGRATE_CALL: Gas = 5_000_000_000_000;
@@ -72,36 +68,21 @@ mod upgrade {
         let current_id = env::current_account_id().into_bytes();
         let method_name = "migrate".as_bytes().to_vec();
         unsafe {
-            BLOCKCHAIN_INTERFACE.with(|b| {
-                // Load input into register 0.
-                b.borrow()
-                    .as_ref()
-                    .expect(BLOCKCHAIN_INTERFACE_NOT_SET_ERR)
-                    .input(0);
-                let promise_id = b
-                    .borrow()
-                    .as_ref()
-                    .expect(BLOCKCHAIN_INTERFACE_NOT_SET_ERR)
-                    .promise_batch_create(current_id.len() as _, current_id.as_ptr() as _);
-                b.borrow()
-                    .as_ref()
-                    .expect(BLOCKCHAIN_INTERFACE_NOT_SET_ERR)
-                    .promise_batch_action_deploy_contract(promise_id, u64::MAX as _, 0);
-                let attached_gas = env::prepaid_gas() - env::used_gas() - GAS_FOR_MIGRATE_CALL;
-                b.borrow()
-                    .as_ref()
-                    .expect(BLOCKCHAIN_INTERFACE_NOT_SET_ERR)
-                    .promise_batch_action_function_call(
-                        promise_id,
-                        method_name.len() as _,
-                        method_name.as_ptr() as _,
-                        0 as _,
-                        0 as _,
-                        0 as _,
-                        attached_gas,
-                    );
-            });
+            // Load input into register 0.
+            sys::input(0);
+            let promise_id =
+                sys::promise_batch_create(current_id.len() as _, current_id.as_ptr() as _);
+            sys::promise_batch_action_deploy_contract(promise_id, u64::MAX as _, 0);
+            let attached_gas = env::prepaid_gas() - env::used_gas() - GAS_FOR_MIGRATE_CALL;
+            sys::promise_batch_action_function_call(
+                promise_id,
+                method_name.len() as _,
+                method_name.as_ptr() as _,
+                0 as _,
+                0 as _,
+                0 as _,
+                attached_gas,
+            );
         }
     }
-
 }
