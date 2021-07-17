@@ -5,7 +5,7 @@ use near_contract_standards::storage_management::{
 use std::convert::TryInto;
 
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{assert_one_yocto, env, log, near_bindgen, Promise, Balance};
+use near_sdk::{assert_one_yocto, env, near_bindgen, Promise, Balance};
 
 use crate::errors::*;
 use crate::*;
@@ -46,10 +46,7 @@ impl StorageManagement for Contract {
             }
         } else {  // old account, only can complement storage fee
             if registration_only {
-                log!("ERR_ACC_REGISTERED");
-                if amount > 0 {
-                    Promise::new(env::predecessor_account_id()).transfer(amount);
-                }
+                env::panic(format!("{}", ERR14_ACC_ALREADY_REGISTERED).as_bytes());
             } else {
                 if amount+deposited < locked {
                     env::panic(format!("{}", ERR11_INSUFFICIENT_STORAGE).as_bytes());
@@ -70,6 +67,7 @@ impl StorageManagement for Contract {
         if deposited > 0 {
             let amount = amount.map(|a| a.0).unwrap_or(deposited);
             assert!(deposited >= locked + amount, "{}", ERR11_INSUFFICIENT_STORAGE);
+            // TODO: should make sure tranfer is OK with a callback
             Promise::new(account_id.clone()).transfer(amount);
             StorageBalance {
                 total: locked.into(),
@@ -85,9 +83,12 @@ impl StorageManagement for Contract {
     fn storage_unregister(&mut self, force: Option<bool>) -> bool {
         assert_one_yocto();
 
+        // force option is useless, leave it for compatible consideration.
+        // User should withdraw all his rewards and seeds token before unregister!
+
         let account_id = env::predecessor_account_id();
         if let Some(farmer) = self.get_farmer_wrapped(&account_id) {
-            // TODO: figure out force option logic.
+            
             assert!(
                 farmer.get_ref().rewards.is_empty(),
                 "{}", ERR12_STORAGE_UNREGISTER_REWARDS_NOT_EMPTY
@@ -98,6 +99,7 @@ impl StorageManagement for Contract {
             );
             self.data_mut().farmers.remove(&account_id);
             self.data_mut().farmer_count -= 1;
+            // TODO: should make sure tranfer is OK with a callback
             Promise::new(account_id.clone()).transfer(farmer.get_ref().amount);
             true
         } else {
@@ -128,6 +130,7 @@ impl StorageManagement for Contract {
 impl Contract {
 
     /// return storage used by given account, and his deposited storage fee 
+    /// return [actual_locked, actual_deposit]
     pub(crate) fn internal_farmer_storage(
         &self, 
         account_id: &AccountId
@@ -164,6 +167,7 @@ impl Contract {
         ) * env::storage_byte_cost()
     }
 
+    /// add balance to user deposited storage balance, if not registered, auto register.
     pub(crate) fn internal_register_account(&mut self, account_id: &AccountId, amount: Balance) {
 
         if let Some(mut farmer) = self.get_farmer_wrapped(&account_id) {

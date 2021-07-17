@@ -65,3 +65,15 @@ Note: to get detailed implement of that distribution logic, please refer to the 
 * Ended, A farm with all reward has been distributed (user may still have unclaimed reward);
 * Cleared, A farm that has ended and no unclaimed reward, can be removed from the contract. After removal, this farm is in this Cleared status. (You can never get this status from contract);
 
+### Storage Management
+Each user would have a place to store his reward tokens balance, staked seed tokens balance, and last time RPS for each farm he involves. So, user storage management is needed.
+
+Although the frontend would take care all of the storage details for users, it is still not bad to understand the core logic behind, especially there is kind of post-pay style exists in our storage management.  
+
+Almost all NEAR contract require a pre-pay style to deal wtih the user storage cost. In that style, users do `storage_register` and deposit a fixed storage fee before invoking any business interfaces.
+
+But take our logic model into consideration, the pre-pay style couldn't have a 100 percent fit. Cause the user storage size would expand even shrink during farming. More involved farms more user storage needs, and even worse, farm management beyonds users scope. User couldn't know exactly how many storage he would need in advance. 
+
+So, we combine traditional storage strategy with kind of pre-pay amendment. When user does his first `storage_register`, we requrie him to deposit a storage fee that can support 5 reward tokens, 5 seed tokens and 10 farms. And then, with the running of farming, if at some point the storage fee exceeds, we keep the farming going but disable user's critical calls, such as stake/un-stake seed, claim rewards. In those critical calls, we would notify user with `insufficient storage` msg through panic, In that case, user then need to add more storage fee through the same `storage_register` interface with `only_register` param set to `false`.  
+
+Complex eh? But no worry, as we said above, the frontend would take care all of this for you.
