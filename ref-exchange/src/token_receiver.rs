@@ -11,7 +11,7 @@ use crate::*;
 enum TokenReceiverMessage {
     /// Alternative to deposit + execute actions call.
     Execute {
-        referral_id: Option<ValidAccountId>,
+        referral_id: Option<AccountId>,
         /// If force != 0, doesn't require user to even have account. In case of failure to deposit to the user's outgoing balance, tokens will be returned to the exchange and can be "saved" via governance.
         /// If force == 0, the account for this user still have been registered. If deposit of outgoing tokens will fail, it will deposit it back into the account.
         force: u8,
@@ -76,14 +76,14 @@ impl FungibleTokenReceiver for Contract {
     /// `msg` format is either "" for deposit or `TokenReceiverMessage`.
     fn ft_on_transfer(
         &mut self,
-        sender_id: ValidAccountId,
+        sender_id: AccountId,
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
         let token_in = env::predecessor_account_id();
         if msg.is_empty() {
             // Simple deposit.
-            self.internal_deposit(sender_id.as_ref(), &token_in, amount.into());
+            self.internal_deposit(&sender_id, &token_in, amount.into());
             PromiseOrValue::Value(U128(0))
         } else {
             let message =
@@ -94,17 +94,16 @@ impl FungibleTokenReceiver for Contract {
                     force,
                     actions,
                 } => {
-                    let referral_id = referral_id.map(|x| x.to_string());
                     let out_amounts = self.internal_direct_actions(
                         token_in,
                         amount.0,
-                        sender_id.as_ref(),
+                        &sender_id,
                         force != 0,
                         referral_id,
                         &actions,
                     );
                     for (token_out, amount_out) in out_amounts.into_iter() {
-                        self.internal_send_tokens(sender_id.as_ref(), &token_out, amount_out);
+                        self.internal_send_tokens(&sender_id, &token_out, amount_out);
                     }
                     // Even if send tokens fails, we don't return funds back to sender.
                     PromiseOrValue::Value(U128(0))

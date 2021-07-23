@@ -5,7 +5,7 @@ use crate::utils::{GAS_FOR_DEPLOY_CALL, GAS_FOR_UPGRADE_CALL};
 
 #[near_bindgen]
 impl Contract {
-    pub fn set_owner(&mut self, owner_id: ValidAccountId) {
+    pub fn set_owner(&mut self, owner_id: AccountId) {
 
         self.assert_owner();
 

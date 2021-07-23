@@ -22,11 +22,11 @@ pub(crate) fn prepair_pool(
     let token2 = deploy_token(&root, eth(), vec![swap()]);
     call!(
         owner,
-        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth())])
+        pool.extend_whitelisted_tokens(vec![dai(), eth()])
     );
     call!(
         root,
-        pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 25),
+        pool.add_simple_pool(vec![dai(), eth()], 25),
         deposit = to_yocto("1")
     )
     .assert_success();
@@ -46,7 +46,7 @@ pub(crate) fn prepair_farm(
         root,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", swap()),
-            reward_token: to_va(token.account_id()),
+            reward_token: token.account_id(),
             start_at: U64(0),
             reward_per_session: to_yocto("1").into(),
             session_interval: U64(60),
@@ -65,13 +65,13 @@ pub(crate) fn prepair_farm(
     // deposit reward token
     call!(
         root,
-        token.storage_deposit(Some(to_va(farming_id())), None),
+        token.storage_deposit(Some(farming_id()), None),
         deposit = to_yocto("1")
     )
     .assert_success();
     call!(
         root,
-        token.ft_transfer_call(to_va(farming_id()), total_reward.into(), None, farm_id.clone()),
+        token.ft_transfer_call(farming_id(), total_reward.into(), None, farm_id.clone()),
         deposit = 1
     )
     .assert_success();
@@ -95,7 +95,7 @@ pub(crate) fn prepair_multi_farms(
     // register farming contract to reward token
     call!(
         root,
-        token.storage_deposit(Some(to_va(farming_id())), None),
+        token.storage_deposit(Some(farming_id()), None),
         deposit = to_yocto("1")
     )
     .assert_success();
@@ -105,7 +105,7 @@ pub(crate) fn prepair_multi_farms(
             root,
             farming.create_simple_farm(HRSimpleFarmTerms{
                 seed_id: format!("{}@0", swap()),
-                reward_token: to_va(token.account_id()),
+                reward_token: token.account_id(),
                 start_at: U64(0),
                 reward_per_session: to_yocto("1").into(),
                 session_interval: U64(60),
@@ -122,7 +122,7 @@ pub(crate) fn prepair_multi_farms(
 
         call!(
             root,
-            token.ft_transfer_call(to_va(farming_id()), total_reward.into(), None, farm_id.clone()),
+            token.ft_transfer_call(farming_id(), total_reward.into(), None, farm_id.clone()),
             deposit = 1
         )
         .assert_success();
@@ -152,13 +152,13 @@ pub(crate) fn add_liqudity(
     .assert_success();
     call!(
         user,
-        token1.ft_transfer_call(to_va(swap()), to_yocto("100").into(), None, "".to_string()),
+        token1.ft_transfer_call(swap(), to_yocto("100").into(), None, "".to_string()),
         deposit = 1
     )
     .assert_success();
     call!(
         user,
-        token2.ft_transfer_call(to_va(swap()), to_yocto("100").into(), None, "".to_string()),
+        token2.ft_transfer_call(swap(), to_yocto("100").into(), None, "".to_string()),
         deposit = 1
     )
     .assert_success();
@@ -179,6 +179,6 @@ pub(crate) fn mint_token(token: &ContractAccount<TestToken>, user: &UserAccount,
     // .assert_success();
     call!(
         user,
-        token.mint(to_va(user.account_id.clone()), amount.into())
+        token.mint(user.account_id.clone(), amount.into())
     ).assert_success();
 }

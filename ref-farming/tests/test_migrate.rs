@@ -1,7 +1,5 @@
-use std::convert::TryFrom;
-
 use near_sdk::borsh::{self, BorshSerialize};
-use near_sdk::json_types::ValidAccountId;
+use near_sdk::AccountId;
 use near_sdk_sim::{deploy, init_simulator, to_yocto};
 
 use ref_farming::ContractContract as Farming;
@@ -20,13 +18,13 @@ struct UpgradeArgs {
 #[test]
 fn test_upgrade() {
     let root = init_simulator(None);
-    let test_user = root.create_user("test".to_string(), to_yocto("100"));
+    let test_user = root.create_user(AccountId::new_unchecked("test".to_string()), to_yocto("100"));
     let farming = deploy!(
         contract: Farming,
         contract_id: "farming".to_string(),
         bytes: &PREV_FARMING_WASM_BYTES,
         signer_account: root,
-        init_method: new(ValidAccountId::try_from(root.account_id.clone()).unwrap())
+        init_method: new(root.account_id.clone())
     );
     let args_nomigration = UpgradeArgs {
         code: FARMING_WASM_BYTES.to_vec(),

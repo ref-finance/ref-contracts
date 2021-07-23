@@ -1,5 +1,5 @@
 use near_contract_standards::fungible_token::metadata::{FungibleTokenMetadata, FT_METADATA_SPEC};
-use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::json_types::U128;
 use near_sdk::{ext_contract, near_bindgen, Balance, PromiseOrValue};
 
 use crate::utils::{GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_RESOLVE_TRANSFER, NO_DEPOSIT};
@@ -36,7 +36,7 @@ fn parse_token_id(token_id: String) -> TokenOrPool {
     if let Ok(pool_id) = str::parse::<u64>(&token_id) {
         TokenOrPool::Pool(pool_id)
     } else {
-        TokenOrPool::Token(token_id)
+        TokenOrPool::Token(AccountId::new_unchecked(token_id))
     }
 }
 
@@ -101,8 +101,8 @@ impl Contract {
     }
 
     /// Returns the balance of the given account. If the account doesn't exist will return `"0"`.
-    pub fn mft_balance_of(&self, token_id: String, account_id: ValidAccountId) -> U128 {
-        self.internal_mft_balance(token_id, account_id.as_ref())
+    pub fn mft_balance_of(&self, token_id: String, account_id: AccountId) -> U128 {
+        self.internal_mft_balance(token_id, &account_id)
             .into()
     }
 
@@ -121,13 +121,13 @@ impl Contract {
     /// Register LP token of given pool for given account.
     /// Fails if token_id is not a pool.
     #[payable]
-    pub fn mft_register(&mut self, token_id: String, account_id: ValidAccountId) {
+    pub fn mft_register(&mut self, token_id: String, account_id: AccountId) {
         let prev_storage = env::storage_usage();
         match parse_token_id(token_id) {
             TokenOrPool::Token(_) => env::panic(b"ERR_INVALID_REGISTER"),
             TokenOrPool::Pool(pool_id) => {
                 let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
-                pool.share_register(account_id.as_ref());
+                pool.share_register(&account_id);
                 self.pools.replace(pool_id, &pool);
                 self.internal_check_storage(prev_storage);
             }
@@ -140,7 +140,7 @@ impl Contract {
     pub fn mft_transfer(
         &mut self,
         token_id: String,
-        receiver_id: ValidAccountId,
+        receiver_id: AccountId,
         amount: U128,
         memo: Option<String>,
     ) {
@@ -148,7 +148,7 @@ impl Contract {
         self.internal_mft_transfer(
             token_id,
             &env::predecessor_account_id(),
-            receiver_id.as_ref(),
+            &receiver_id,
             amount.0,
             memo,
         );
@@ -158,7 +158,7 @@ impl Contract {
     pub fn mft_transfer_call(
         &mut self,
         token_id: String,
-        receiver_id: ValidAccountId,
+        receiver_id: AccountId,
         amount: U128,
         memo: Option<String>,
         msg: String,
@@ -168,7 +168,7 @@ impl Contract {
         self.internal_mft_transfer(
             token_id.clone(),
             &sender_id,
-            receiver_id.as_ref(),
+            &receiver_id,
             amount.0,
             memo,
         );
@@ -177,7 +177,7 @@ impl Contract {
             sender_id.clone(),
             amount,
             msg,
-            receiver_id.as_ref(),
+            &receiver_id,
             NO_DEPOSIT,
             env::prepaid_gas() - GAS_FOR_FT_TRANSFER_CALL,
         )

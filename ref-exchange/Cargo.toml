@@ -9,10 +9,10 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077" }
-near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077" }
+near-sdk = { version = "=4.0.0-pre.1", features = ["unstable"] }
+near-contract-standards = "=4.0.0-pre.1"
 uint = { version = "0.9.0", default-features = false }
 
 [dev-dependencies]
-near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077" }
+near-sdk-sim = "=4.0.0-pre.1"
 test-token = { path = "../test-token" }

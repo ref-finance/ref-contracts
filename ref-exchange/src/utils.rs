@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
-use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{ext_contract, AccountId, Balance, Gas};
 use uint::construct_uint;
@@ -10,12 +10,12 @@ use uint::construct_uint;
 /// Attach no deposit.
 pub const NO_DEPOSIT: u128 = 0;
 
-pub const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
+pub const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
 
-pub const GAS_FOR_FT_TRANSFER_CALL: Gas = 25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER;
+pub const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER.0);
 
 /// Amount of gas for fungible token transfers.
-pub const GAS_FOR_FT_TRANSFER: Gas = 10_000_000_000_000;
+pub const GAS_FOR_FT_TRANSFER: Gas = Gas(10_000_000_000_000);
 
 /// Fee divisor, allowing to provide fee in bps.
 pub const FEE_DIVISOR: u32 = 10_000;
@@ -56,13 +56,13 @@ pub trait RefExchange {
 }
 
 /// Adds given value to item stored in the given key in the LookupMap collection.
-pub fn add_to_collection(c: &mut LookupMap<AccountId, Balance>, key: &String, value: Balance) {
+pub fn add_to_collection(c: &mut LookupMap<AccountId, Balance>, key: &AccountId, value: Balance) {
     let prev_value = c.get(key).unwrap_or(0);
     c.insert(key, &(prev_value + value));
 }
 
 /// Checks if there are any duplicates in the given list of tokens.
-pub fn check_token_duplicates(tokens: &[ValidAccountId]) {
+pub fn check_token_duplicates(tokens: &[AccountId]) {
     let token_set: HashSet<_> = tokens.iter().map(|a| a.as_ref()).collect();
     assert_eq!(token_set.len(), tokens.len(), "ERR_TOKEN_DUPLICATES");
 }

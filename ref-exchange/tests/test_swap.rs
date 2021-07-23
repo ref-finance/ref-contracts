@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
-use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::json_types::U128;
 use near_sdk::AccountId;
 use near_sdk_sim::transaction::ExecutionStatus;
 use near_sdk_sim::{
@@ -76,19 +76,19 @@ fn mft_balance_of(
 }
 
 fn dai() -> AccountId {
-    "dai".to_string()
+    AccountId::new_unchecked("dai".to_string())
 }
 
 fn eth() -> AccountId {
-    "eth".to_string()
+    AccountId::new_unchecked("eth".to_string())
 }
 
 fn swap() -> AccountId {
-    "swap".to_string()
+    AccountId::new_unchecked("swap".to_string())
 }
 
-fn to_va(a: AccountId) -> ValidAccountId {
-    ValidAccountId::try_from(a).unwrap()
+fn to_va(a: AccountId) -> AccountId {
+    AccountId::try_from(a).unwrap()
 }
 
 fn setup_pool_with_liquidity() -> (
@@ -99,13 +99,16 @@ fn setup_pool_with_liquidity() -> (
     ContractAccount<TestToken>,
 ) {
     let root = init_simulator(None);
-    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let owner = root.create_user(
+        AccountId::new_unchecked("owner".to_string()),
+        to_yocto("100"),
+    );
     let pool = deploy!(
         contract: Exchange,
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va("owner".to_string()), 4, 1)
+        init_method: new(to_va(AccountId::new_unchecked("owner".to_string())), 4, 1)
     );
     let token1 = test_token(&root, dai(), vec![swap()]);
     let token2 = test_token(&root, eth(), vec![swap()]);
@@ -233,14 +236,17 @@ fn test_swap() {
 #[test]
 fn test_withdraw_failure() {
     let root = init_simulator(None);
-    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let owner = root.create_user(
+        AccountId::new_unchecked("owner".to_string()),
+        to_yocto("100"),
+    );
     // Deploy exchange contract and call init method setting owner to "owner"
     let pool = deploy!(
         contract: Exchange,
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va("owner".to_string()), 4, 1)
+        init_method: new(to_va(AccountId::new_unchecked("owner".to_string())), 4, 1)
     );
     // Deploy DAI and wETH fungible tokens
     let dai_contract = test_token(&root, dai(), vec![swap()]);
@@ -288,7 +294,8 @@ fn test_withdraw_failure() {
 
     // See how much root account has on each fungible token
     let mut dai_amount: U128 =
-        view!(dai_contract.ft_balance_of(to_va("root".to_string()))).unwrap_json();
+        view!(dai_contract.ft_balance_of(to_va(AccountId::new_unchecked("root".to_string()))))
+            .unwrap_json();
     assert_eq!(dai_amount, to_yocto("895").into());
 
     // User (perhaps accidentally) unregisters account from fungible token.
@@ -300,7 +307,7 @@ fn test_withdraw_failure() {
     .assert_success();
 
     // Now DAI balance for root is now 0, with no storage either
-    dai_amount = view!(dai_contract.ft_balance_of(to_va("root".to_string()))).unwrap_json();
+    dai_amount = view!(dai_contract.ft_balance_of(to_va(AccountId::new_unchecked("root".to_string())))).unwrap_json();
     assert_eq!(dai_amount, U128(0));
 
     // Root tries to withdraw and the transfer fails
@@ -350,7 +357,7 @@ fn direct_swap(user: &UserAccount, contract: &ContractAccount<TestToken>, force:
 #[test]
 fn test_direct_swap() {
     let (root, owner, pool, token1, token2) = setup_pool_with_liquidity();
-    let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
+    let new_user = root.create_user(AccountId::new_unchecked("new_user".to_string()), to_yocto("100"));
     call!(
         new_user,
         token1.mint(to_va(new_user.account_id.clone()), U128(to_yocto("10")))
@@ -376,7 +383,7 @@ fn test_direct_swap() {
     direct_swap(&new_user, &token1, 1);
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("9"));
     assert_eq!(balance_of(&token2, &new_user.account_id), to_yocto("0"));
-    assert!(mft_balance_of(&pool, &token2.account_id(), &owner.account_id) > to_yocto("1"));
+    assert!(mft_balance_of(&pool, &token2.account_id().as_ref(), &owner.account_id) > to_yocto("1"));
 
     // Test that if force and token2 account exists, everything works.
     call!(
@@ -405,5 +412,5 @@ fn test_direct_swap() {
     direct_swap(&new_user, &token1, 0);
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("6"));
     assert_eq!(balance_of(&token2, &new_user.account_id), 0);
-    assert!(mft_balance_of(&pool, &token2.account_id(), &new_user.account_id) > to_yocto("0.5"));
+    assert!(mft_balance_of(&pool, &token2.account_id().as_ref(), &new_user.account_id) > to_yocto("0.5"));
 }

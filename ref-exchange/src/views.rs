@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
 
@@ -74,11 +74,11 @@ impl Contract {
     }
 
     /// Returns number of shares given account has in given pool.
-    pub fn get_pool_shares(&self, pool_id: u64, account_id: ValidAccountId) -> U128 {
+    pub fn get_pool_shares(&self, pool_id: u64, account_id: AccountId) -> U128 {
         self.pools
             .get(pool_id)
             .expect("ERR_NO_POOL")
-            .share_balances(account_id.as_ref())
+            .share_balances(&account_id)
             .into()
     }
 
@@ -93,9 +93,9 @@ impl Contract {
 
     /// Returns balances of the deposits for given user outside of any pools.
     /// Returns empty list if no tokens deposited.
-    pub fn get_deposits(&self, account_id: ValidAccountId) -> HashMap<AccountId, U128> {
+    pub fn get_deposits(&self, account_id: AccountId) -> HashMap<AccountId, U128> {
         self.accounts
-            .get(account_id.as_ref())
+            .get(&account_id)
             .map(|d| {
                 d.tokens
                     .into_iter()
@@ -106,8 +106,8 @@ impl Contract {
     }
 
     /// Returns balance of the deposit for given user outside of any pools.
-    pub fn get_deposit(&self, account_id: ValidAccountId, token_id: ValidAccountId) -> U128 {
-        self.internal_get_deposit(account_id.as_ref(), token_id.as_ref())
+    pub fn get_deposit(&self, account_id: AccountId, token_id: AccountId) -> U128 {
+        self.internal_get_deposit(&account_id, &token_id)
             .into()
     }
 
@@ -115,12 +115,12 @@ impl Contract {
     pub fn get_return(
         &self,
         pool_id: u64,
-        token_in: ValidAccountId,
+        token_in: AccountId,
         amount_in: U128,
-        token_out: ValidAccountId,
+        token_out: AccountId,
     ) -> U128 {
         let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
-        pool.get_return(token_in.as_ref(), amount_in.into(), token_out.as_ref())
+        pool.get_return(&token_in, amount_in.into(), &token_out)
             .into()
     }
 

@@ -1,20 +1,17 @@
-
-use std::convert::TryInto;
-use near_sdk::json_types::{U128};
+use near_sdk::json_types::U128;
 use near_sdk::{AccountId, Balance, PromiseResult};
+use std::convert::TryInto;
 
-use crate::utils::{
-    assert_one_yocto, ext_multi_fungible_token, ext_fungible_token, 
-    ext_self, parse_seed_id, GAS_FOR_FT_TRANSFER
-};
 use crate::errors::*;
 use crate::farm_seed::SeedType;
+use crate::utils::{
+    assert_one_yocto, ext_fungible_token, ext_multi_fungible_token, ext_self, parse_seed_id,
+    GAS_FOR_FT_TRANSFER,
+};
 use crate::*;
-
 
 #[near_bindgen]
 impl Contract {
-
     #[payable]
     pub fn withdraw_seed(&mut self, seed_id: SeedId, amount: U128) {
         assert_one_yocto();
@@ -35,7 +32,7 @@ impl Contract {
                     amount.into(),
                     None,
                     &seed_id,
-                    1,  // one yocto near
+                    1, // one yocto near
                     GAS_FOR_FT_TRANSFER,
                 )
                 .then(ext_self::callback_post_withdraw_ft_seed(
@@ -55,7 +52,7 @@ impl Contract {
                     amount.into(),
                     None,
                     &receiver_id,
-                    1,  // one yocto near
+                    1, // one yocto near
                     GAS_FOR_FT_TRANSFER,
                 )
                 .then(ext_self::callback_post_withdraw_mft_seed(
@@ -68,7 +65,6 @@ impl Contract {
                 ));
             }
         }
-        
     }
 
     #[private]
@@ -88,12 +84,12 @@ impl Contract {
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Failed => {
-                env::log(
+                env::log_str(
                     format!(
                         "{} withdraw {} ft seed with amount {}, Callback Failed.",
                         sender_id, seed_id, amount,
                     )
-                    .as_bytes(),
+                    .as_str(),
                 );
                 // revert withdraw, equal to deposit, claim reward to update user reward_per_seed
                 self.internal_claim_user_reward_by_seed_id(&sender_id, &seed_id);
@@ -105,14 +101,14 @@ impl Contract {
                 farmer.get_ref_mut().add_seed(&seed_id, amount);
                 self.data_mut().seeds.insert(&seed_id, &farm_seed);
                 self.data_mut().farmers.insert(&sender_id, &farmer);
-            },
+            }
             PromiseResult::Successful(_) => {
-                env::log(
+                env::log_str(
                     format!(
                         "{} withdraw {} ft seed with amount {}, Succeed.",
                         sender_id, seed_id, amount,
                     )
-                    .as_bytes(),
+                    .as_str(),
                 );
             }
         };
@@ -135,12 +131,12 @@ impl Contract {
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Failed => {
-                env::log(
+                env::log_str(
                     format!(
                         "{} withdraw {} mft seed with amount {}, Callback Failed.",
                         sender_id, seed_id, amount,
                     )
-                    .as_bytes(),
+                    .as_str(),
                 );
                 // revert withdraw, equal to deposit, claim reward to update user reward_per_seed
                 self.internal_claim_user_reward_by_seed_id(&sender_id, &seed_id);
@@ -152,32 +148,34 @@ impl Contract {
                 farmer.get_ref_mut().add_seed(&seed_id, amount);
                 self.data_mut().seeds.insert(&seed_id, &farm_seed);
                 self.data_mut().farmers.insert(&sender_id, &farmer);
-            },
+            }
             PromiseResult::Successful(_) => {
-                env::log(
+                env::log_str(
                     format!(
                         "{} withdraw {} mft seed with amount {}, Succeed.",
                         sender_id, seed_id, amount,
                     )
-                    .as_bytes(),
+                    .as_str(),
                 );
             }
         };
     }
 }
 
-
 /// Internal methods implementation.
 impl Contract {
-
     #[inline]
     pub(crate) fn get_seed(&self, seed_id: &String) -> VersionedFarmSeed {
-        let orig = self.data().seeds.get(seed_id).expect(&format!("{}", ERR31_SEED_NOT_EXIST));
+        let orig = self
+            .data()
+            .seeds
+            .get(seed_id)
+            .expect(&format!("{}", ERR31_SEED_NOT_EXIST));
         if orig.need_upgrade() {
             orig.upgrade()
         } else {
             orig
-        } 
+        }
     }
 
     #[inline]
@@ -194,14 +192,14 @@ impl Contract {
     }
 
     pub(crate) fn internal_seed_deposit(
-        &mut self, 
-        seed_id: &String, 
-        sender_id: &AccountId, 
-        amount: Balance, 
-        seed_type: SeedType) {
-
-        // first claim all reward of the user for this seed farms 
-        // to update user reward_per_seed in each farm 
+        &mut self,
+        seed_id: &String,
+        sender_id: &AccountId,
+        amount: Balance,
+        seed_type: SeedType,
+    ) {
+        // first claim all reward of the user for this seed farms
+        // to update user reward_per_seed in each farm
         self.internal_claim_user_reward_by_seed_id(sender_id, seed_id);
 
         // **** update seed (new version)
@@ -216,12 +214,12 @@ impl Contract {
     }
 
     fn internal_seed_withdraw(
-        &mut self, 
-        seed_id: &SeedId, 
-        sender_id: &AccountId, 
-        amount: Balance) -> SeedType {
-        
-        // first claim all reward of the user for this seed farms 
+        &mut self,
+        seed_id: &SeedId,
+        sender_id: &AccountId,
+        amount: Balance,
+    ) -> SeedType {
+        // first claim all reward of the user for this seed farms
         // to update user reward_per_seed in each farm
         self.internal_claim_user_reward_by_seed_id(sender_id, seed_id);
 

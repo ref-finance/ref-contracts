@@ -1,10 +1,9 @@
-
-use std::convert::TryInto;
-use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::json_types::U128;
 use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult};
+use std::convert::TryInto;
 
-use crate::utils::{ext_fungible_token, ext_self, GAS_FOR_FT_TRANSFER, parse_farm_id};
 use crate::errors::*;
+use crate::utils::{ext_fungible_token, ext_self, parse_farm_id, GAS_FOR_FT_TRANSFER};
 use crate::*;
 use uint::construct_uint;
 
@@ -15,7 +14,6 @@ construct_uint! {
 
 #[near_bindgen]
 impl Contract {
-
     pub fn claim_reward_by_farm(&mut self, farm_id: FarmId) {
         let sender_id = env::predecessor_account_id();
         self.assert_storage_usage(&sender_id);
@@ -32,15 +30,15 @@ impl Contract {
 
     /// Withdraws given reward token of given user.
     #[payable]
-    pub fn withdraw_reward(&mut self, token_id: ValidAccountId, amount: Option<U128>) {
+    pub fn withdraw_reward(&mut self, token_id: AccountId, amount: Option<U128>) {
         assert_one_yocto();
 
         let token_id: AccountId = token_id.into();
-        let amount: u128 = amount.unwrap_or(U128(0)).into(); 
+        let amount: u128 = amount.unwrap_or(U128(0)).into();
 
         let sender_id = env::predecessor_account_id();
         self.assert_storage_usage(&sender_id);
-        
+
         self.remove_unused_rps(&sender_id);
 
         let mut farmer = self.get_farmer(&sender_id);
@@ -82,21 +80,21 @@ impl Contract {
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {
-                env::log(
+                env::log_str(
                     format!(
                         "{} withdraw reward {} amount {}, Succeed.",
                         sender_id, token_id, amount.0,
                     )
-                    .as_bytes(),
+                    .as_str(),
                 );
             }
             PromiseResult::Failed => {
-                env::log(
+                env::log_str(
                     format!(
                         "{} withdraw reward {} amount {}, Callback Failed.",
                         sender_id, token_id, amount.0,
                     )
-                    .as_bytes(),
+                    .as_str(),
                 );
                 // This reverts the changes from withdraw function.
                 let mut farmer = self.get_farmer(&sender_id);
@@ -108,35 +106,39 @@ impl Contract {
 }
 
 fn claim_user_reward_from_farm(
-    farm: &mut Farm, 
-    farmer: &mut Farmer, 
+    farm: &mut Farm,
+    farmer: &mut Farmer,
     total_seeds: &Balance,
     silent: bool,
 ) -> bool {
     let user_seeds = farmer.seeds.get(&farm.get_seed_id()).unwrap_or(&0_u128);
     let user_rps = farmer.get_rps(&farm.get_farm_id());
-    if let Some((new_user_rps, reward_amount)) = 
-        farm.claim_user_reward(&user_rps, user_seeds, total_seeds, silent) {
+    if let Some((new_user_rps, reward_amount)) =
+        farm.claim_user_reward(&user_rps, user_seeds, total_seeds, silent)
+    {
         if !silent {
-            env::log(
+            env::log_str(
                 format!(
                     "user_rps@{} increased to {}",
-                    farm.get_farm_id(), U256::from_little_endian(&new_user_rps),
+                    farm.get_farm_id(),
+                    U256::from_little_endian(&new_user_rps),
                 )
-                .as_bytes(),
+                .as_str(),
             );
         }
-        
+
         farmer.set_rps(&farm.get_farm_id(), new_user_rps);
         if reward_amount > 0 {
             farmer.add_reward(&farm.get_reward_token(), reward_amount);
             if !silent {
-                env::log(
+                env::log_str(
                     format!(
                         "claimed {} {} as reward from {}",
-                        reward_amount, farm.get_reward_token() , farm.get_farm_id(),
+                        reward_amount,
+                        farm.get_reward_token(),
+                        farm.get_farm_id(),
                     )
-                    .as_bytes(),
+                    .as_str(),
                 );
             }
         }
@@ -147,14 +149,18 @@ fn claim_user_reward_from_farm(
 }
 
 impl Contract {
-
     /// When a farm is removed, each farmer can free storage used by user_rps,
     /// which takes a key (farm_id as max 64 bytes) and a U256 (user_rps as 32 bytes),
     /// this clean method would be invoked in claim reward interface called by farmer.
     pub(crate) fn remove_unused_rps(&mut self, sender_id: &AccountId) {
         let mut farmer = self.get_farmer(sender_id);
         let mut changed = false;
-        let farm_ids: Vec<String> = farmer.get_ref().user_rps.keys().map(|x| x.clone()).collect();
+        let farm_ids: Vec<String> = farmer
+            .get_ref()
+            .user_rps
+            .keys()
+            .map(|x| x.clone())
+            .collect();
         for farm_id in farm_ids {
             let (seed_id, _) = parse_farm_id(&farm_id);
             let farm_seed = self.get_seed(&seed_id);
@@ -169,19 +175,15 @@ impl Contract {
     }
 
     pub(crate) fn internal_claim_user_reward_by_seed_id(
-        &mut self, 
+        &mut self,
         sender_id: &AccountId,
-        seed_id: &SeedId) {
+        seed_id: &SeedId,
+    ) {
         let mut farmer = self.get_farmer(sender_id);
         if let Some(mut farm_seed) = self.get_seed_wrapped(seed_id) {
             let amount = farm_seed.get_ref().amount;
             for farm in &mut farm_seed.get_ref_mut().farms.values_mut() {
-                claim_user_reward_from_farm(
-                    farm, 
-                    farmer.get_ref_mut(),  
-                    &amount,
-                    true,
-                );
+                claim_user_reward_from_farm(farm, farmer.get_ref_mut(), &amount, true);
             }
             self.data_mut().seeds.insert(seed_id, &farm_seed);
             self.data_mut().farmers.insert(sender_id, &farmer);
@@ -189,9 +191,10 @@ impl Contract {
     }
 
     pub(crate) fn internal_claim_user_reward_by_farm_id(
-        &mut self, 
-        sender_id: &AccountId, 
-        farm_id: &FarmId) {
+        &mut self,
+        sender_id: &AccountId,
+        farm_id: &FarmId,
+    ) {
         let mut farmer = self.get_farmer(sender_id);
 
         let (seed_id, _) = parse_farm_id(farm_id);
@@ -199,34 +202,34 @@ impl Contract {
         if let Some(mut farm_seed) = self.get_seed_wrapped(&seed_id) {
             let amount = farm_seed.get_ref().amount;
             if let Some(farm) = farm_seed.get_ref_mut().farms.get_mut(farm_id) {
-                claim_user_reward_from_farm(
-                    farm, 
-                    farmer.get_ref_mut(), 
-                    &amount,
-                    false,
-                );
+                claim_user_reward_from_farm(farm, farmer.get_ref_mut(), &amount, false);
                 self.data_mut().seeds.insert(&seed_id, &farm_seed);
                 self.data_mut().farmers.insert(sender_id, &farmer);
             }
         }
     }
 
-
     #[inline]
     pub(crate) fn get_farmer(&self, from: &AccountId) -> VersionedFarmer {
-        let orig = self.data().farmers
+        let orig = self
+            .data()
+            .farmers
             .get(from)
             .expect(ERR10_ACC_NOT_REGISTERED);
         if orig.need_upgrade() {
-                orig.upgrade()
-            } else {
-                orig
-            }
+            orig.upgrade()
+        } else {
+            orig
+        }
     }
 
     #[inline]
     pub(crate) fn get_farmer_default(&self, from: &AccountId) -> VersionedFarmer {
-        let orig = self.data().farmers.get(from).unwrap_or(VersionedFarmer::new(0));
+        let orig = self
+            .data()
+            .farmers
+            .get(from)
+            .unwrap_or(VersionedFarmer::new(0));
         if orig.need_upgrade() {
             orig.upgrade()
         } else {
@@ -247,7 +250,7 @@ impl Contract {
         }
     }
 
-    /// Returns current balance of given token for given user. 
+    /// Returns current balance of given token for given user.
     /// If there is nothing recorded, returns 0.
     pub(crate) fn internal_get_reward(
         &self,
@@ -255,7 +258,10 @@ impl Contract {
         token_id: &AccountId,
     ) -> Balance {
         self.get_farmer_default(sender_id)
-            .get_ref().rewards.get(token_id).cloned()
+            .get_ref()
+            .rewards
+            .get(token_id)
+            .cloned()
             .unwrap_or_default()
     }
 }

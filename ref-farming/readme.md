@@ -26,7 +26,7 @@ pub struct SeedInfo {
 /// used to create a farm
 pub struct HRSimpleFarmTerms {
     pub seed_id: SeedId,
-    pub reward_token: ValidAccountId,
+    pub reward_token: AccountId,
     pub start_at: U64,
     pub reward_per_session: U128,
     pub session_interval: U64, 
@@ -83,13 +83,13 @@ pub fn get_farm(&self, farm_id: FarmId) -> Option<FarmInfo>;
 pub fn list_rewards_info(&self, from_index: u64, limit: u64) -> HashMap<AccountId, U128>;
 
 /// claimed rewards of given user
-pub fn list_rewards(&self, account_id: ValidAccountId) -> HashMap<AccountId, U128>;
+pub fn list_rewards(&self, account_id: AccountId) -> HashMap<AccountId, U128>;
 
 /// claimed reward of given user and given reward token.
-pub fn get_reward(&self, account_id: ValidAccountId, token_id: ValidAccountId) -> U128;
+pub fn get_reward(&self, account_id: AccountId, token_id: AccountId) -> U128;
 
 /// unclaimed reward of given user and given farm
-pub fn get_unclaimed_reward(&self, account_id: ValidAccountId, farm_id: FarmId) -> U128;
+pub fn get_unclaimed_reward(&self, account_id: AccountId, farm_id: FarmId) -> U128;
 
 //***********************************
 //*********** about Seeds ***********
@@ -122,7 +122,7 @@ pub struct StorageBalance {
 /// Farmer also use this method to add storage fee, with registration_only set to false.
 #[payable]
 fn storage_deposit(&mut self, account_id: 
-    Option<ValidAccountId>, 
+    Option<AccountId>, 
     registration_only: Option<bool>,
 ) -> StorageBalance;
 
@@ -135,7 +135,7 @@ fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance;
 fn storage_unregister(&mut self, force: Option<bool>) -> bool;
 
 /// get current storage fee info
-fn storage_balance_of(&self, account_id: ValidAccountId) -> Option<StorageBalance>;
+fn storage_balance_of(&self, account_id: AccountId) -> Option<StorageBalance>;
 ```
 
 ***Manage farms***  
@@ -181,12 +181,12 @@ pub fn claim_reward_by_seed(&mut self, seed_id: SeedId);
 /// All claimed rewards goes to farmer's inner account in this contract,
 /// So, farmer can withdraw given reward token back to his own account.
 #[payable]
-pub fn withdraw_reward(&mut self, token_id: ValidAccountId, amount: Option<U128>);
+pub fn withdraw_reward(&mut self, token_id: AccountId, amount: Option<U128>);
 ```
 
 ***Owner methods***  
 ```rust
-pub fn set_owner(&mut self, owner_id: ValidAccountId);
+pub fn set_owner(&mut self, owner_id: AccountId);
 
 /// those farm with Ended status and zero unclaimed reward, 
 /// can be cleaned to save storage.

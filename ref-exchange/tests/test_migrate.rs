@@ -1,6 +1,4 @@
-use std::convert::TryFrom;
-
-use near_sdk::json_types::ValidAccountId;
+use near_sdk::AccountId;
 use near_sdk_sim::{deploy, init_simulator, to_yocto};
 
 use ref_exchange::ContractContract as Exchange;
@@ -13,13 +11,16 @@ near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
 #[test]
 fn test_upgrade() {
     let root = init_simulator(None);
-    let test_user = root.create_user("test".to_string(), to_yocto("100"));
+    let test_user = root.create_user(
+        AccountId::new_unchecked("test".to_string()),
+        to_yocto("100"),
+    );
     let pool = deploy!(
         contract: Exchange,
         contract_id: "swap".to_string(),
         bytes: &PREV_EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(ValidAccountId::try_from(root.account_id.clone()).unwrap(), 4, 1)
+        init_method: new(root.account_id.clone(), 4, 1)
     );
     // Failed upgrade with no permissions.
     let result = test_user

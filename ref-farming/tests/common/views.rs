@@ -1,8 +1,8 @@
-use near_sdk::json_types::{U128, U64};
+use near_sdk::json_types::U128;
 use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::AccountId;
 use near_sdk_sim::{view, ContractAccount};
 
-use super::utils::to_va;
 use ref_farming::{ContractContract as Farming, FarmInfo};
 use std::collections::HashMap;
 
@@ -90,11 +90,11 @@ pub(crate) fn show_seedsinfo(
 
 pub(crate) fn show_userseeds(
     farming: &ContractAccount<Farming>,
-    user_id: String,
+    user_id: AccountId,
     show_print: bool,
 ) -> HashMap<String, U128> {
-    let ret = view!(farming.list_user_seeds(to_va(user_id.clone())))
-        .unwrap_json::<HashMap<String, U128>>();
+    let ret =
+        view!(farming.list_user_seeds(user_id.clone())).unwrap_json::<HashMap<String, U128>>();
     if show_print {
         println!("User Seeds for {}: {:#?}", user_id, ret);
     }
@@ -103,13 +103,13 @@ pub(crate) fn show_userseeds(
 
 pub(crate) fn show_unclaim(
     farming: &ContractAccount<Farming>,
-    user_id: String,
+    user_id: AccountId,
     farm_id: String,
     show_print: bool,
 ) -> U128 {
     let farm_info = get_farminfo(farming, farm_id.clone());
-    let ret = view!(farming.get_unclaimed_reward(to_va(user_id.clone()), farm_id.clone()))
-        .unwrap_json::<U128>();
+    let ret =
+        view!(farming.get_unclaimed_reward(user_id.clone(), farm_id.clone())).unwrap_json::<U128>();
     if show_print {
         println!(
             "User Unclaimed for {}@{}:[CRR:{}, LRR:{}] {}",
@@ -121,11 +121,10 @@ pub(crate) fn show_unclaim(
 
 pub(crate) fn show_reward(
     farming: &ContractAccount<Farming>,
-    user_id: String,
-    reward_id: String,
+    user_id: AccountId,
+    reward_id: AccountId,
 ) -> U128 {
-    let ret = view!(farming.get_reward(to_va(user_id.clone()), to_va(reward_id.clone())))
-        .unwrap_json::<U128>();
+    let ret = view!(farming.get_reward(user_id.clone(), reward_id.clone())).unwrap_json::<U128>();
     println!("Reward {} for {}: {}", reward_id, user_id, ret.0);
     ret
 }

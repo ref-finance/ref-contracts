@@ -1,24 +1,17 @@
-use std::convert::TryFrom;
-use near_sdk::{AccountId};
-use near_sdk::json_types::{ValidAccountId};
-
+use near_sdk::AccountId;
 
 pub(crate) fn dai() -> AccountId {
-    "dai".to_string()
+    AccountId::new_unchecked("dai".to_string())
 }
 
 pub(crate) fn eth() -> AccountId {
-    "eth".to_string()
+    AccountId::new_unchecked("eth".to_string())
 }
 
 pub(crate) fn swap() -> AccountId {
-    "swap".to_string()
+    AccountId::new_unchecked("swap".to_string())
 }
 
 pub(crate) fn farming_id() -> AccountId {
-    "farming".to_string()
-}
-
-pub(crate) fn to_va(a: AccountId) -> ValidAccountId {
-    ValidAccountId::try_from(a).unwrap()
+    AccountId::new_unchecked("farming".to_string())
 }

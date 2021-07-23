@@ -2,13 +2,13 @@
 
 use std::collections::HashMap;
 
-use near_sdk::json_types::{ValidAccountId, U128, U64};
+use near_sdk::json_types::{U128, U64};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
 
 use crate::farm_seed::SeedInfo;
-use crate::utils::parse_farm_id;
 use crate::simple_farm::DENOM;
+use crate::utils::parse_farm_id;
 use crate::*;
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -79,14 +79,14 @@ impl From<&Farm> for FarmInfo {
                         start_at: farm.terms.start_at.into(),
                         reward_per_session: farm.terms.reward_per_session.into(),
                         session_interval: farm.terms.session_interval.into(),
-    
+
                         total_reward: farm.amount_of_reward.into(),
                         cur_round: farm.last_distribution.rr.into(),
                         last_round: farm.last_distribution.rr.into(),
                         claimed_reward: farm.amount_of_claimed.into(),
                         unclaimed_reward: (farm.amount_of_reward - farm.amount_of_claimed).into(),
                     }
-                }                
+                }
             }
         }
     }
@@ -174,8 +174,8 @@ impl Contract {
 
     /// Returns reward token claimed for given user outside of any farms.
     /// Returns empty list if no rewards claimed.
-    pub fn list_rewards(&self, account_id: ValidAccountId) -> HashMap<AccountId, U128> {
-        self.get_farmer_default(account_id.as_ref())
+    pub fn list_rewards(&self, account_id: AccountId) -> HashMap<AccountId, U128> {
+        self.get_farmer_default(&account_id)
             .get()
             .rewards
             .into_iter()
@@ -184,16 +184,15 @@ impl Contract {
     }
 
     /// Returns balance of amount of given reward token that ready to withdraw.
-    pub fn get_reward(&self, account_id: ValidAccountId, token_id: ValidAccountId) -> U128 {
-        self.internal_get_reward(account_id.as_ref(), token_id.as_ref())
-            .into()
+    pub fn get_reward(&self, account_id: AccountId, token_id: AccountId) -> U128 {
+        self.internal_get_reward(&account_id, &token_id).into()
     }
 
-    pub fn get_unclaimed_reward(&self, account_id: ValidAccountId, farm_id: FarmId) -> U128 {
+    pub fn get_unclaimed_reward(&self, account_id: AccountId, farm_id: FarmId) -> U128 {
         let (seed_id, _) = parse_farm_id(&farm_id);
 
         if let (Some(farmer), Some(farm_seed)) = (
-            self.get_farmer_wrapped(account_id.as_ref()),
+            self.get_farmer_wrapped(&account_id),
             self.get_seed_wrapped(&seed_id),
         ) {
             if let Some(farm) = farm_seed.get_ref().farms.get(&farm_id) {
@@ -228,8 +227,8 @@ impl Contract {
     }
 
     /// return user staked seeds and its amount in a hashmap
-    pub fn list_user_seeds(&self, account_id: ValidAccountId) -> HashMap<SeedId, U128> {
-        if let Some(farmer) = self.get_farmer_wrapped(account_id.as_ref()) {
+    pub fn list_user_seeds(&self, account_id: AccountId) -> HashMap<SeedId, U128> {
+        if let Some(farmer) = self.get_farmer_wrapped(&account_id) {
             farmer
                 .get()
                 .seeds

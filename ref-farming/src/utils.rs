@@ -8,11 +8,11 @@ use crate::errors::*;
 pub const MIN_SEED_DEPOSIT: u128 = 1_000_000_000_000_000_000;
 pub const MAX_ACCOUNT_LENGTH: u128 = 64;
 /// Amount of gas for fungible token transfers.
-pub const GAS_FOR_FT_TRANSFER: Gas = 10_000_000_000_000;
+pub const GAS_FOR_FT_TRANSFER: Gas = Gas(10_000_000_000_000);
 /// Amount of gas used for upgrade function itself.
-pub const GAS_FOR_UPGRADE_CALL: Gas = 50_000_000_000_000;
+pub const GAS_FOR_UPGRADE_CALL: Gas = Gas(50_000_000_000_000);
 /// Amount of gas for deploy action.
-pub const GAS_FOR_DEPLOY_CALL: Gas = 20_000_000_000_000;
+pub const GAS_FOR_DEPLOY_CALL: Gas = Gas(20_000_000_000_000);
 pub const MFT_TAG: &str = "@";
 
 

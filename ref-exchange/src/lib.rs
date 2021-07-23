@@ -5,7 +5,7 @@ use near_contract_standards::storage_management::{
 };
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
-use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::json_types::U128;
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
     PromiseResult, StorageUsage,
@@ -33,8 +33,6 @@ mod token_receiver;
 mod utils;
 mod views;
 
-near_sdk::setup_alloc!();
-
 #[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 pub struct Contract {
@@ -55,9 +53,9 @@ pub struct Contract {
 #[near_bindgen]
 impl Contract {
     #[init]
-    pub fn new(owner_id: ValidAccountId, exchange_fee: u32, referral_fee: u32) -> Self {
+    pub fn new(owner_id: AccountId, exchange_fee: u32, referral_fee: u32) -> Self {
         Self {
-            owner_id: owner_id.as_ref().clone(),
+            owner_id: owner_id,
             exchange_fee,
             referral_fee,
             pools: Vector::new(b"p".to_vec()),
@@ -69,7 +67,7 @@ impl Contract {
     /// Adds new "Simple Pool" with given tokens and given fee.
     /// Attached NEAR should be enough to cover the added storage.
     #[payable]
-    pub fn add_simple_pool(&mut self, tokens: Vec<ValidAccountId>, fee: u32) -> u64 {
+    pub fn add_simple_pool(&mut self, tokens: Vec<AccountId>, fee: u32) -> u64 {
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
@@ -86,7 +84,7 @@ impl Contract {
     pub fn execute_actions(
         &mut self,
         actions: Vec<Action>,
-        referral_id: Option<ValidAccountId>,
+        referral_id: Option<AccountId>,
     ) -> ActionResult {
         let sender_id = env::predecessor_account_id();
         let mut account = self.get_account_deposits(&sender_id);
@@ -114,7 +112,7 @@ impl Contract {
     /// If referrer provided, pays referral_fee to it.
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
     #[payable]
-    pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
+    pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<AccountId>) -> U128 {
         assert_ne!(actions.len(), 0, "ERR_AT_LEAST_ONE_SWAP");
         U128(
             self.execute_actions(
@@ -292,11 +290,9 @@ impl Contract {
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryFrom;
-
     use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
     use near_sdk::test_utils::{accounts, VMContextBuilder};
-    use near_sdk::{testing_env, Balance, MockedBlockchain};
+    use near_sdk::{testing_env, Balance};
     use near_sdk_sim::to_yocto;
 
     use super::*;
@@ -312,8 +308,8 @@ mod tests {
     fn deposit_tokens(
         context: &mut VMContextBuilder,
         contract: &mut Contract,
-        account_id: ValidAccountId,
-        token_amounts: Vec<(ValidAccountId, Balance)>,
+        account_id: AccountId,
+        token_amounts: Vec<(AccountId, Balance)>,
     ) {
         if contract.storage_balance_of(account_id.clone()).is_none() {
             testing_env!(context
@@ -344,8 +340,8 @@ mod tests {
     fn create_pool_with_liquidity(
         context: &mut VMContextBuilder,
         contract: &mut Contract,
-        account_id: ValidAccountId,
-        token_amounts: Vec<(ValidAccountId, Balance)>,
+        account_id: AccountId,
+        token_amounts: Vec<(AccountId, Balance)>,
     ) -> u64 {
         let tokens = token_amounts
             .iter()
@@ -379,9 +375,9 @@ mod tests {
     fn swap(
         contract: &mut Contract,
         pool_id: u64,
-        token_in: ValidAccountId,
+        token_in: AccountId,
         amount_in: Balance,
-        token_out: ValidAccountId,
+        token_out: AccountId,
     ) -> Balance {
         contract
             .swap(
@@ -566,14 +562,14 @@ mod tests {
     #[should_panic(expected = "E12: token not whitelisted")]
     fn test_deny_send_malicious_token() {
         let (mut context, mut contract) = setup_contract();
-        let acc = ValidAccountId::try_from("test_user").unwrap();
+        let acc = AccountId::new_unchecked("test_user".to_string());
         testing_env!(context
             .predecessor_account_id(acc.clone())
             .attached_deposit(to_yocto("1"))
             .build());
         contract.storage_deposit(Some(acc.clone()), None);
         testing_env!(context
-            .predecessor_account_id(ValidAccountId::try_from("malicious").unwrap())
+            .predecessor_account_id(AccountId::new_unchecked("malicious".to_string()))
             .build());
         contract.ft_on_transfer(acc, U128(1_000), "".to_string());
     }
@@ -581,8 +577,8 @@ mod tests {
     #[test]
     fn test_send_user_specific_token() {
         let (mut context, mut contract) = setup_contract();
-        let acc = ValidAccountId::try_from("test_user").unwrap();
-        let custom_token = ValidAccountId::try_from("custom").unwrap();
+        let acc = AccountId::new_unchecked("test_user".to_string());
+        let custom_token = AccountId::new_unchecked("custom".to_string());
         testing_env!(context
             .predecessor_account_id(acc.clone())
             .attached_deposit(to_yocto("1"))
@@ -613,7 +609,7 @@ mod tests {
             accounts(3),
             vec![(accounts(1), to_yocto("1")), (accounts(2), to_yocto("1"))],
         );
-        let acc = ValidAccountId::try_from("test_user").unwrap();
+        let acc = AccountId::new_unchecked("test_user".to_string());
         deposit_tokens(
             &mut context,
             &mut contract,
@@ -688,7 +684,7 @@ mod tests {
             accounts(3),
             vec![(accounts(1), to_yocto("5")), (accounts(2), to_yocto("10"))],
         );
-        let acc = ValidAccountId::try_from("test_user").unwrap();
+        let acc = AccountId::new_unchecked("test_user".to_string());
         deposit_tokens(
             &mut context,
             &mut contract,

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::json_types::U128;
 use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult};
 
 use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER};
@@ -68,11 +68,10 @@ impl Account {
 
     /// Registers given token and set balance to 0.
     /// Fails if not enough amount to cover new storage usage.
-    pub(crate) fn register(&mut self, token_ids: &Vec<ValidAccountId>) {
+    pub(crate) fn register(&mut self, token_ids: &Vec<AccountId>) {
         for token_id in token_ids {
-            let t = token_id.as_ref();
-            if !self.tokens.contains_key(t) {
-                self.tokens.insert(t.clone(), 0);
+            if !self.tokens.contains_key(&token_id) {
+                self.tokens.insert(token_id.clone(), 0);
             }
         }
     }
@@ -90,7 +89,7 @@ impl Contract {
     /// Registers given token in the user's account deposit.
     /// Fails if not enough balance on this account to cover storage.
     #[payable]
-    pub fn register_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
+    pub fn register_tokens(&mut self, token_ids: Vec<AccountId>) {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.get_account_deposits(&sender_id);
@@ -101,12 +100,12 @@ impl Contract {
     /// Unregister given token from user's account deposit.
     /// Panics if the balance of any given token is non 0.
     #[payable]
-    pub fn unregister_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
+    pub fn unregister_tokens(&mut self, token_ids: Vec<AccountId>) {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.get_account_deposits(&sender_id);
         for token_id in token_ids {
-            deposits.unregister(token_id.as_ref());
+            deposits.unregister(&token_id);
         }
         self.internal_save_account(&sender_id, deposits);
     }
@@ -117,7 +116,7 @@ impl Contract {
     #[payable]
     pub fn withdraw(
         &mut self,
-        token_id: ValidAccountId,
+        token_id: AccountId,
         amount: U128,
         unregister: Option<bool>,
     ) -> Promise {
@@ -157,12 +156,12 @@ impl Contract {
                     account.deposit(&token_id, amount.0);
                     self.internal_save_account(&sender_id, account);
                 } else {
-                    env::log(
+                    env::log_str(
                         format!(
                             "Account {} is not registered or not enough storage. Depositing to owner.",
                             sender_id
                         )
-                        .as_bytes(),
+                        .as_str(),
                     );
                     let mut owner_account = self.get_account_deposits(&self.owner_id);
                     owner_account.deposit(&token_id, amount.0);
