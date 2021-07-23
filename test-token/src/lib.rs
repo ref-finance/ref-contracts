@@ -7,7 +7,7 @@ use near_sdk::json_types::U128;
 use near_sdk::{near_bindgen, AccountId, PanicOnDefault, PromiseOrValue};
 
 // TODO(austinabell) this is only required because of an issue within the SDK, should be able
-// to remove later
+// to remove later. PR: https://github.com/near/near-sdk-rs/pull/491
 #[cfg(target_arch = "wasm32")]
 use near_sdk::env;
 
