@@ -78,7 +78,7 @@ impl Farm {
         user_seeds: &Balance, 
         total_seeds: &Balance, 
         silent: bool,
-    ) -> Option<(RPS, Balance)> {
+    ) -> (RPS, Balance) {
         match self {
             Farm::SimpleFarm(farm) 
                 => farm.claim_user_reward(user_rps, user_seeds, total_seeds, silent),

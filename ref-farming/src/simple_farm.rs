@@ -112,6 +112,8 @@ pub struct SimpleFarm {
     pub amount_of_reward: Balance,
     /// reward token has been claimed by farmer by far
     pub amount_of_claimed: Balance,
+    /// when there is no seed token staked, reward goes to beneficiary
+    pub amount_of_beneficiary: Balance,
 
 }
 
@@ -124,6 +126,7 @@ impl SimpleFarm {
             farm_id: id.clone(),
             amount_of_reward: 0,
             amount_of_claimed: 0,
+            amount_of_beneficiary: 0,
 
             status: SimpleFarmStatus::Created,
             last_distribution: SimpleFarmRewardDistribution::default(),
@@ -158,10 +161,12 @@ impl SimpleFarm {
 
     pub(crate) fn try_distribute(&self, total_seeds: &Balance) -> Option<SimpleFarmRewardDistribution> {
 
-        assert!(
-            total_seeds != &0_u128,
-            "{}", ERR500
-        );
+        // if total_seeds == 0, then contract itself takes rewrad
+
+        // assert!(
+        //     total_seeds != &0_u128,
+        //     "{}", ERR500
+        // );
 
         if let SimpleFarmStatus::Running = self.status {
             let mut dis = self.last_distribution.clone();
@@ -187,13 +192,16 @@ impl SimpleFarm {
             dis.undistributed -= reward_added;
 
             // calculate rps
-            (
-                U256::from_little_endian(&self.last_distribution.rps) + 
-                U256::from(reward_added) 
-                * U256::from(DENOM) 
-                / U256::from(*total_seeds)
-            ).to_little_endian(&mut dis.rps);
-
+            if total_seeds == &0 {
+                U256::from(0).to_little_endian(&mut dis.rps);
+            } else {
+                (
+                    U256::from_little_endian(&self.last_distribution.rps) + 
+                    U256::from(reward_added) 
+                    * U256::from(DENOM) 
+                    / U256::from(*total_seeds)
+                ).to_little_endian(&mut dis.rps);
+            }
             Some(dis)
         } else {
             None
@@ -212,6 +220,9 @@ impl SimpleFarm {
         if total_seeds == &0 {
             return 0;
         }
+        if user_seeds == &0 {
+            return 0;
+        }
         if let Some(dis) = self.try_distribute(total_seeds) {
             (U256::from(*user_seeds) 
             * (U256::from_little_endian(&dis.rps) - U256::from_little_endian(user_rps))
@@ -222,13 +233,16 @@ impl SimpleFarm {
     }
 
     pub(crate) fn distribute(&mut self, total_seeds: &Balance, silent: bool) {
-        if total_seeds == &0 {
-            return;
-        }
-    
         if let Some(dis) = self.try_distribute(total_seeds) {
             if self.last_distribution.rr != dis.rr {
                 self.last_distribution = dis.clone();
+                if total_seeds == &0 {
+                    // if total_seeds == &0, 
+                    // reward goes to beneficiary,
+                    self.amount_of_claimed += self.last_distribution.unclaimed;
+                    self.amount_of_beneficiary += self.last_distribution.unclaimed;
+                    self.last_distribution.unclaimed = 0;
+                }   
                 if !silent {
                     env::log(
                         format!(
@@ -254,13 +268,12 @@ impl SimpleFarm {
         user_seeds: &Balance, 
         total_seeds: &Balance, 
         silent: bool,
-    ) -> Option<(RPS, Balance)> {
-
-        if total_seeds == &0 {
-            return None;
-        }
+    ) -> (RPS, Balance) {
 
         self.distribute(total_seeds, silent);
+        if user_seeds == &0 {
+            return (self.last_distribution.rps, 0);
+        }
 
         let claimed = (
             U256::from(*user_seeds) 
@@ -269,13 +282,16 @@ impl SimpleFarm {
         ).as_u128();
 
         if claimed > 0 {
-            assert!(self.last_distribution.unclaimed >= claimed, "{}", ERR500);
+            assert!(
+                self.last_distribution.unclaimed >= claimed, 
+                "{} unclaimed:{}, cur_claim:{}", 
+                ERR500, self.last_distribution.unclaimed, claimed
+            );
             self.last_distribution.unclaimed -= claimed;
+            self.amount_of_claimed += claimed;
         }
 
-        self.amount_of_claimed += claimed;
-        
-        Some((self.last_distribution.rps, claimed))
+        (self.last_distribution.rps, claimed)
     }
 
     pub fn can_be_removed(&self) -> bool {

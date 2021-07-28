@@ -1,6 +1,7 @@
 use crate::*;
 
 use near_sdk::{Promise};
+use near_sdk::json_types::U128;
 use crate::utils::{GAS_FOR_DEPLOY_CALL, GAS_FOR_UPGRADE_CALL};
 
 #[near_bindgen]
@@ -19,10 +20,10 @@ impl Contract {
         }
     }
 
-    pub fn modify_seed_min_deposit(&mut self, seed_id: String, min_deposit: Balance) {
+    pub fn modify_seed_min_deposit(&mut self, seed_id: String, min_deposit: U128) {
         self.assert_owner();
         let mut farm_seed = self.get_seed(&seed_id);
-        farm_seed.get_ref_mut().min_deposit = min_deposit;
+        farm_seed.get_ref_mut().min_deposit = min_deposit.into();
     }
 
     /// Upgrades given contract. Only can be called by owner.

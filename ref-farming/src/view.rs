@@ -39,6 +39,7 @@ pub struct FarmInfo {
     pub last_round: U64,
     pub claimed_reward: U128,
     pub unclaimed_reward: U128,
+    pub beneficiary_reward: U128,
 }
 
 impl From<&Farm> for FarmInfo {
@@ -68,6 +69,7 @@ impl From<&Farm> for FarmInfo {
                         last_round: farm.last_distribution.rr.into(),
                         claimed_reward: farm.amount_of_claimed.into(),
                         unclaimed_reward: dis.unclaimed.into(),
+                        beneficiary_reward: farm.amount_of_beneficiary.into(),
                     }
                 } else {
                     Self {
@@ -85,6 +87,7 @@ impl From<&Farm> for FarmInfo {
                         last_round: farm.last_distribution.rr.into(),
                         claimed_reward: farm.amount_of_claimed.into(),
                         unclaimed_reward: (farm.amount_of_reward - farm.amount_of_claimed).into(),
+                        beneficiary_reward: farm.amount_of_beneficiary.into(),
                     }
                 }                
             }
@@ -97,7 +100,7 @@ impl Contract {
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
             owner_id: self.data().owner_id.clone(),
-            version: String::from("0.4.2"),
+            version: String::from("0.5.0"),
             farmer_count: self.data().farmer_count.into(),
             farm_count: self.data().farm_count.into(),
             seed_count: self.data().seeds.len().into(),

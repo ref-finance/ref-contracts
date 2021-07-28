@@ -14,7 +14,7 @@ use ref_farming::{ContractContract as Farming};
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange_release.wasm",
-    FARM_WASM_BYTES => "../res/ref_farming_local.wasm",
+    FARM_WASM_BYTES => "../res/ref_farming_release.wasm",
 }
 
 pub fn deploy_farming(root: &UserAccount, farming_id: AccountId, owner_id: AccountId) -> ContractAccount<Farming> {
