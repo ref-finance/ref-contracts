@@ -51,7 +51,7 @@ fn one_farm_whole_lifecycle() {
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-    assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 0, 0, 0, 0);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 0, 0, 0, 0, 0);
     let user_seeds = show_userseeds(&farming, farmer.account_id(), false);
     assert_eq!(user_seeds.get(&String::from("swap@0")).unwrap().0, to_yocto("1"));
     let unclaim = show_unclaim(&farming, farmer.account_id(), farm_id.clone(), false);
@@ -66,7 +66,7 @@ fn one_farm_whole_lifecycle() {
             root.borrow_runtime().current_block().block_height,
         );
         let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-        assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 1, 0, 0, to_yocto("1"));
+        assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 1, 0, 0, to_yocto("1"), 0);
         let unclaim = show_unclaim(&farming, farmer.account_id(), farm_id.clone(), false);
         assert_eq!(unclaim.0, to_yocto("1"));
     }
@@ -78,7 +78,7 @@ fn one_farm_whole_lifecycle() {
             root.borrow_runtime().current_block().block_height,
         );
         let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-        assert_farming(&farm_info, "Ended".to_string(), to_yocto("10"), 10, 0, 0, to_yocto("10"));
+        assert_farming(&farm_info, "Ended".to_string(), to_yocto("10"), 10, 0, 0, to_yocto("10"), 0);
         let unclaim = show_unclaim(&farming, farmer.account_id(), farm_id.clone(), false);
         assert_eq!(unclaim.0, to_yocto("10"));
     }
@@ -94,7 +94,7 @@ fn one_farm_whole_lifecycle() {
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     let farm_info = show_farminfo(&farming, farm_id.clone(), true);
-    assert_farming(&farm_info, "Ended".to_string(), to_yocto("10"), 10, 10, to_yocto("10"), 0);
+    assert_farming(&farm_info, "Ended".to_string(), to_yocto("10"), 10, 10, to_yocto("10"), 0, 0);
     let unclaim = show_unclaim(&farming, farmer.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, 0_u128);
     println!("----->> Farmer claimed reward at #{}.", root.borrow_runtime().current_block().block_height);
@@ -106,7 +106,7 @@ fn one_farm_whole_lifecycle() {
             root.borrow_runtime().current_block().block_height,
         );
         let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-        assert_farming(&farm_info, "Ended".to_string(), to_yocto("10"), 10, 10, to_yocto("10"), 0);
+        assert_farming(&farm_info, "Ended".to_string(), to_yocto("10"), 10, 10, to_yocto("10"), 0, 0);
     }
 
 }
@@ -521,10 +521,7 @@ fn one_farm_before_farmer() {
     }
 
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-    assert_eq!(farm_info.cur_round.0, 1_u64);
-    assert_eq!(farm_info.last_round.0, 0_u64);
-    assert_eq!(farm_info.claimed_reward.0, 0_u128);
-    assert_eq!(farm_info.unclaimed_reward.0, to_yocto("1"));
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 1, 0, to_yocto("0"), to_yocto("1"), to_yocto("0"));
 
     // chain goes for 60 blocks
     if root.borrow_runtime_mut().produce_blocks(60).is_ok() {
@@ -537,11 +534,7 @@ fn one_farm_before_farmer() {
     }
 
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-    assert_eq!(farm_info.cur_round.0, 2_u64);
-    assert_eq!(farm_info.last_round.0, 0_u64);
-    assert_eq!(farm_info.claimed_reward.0, 0_u128);
-    assert_eq!(farm_info.unclaimed_reward.0, to_yocto("2"));
-
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 2, 0, to_yocto("0"), to_yocto("2"), to_yocto("0"));
 
     // farmer1 register and stake liquidity token
     call!(farmer1, farming.storage_deposit(None, None), deposit = to_yocto("1"))
@@ -553,6 +546,9 @@ fn one_farm_before_farmer() {
     );
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 2, 2, to_yocto("2"), to_yocto("0"), to_yocto("2"));
+
     let user_seeds = show_userseeds(&farming, farmer1.account_id(), false);
     assert_eq!(user_seeds.get(&String::from("swap@0")).unwrap().0, to_yocto("1"));
     let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
@@ -570,10 +566,7 @@ fn one_farm_before_farmer() {
         assert_eq!(unclaim.0, to_yocto("1"));
     }
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-    assert_eq!(farm_info.cur_round.0, 3_u64);
-    assert_eq!(farm_info.last_round.0, 2_u64);
-    assert_eq!(farm_info.claimed_reward.0, to_yocto("2"));
-    assert_eq!(farm_info.unclaimed_reward.0, to_yocto("1"));
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 3, 2, to_yocto("2"), to_yocto("1"), to_yocto("2"));
 
     // chain goes for another 60 blocks
     if root.borrow_runtime_mut().produce_blocks(60).is_ok() {

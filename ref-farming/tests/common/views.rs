@@ -139,6 +139,7 @@ pub(crate) fn assert_farming(
     last_round: u64,
     claimed_reward: u128,
     unclaimed_reward: u128,
+    beneficiary_reward: u128,
 ) {
     assert_eq!(farm_info.farm_status, farm_status);
     assert_eq!(farm_info.total_reward.0, total_reward);
@@ -146,6 +147,7 @@ pub(crate) fn assert_farming(
     assert_eq!(farm_info.last_round.0, last_round);
     assert_eq!(farm_info.claimed_reward.0, claimed_reward);
     assert_eq!(farm_info.unclaimed_reward.0, unclaimed_reward);
+    assert_eq!(farm_info.beneficiary_reward.0, beneficiary_reward);
 }
 
 // =============  internal methods ================

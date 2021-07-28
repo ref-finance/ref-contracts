@@ -51,7 +51,7 @@ fn multi_farm_in_single_seed() {
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-    assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 0, 0, 0, 0);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 0, 0, 0, 0, 0);
     let user_seeds = show_userseeds(&farming, farmer.account_id(), false);
     assert_eq!(user_seeds.get(&String::from("swap@0")).unwrap().0, to_yocto("1"));
     let unclaim = show_unclaim(&farming, farmer.account_id(), farm_id.clone(), false);
@@ -66,7 +66,7 @@ fn multi_farm_in_single_seed() {
             root.borrow_runtime().current_block().block_height,
         );
         let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-        assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 1, 0, 0, to_yocto("1"));
+        assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 1, 0, 0, to_yocto("1"), 0);
         let unclaim = show_unclaim(&farming, farmer.account_id(), farm_id.clone(), false);
         assert_eq!(unclaim.0, to_yocto("1"));
     }
@@ -94,7 +94,7 @@ fn multi_farm_in_single_seed() {
 
     // println!("profile_data: {:#?} \n", out_come.profile_data());
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-    assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 1, 1, to_yocto("1"), 0);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 1, 1, to_yocto("1"), 0, 0);
     let unclaim = show_unclaim(&farming, farmer.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, 0_u128);
     println!("----->> Farmer claimed reward at #{}.", root.borrow_runtime().current_block().block_height);

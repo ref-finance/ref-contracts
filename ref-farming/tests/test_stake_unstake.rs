@@ -8,6 +8,8 @@ use crate::common::actions::*;
 mod common;
 
 
+/// staking, unstaking, staking again, half unstaking
+/// append staking
 #[test]
 fn one_farm_staking() {
     let root = init_simulator(None);
@@ -31,17 +33,19 @@ fn one_farm_staking() {
     );
     println!("----->> Liquidity added by farmer1.");
 
-
     // create farm
+    println!("----->> Creating farm.");
     let (farming, farm_id) = prepair_farm(&root, &owner, &token1, to_yocto("500"));
-    show_seedsinfo(&farming, false);
-    println!("----->> Farm {} is ready.", farm_id.clone());
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 0, 0, 0, 0, 0);
 
     // register LP for farming contract
+    println!("---->> Registering LP 0 for {}.", farming_id());
     call!(root, pool.mft_register("0".to_string(), to_va(farming_id())), deposit = to_yocto("1"))
     .assert_success();
-    println!("Registered LP 0 for {}.", farming_id());
+    
     // farmer1 register and stake liquidity token
+    println!("---->> Step01: Farmer1 register and stake liquidity token.");
     call!(farmer1, farming.storage_deposit(None, None), deposit = to_yocto("1"))
     .assert_success();
     let out_come = call!(
@@ -52,63 +56,99 @@ fn one_farm_staking() {
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-    assert_eq!(farm_info.cur_round.0, 0_u64);
-    assert_eq!(farm_info.last_round.0, 0_u64);
-    assert_eq!(farm_info.claimed_reward.0, 0_u128);
-    assert_eq!(farm_info.unclaimed_reward.0, 0_u128);
-    let user_seeds = show_userseeds(&farming, farmer1.account_id(), false);
-    assert_eq!(user_seeds.get(&String::from("swap@0")).unwrap().0, to_yocto("1"));
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 0, 0, 0, 0, 0);
     let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, 0_u128);
-    show_seedsinfo(&farming, false);
-    println!("----->> Farmer1 staked liquidity at #{}.", root.borrow_runtime().current_block().block_height);
+    println!("  Farmer1 staked liquidity at #{}.", root.borrow_runtime().current_block().block_height);
 
-    // chain goes for 60 blocks
+    println!("---->> Step02: Farmer1 unstake seeds after 60 blocks************");
     assert!(root.borrow_runtime_mut().produce_blocks(60).is_ok());
-    println!();
-    println!("*** Chain goes for 60 blocks *** now height: {}", 
-        root.borrow_runtime().current_block().block_height,
-    );
-    let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
-    assert_eq!(unclaim.0, to_yocto("1"));
-    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-
-    // farmer1 unstake
-    println!();
-    println!("********** Farmer1 unstake seeds ************");
+    println!("  Chain goes for 60 blocks *** now height: {}", root.borrow_runtime().current_block().block_height);
     let out_come = call!(
         farmer1,
         farming.withdraw_seed(format!("{}@0", swap()), to_yocto("1").into()),
         deposit = 1
     );
     out_come.assert_success();
-    println!("----->> Farmer1 unstake seeds at #{}.", root.borrow_runtime().current_block().block_height);
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 1, 1, to_yocto("1"), 0, 0);
+    println!("  Farmer1 unstake seeds at #{}.", root.borrow_runtime().current_block().block_height);
 
-    // chain goes for 120 blocks
+    println!("---->> Step03: Farmer1 staking liquidity again after 120 blocks.");
     assert!(root.borrow_runtime_mut().produce_blocks(120).is_ok());
-    println!();
-    println!("*** Chain goes for 120 blocks *** now height: {}", 
-        root.borrow_runtime().current_block().block_height,
+    println!("  Chain goes for 120 blocks *** now height: {}", root.borrow_runtime().current_block().block_height);
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 3, 1, to_yocto("1"), to_yocto("2"), 0);
+    let out_come = call!(
+        farmer1,
+        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("0.5").into(), None, "".to_string()),
+        deposit = 1
     );
+    out_come.assert_success();
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 3, 3, to_yocto("3"), 0, to_yocto("2"));
+    println!("  Farmer1 staked liquidity again at #{}.", root.borrow_runtime().current_block().block_height);
 
+    println!("---->> Step04: Farmer1 append staking liquidity after 60 blocks.");
+    assert!(root.borrow_runtime_mut().produce_blocks(60).is_ok());
+    println!("  Chain goes for 60 blocks *** now height: {}", root.borrow_runtime().current_block().block_height);
+    let out_come = call!(
+        farmer1,
+        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("0.5").into(), None, "".to_string()),
+        deposit = 1
+    );
+    out_come.assert_success();
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 4, 4, to_yocto("4"), 0, to_yocto("2"));
+    println!("  Farmer1 append staking liquidity at #{}.", root.borrow_runtime().current_block().block_height);
+
+    println!("---->> Step05: Farmer1 unstake half seeds after 60 blocks************");
+    assert!(root.borrow_runtime_mut().produce_blocks(60).is_ok());
+    println!("  Chain goes for 60 blocks *** now height: {}", root.borrow_runtime().current_block().block_height);
+    let out_come = call!(
+        farmer1,
+        farming.withdraw_seed(format!("{}@0", swap()), to_yocto("0.5").into()),
+        deposit = 1
+    );
+    out_come.assert_success();
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 5, 5, to_yocto("5"), 0, to_yocto("2"));
+    println!("  Farmer1 unstake half seeds at #{}.", root.borrow_runtime().current_block().block_height);
+
+    println!("---->> Step06: Farmer1 unstake another half seeds after 60 blocks************");
+    assert!(root.borrow_runtime_mut().produce_blocks(60).is_ok());
+    println!("  Chain goes for 60 blocks *** now height: {}", root.borrow_runtime().current_block().block_height);
+    let out_come = call!(
+        farmer1,
+        farming.withdraw_seed(format!("{}@0", swap()), to_yocto("0.5").into()),
+        deposit = 1
+    );
+    out_come.assert_success();
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 6, 6, to_yocto("6"), 0, to_yocto("2"));
+    println!("  Farmer1 unstake another half seeds at #{}.", root.borrow_runtime().current_block().block_height);
+
+    println!("---->> Step07: Farmer1 staking liquidity after 60 blocks.");
+    assert!(root.borrow_runtime_mut().produce_blocks(60).is_ok());
+    println!("  Chain goes for 60 blocks *** now height: {}", root.borrow_runtime().current_block().block_height);
     let out_come = call!(
         farmer1,
         pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
         deposit = 1
     );
     out_come.assert_success();
-    println!("----->> Farmer1 staked liquidity again at #{}.", root.borrow_runtime().current_block().block_height);
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 7, 7, to_yocto("7"), 0, to_yocto("3"));
+    println!("  Farmer1 staking liquidity at #{}.", root.borrow_runtime().current_block().block_height);
 
-    // chain goes for 120 blocks
-    assert!(root.borrow_runtime_mut().produce_blocks(120).is_ok());
-    println!();
-    println!("*** Chain goes for 120 blocks *** now height: {}", 
-        root.borrow_runtime().current_block().block_height,
-    );
 
-    // farmer1 claim reward
-    println!();
-    println!("********** Farmer1 claim reward by farm_id ************");
+    println!("----->> Step08: Farmer1 claiming reward by farm_id after 60 blocks ************");
+    assert!(root.borrow_runtime_mut().produce_blocks(60).is_ok());
+    println!("  Chain goes for 60 blocks *** now height: {}", root.borrow_runtime().current_block().block_height);
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 8, 7, to_yocto("7"), to_yocto("1"), to_yocto("3"));
+    let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
+    assert_eq!(unclaim.0, to_yocto("1"));
     let out_come = call!(
         farmer1,
         farming.claim_reward_by_farm(farm_id.clone()),
@@ -116,8 +156,9 @@ fn one_farm_staking() {
     );
     out_come.assert_success();
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 8, 8, to_yocto("8"), 0, to_yocto("3"));
     let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, 0_u128);
-    println!("----->> Farmer1 claimed reward at #{}.", root.borrow_runtime().current_block().block_height);
+    println!("  Farmer1 claimed reward at #{}.", root.borrow_runtime().current_block().block_height);
 }
 
