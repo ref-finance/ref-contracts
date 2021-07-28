@@ -13,6 +13,8 @@ impl Contract {
     #[payable]
     pub fn create_simple_farm(&mut self, terms: HRSimpleFarmTerms, min_deposit: Option<U128>) -> FarmId {
 
+        self.assert_owner();
+        
         let prev_storage = env::storage_usage();
 
         let min_deposit: u128 = min_deposit.unwrap_or(U128(MIN_SEED_DEPOSIT)).0;

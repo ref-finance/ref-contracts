@@ -43,7 +43,7 @@ pub(crate) fn prepair_farm(
     
     let farming = deploy_farming(&root, farming_id(), owner.account_id());
     let out_come = call!(
-        root,
+        owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", swap()),
             reward_token: to_va(token.account_id()),
@@ -102,7 +102,7 @@ pub(crate) fn prepair_multi_farms(
 
     for _ in 0..farm_count {
         let out_come = call!(
-            root,
+            owner,
             farming.create_simple_farm(HRSimpleFarmTerms{
                 seed_id: format!("{}@0", swap()),
                 reward_token: to_va(token.account_id()),

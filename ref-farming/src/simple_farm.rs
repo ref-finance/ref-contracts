@@ -161,14 +161,10 @@ impl SimpleFarm {
 
     pub(crate) fn try_distribute(&self, total_seeds: &Balance) -> Option<SimpleFarmRewardDistribution> {
 
-        // if total_seeds == 0, then contract itself takes rewrad
-
-        // assert!(
-        //     total_seeds != &0_u128,
-        //     "{}", ERR500
-        // );
-
         if let SimpleFarmStatus::Running = self.status {
+            if env::block_index() < self.terms.start_at {
+                return None;
+            }
             let mut dis = self.last_distribution.clone();
             // calculate rr according to cur_height
             dis.rr = (env::block_index() - self.terms.start_at) / self.terms.session_interval;
