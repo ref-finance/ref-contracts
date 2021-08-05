@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::json_types::{ValidAccountId, U128, U64};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
 
@@ -39,8 +39,32 @@ impl From<Pool> for PoolInfo {
     }
 }
 
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Metadata {
+    pub version: String,
+    pub owner_id: AccountId,
+    pub pool_count: U64,
+    pub whitelist_count: U64,
+    pub fee_policy: InternalFeesRatio,
+}
+
+
 #[near_bindgen]
 impl Contract {
+
+    /// meta_data of this contract
+    pub fn get_metadata(&self) -> Metadata {
+        Metadata {
+            owner_id: self.owner_id.clone(),
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            pool_count: self.pools.len().into(),
+            whitelist_count: self.whitelisted_tokens.len().into(),
+            fee_policy: self.fee_policy.clone(),
+        }
+    }
+
     /// Returns semver of this contract.
     pub fn version(&self) -> String {
         env!("CARGO_PKG_VERSION").to_string()
