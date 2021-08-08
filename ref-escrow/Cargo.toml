@@ -1,0 +1,17 @@
+[package]
+name = "ref-escrow"
+version = "0.1.0"
+authors = ["referencedev <goi65io3903d@protonmail.com>"]
+edition = "2018"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+near-sdk = "3.1.0"
+near-contract-standards = "3.1.0"
+
+[dev-dependencies]
+near-sdk-sim = "3.1.0"
+test-token = { path = "../test-token" }
