@@ -8,6 +8,9 @@ This mono repo contains the source code for the smart contracts of Ref Finance o
 | - | - | - |
 | [test-token](test-token/src/lib.rs) | - | Test token contract |
 | [ref-exchange](ref-exchange/src/lib.rs) | [docs](https://ref-finance.gitbook.io/ref-finance/smart-contracts/ref-exchange) | Main exchange contract, that allows to deposit and withdraw tokens, exchange them via various pools |
+| ref-farm | TODO | TODO |
+| [ref-escrow](ref-escrow/src/lib.rs) | TODO | Escrow contract for OTC and limit orders |
+
 
 ## Development
 
