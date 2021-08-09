@@ -133,8 +133,8 @@ impl MFTTokenReceiver for Contract {
             TokenOrPool::Pool(pool_id) => {
                 seed_id = format!("{}{}{}", env::predecessor_account_id(), MFT_TAG, pool_id);
             }
-            TokenOrPool::Token(token_id) => {
-                seed_id = token_id;
+            TokenOrPool::Token(_) => {
+                seed_id = env::predecessor_account_id();
             }
         }
 
