@@ -182,7 +182,8 @@ impl SimplePool {
             result.push(amount);
         }
         if prev_shares_amount == shares {
-            self.shares.remove(&sender_id);
+            // hotfix_lp_unregister
+            // self.shares.remove(&sender_id);
         } else {
             self.shares
                 .insert(&sender_id, &(prev_shares_amount - shares));
