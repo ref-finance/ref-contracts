@@ -32,7 +32,10 @@ impl Contract {
         referral_id: Option<AccountId>,
         actions: &[Action],
     ) -> Vec<(AccountId, Balance)> {
+        // [AUDIT_12] always save back account for a resident user
+        let mut is_resident_user: bool = true;
         let mut initial_account = self.accounts.get(sender_id).unwrap_or_else(|| {
+            is_resident_user = false;
             if !force {
                 env::panic(ERR10_ACC_NOT_REGISTERED.as_bytes());
             } else {
@@ -45,7 +48,8 @@ impl Contract {
             &mut account,
             &referral_id,
             &actions,
-            ActionResult::Amount(amount_in),
+            // [AUDIT_02]
+            ActionResult::Amount(U128(amount_in)),
         );
         let mut result = vec![];
         for (token, amount) in account.tokens.clone().into_iter() {
@@ -61,8 +65,8 @@ impl Contract {
                 }
             }
         }
-        if !force {
-            // If not forced, make sure there is enough deposit to add all tokens to the account.
+        // [AUDIT_12] always save back account for a resident user
+        if is_resident_user {
             // To avoid race conditions, we actually going to insert 0 to all changed tokens and save that.
             self.internal_save_account(sender_id, account);
         }

@@ -58,6 +58,7 @@ impl SimplePool {
             total_fee,
             exchange_fee,
             referral_fee,
+            // [AUDIT_11_reject]
             shares: LookupMap::new(format!("s{}", id).into_bytes()),
             shares_total_supply: 0,
         }

@@ -32,6 +32,8 @@ enum TokenOrPool {
     Pool(u64),
 }
 
+/// [AUDIT_06_postpone]
+/// make digital to #nn partern to avoid conflict with possible token account id
 fn parse_token_id(token_id: String) -> TokenOrPool {
     if let Ok(pool_id) = str::parse::<u64>(&token_id) {
         TokenOrPool::Pool(pool_id)

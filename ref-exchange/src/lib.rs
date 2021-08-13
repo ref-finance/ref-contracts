@@ -80,36 +80,6 @@ impl Contract {
         )))
     }
 
-    /// Executes generic set of actions.
-    /// If referrer provided, pays referral_fee to it.
-    /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
-    pub fn execute_actions(
-        &mut self,
-        actions: Vec<Action>,
-        referral_id: Option<ValidAccountId>,
-    ) -> ActionResult {
-        let sender_id = env::predecessor_account_id();
-        let mut account = self.get_account_deposits(&sender_id);
-        // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
-        if env::attached_deposit() == 0 {
-            for action in &actions {
-                for token in action.tokens() {
-                    assert!(
-                        account.tokens.contains_key(&token)
-                            || self.whitelisted_tokens.contains(&token),
-                        "{}",
-                        ERR26_ACCESS_KEY_NOT_ALLOWED
-                    );
-                }
-            }
-        }
-        let referral_id = referral_id.map(|r| r.into());
-        let result =
-            self.internal_execute_actions(&mut account, &referral_id, &actions, ActionResult::None);
-        self.internal_save_account(&sender_id, account);
-        result
-    }
-
     /// Execute set of swap actions between pools.
     /// If referrer provided, pays referral_fee to it.
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
@@ -195,6 +165,39 @@ impl Contract {
 
 /// Internal methods implementation.
 impl Contract {
+
+    /// [AUDIT_03] [AUDIT_04]
+    /// Executes generic set of actions.
+    /// If referrer provided, pays referral_fee to it.
+    /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
+    fn execute_actions(
+        &mut self,
+        actions: Vec<Action>,
+        referral_id: Option<ValidAccountId>,
+    ) -> ActionResult {
+        let sender_id = env::predecessor_account_id();
+        let mut account = self.get_account_deposits(&sender_id);
+        // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
+        if env::attached_deposit() == 0 {
+            for action in &actions {
+                for token in action.tokens() {
+                    assert!(
+                        account.tokens.contains_key(&token)
+                            || self.whitelisted_tokens.contains(&token),
+                        "{}",
+                        // [AUDIT_05]
+                        ERR27_DEPOSIT_NEEDED
+                    );
+                }
+            }
+        }
+        let referral_id = referral_id.map(|r| r.into());
+        let result =
+            self.internal_execute_actions(&mut account, &referral_id, &actions, ActionResult::None);
+        self.internal_save_account(&sender_id, account);
+        result
+    }
+
     /// Check how much storage taken costs and refund the left over back.
     fn internal_check_storage(&self, prev_storage: StorageUsage) {
         let storage_cost = env::storage_usage()
@@ -260,7 +263,8 @@ impl Contract {
                     referral_id,
                 );
                 account.deposit(&swap_action.token_out, amount_out);
-                ActionResult::Amount(amount_out)
+                // [AUDIT_02]
+                ActionResult::Amount(U128(amount_out))
             }
         }
     }
@@ -657,7 +661,7 @@ mod tests {
 
     /// Check that can not swap non whitelisted tokens when attaching 0 deposit (access key).
     #[test]
-    #[should_panic(expected = "E26: access key not allowed")]
+    #[should_panic(expected = "E27: deposit needed when swapping with token not in whitelist")]
     fn test_fail_swap_not_whitelisted() {
         let (mut context, mut contract) = setup_contract();
         deposit_tokens(
