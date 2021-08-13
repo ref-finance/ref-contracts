@@ -419,7 +419,7 @@ mod tests {
             shares_total_supply: 35967818779820559673547466,
             shares: LookupMap::new(b"s0".to_vec()),
         };
-        let mut amounts = vec![145782, 0];
+        let mut amounts = vec![145782, 1];
         let _ = pool.add_liquidity(&accounts(2).to_string(), &mut amounts);
     }
 }
