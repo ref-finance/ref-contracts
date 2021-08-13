@@ -534,7 +534,7 @@ mod tests {
 
     /// Deny pool with a single token
     #[test]
-    #[should_panic(expected = "ERR_NOT_ENOUGH_TOKENS")]
+    #[should_panic(expected = "ERR_SHOULD_HAVE_2_TOKENS")]
     fn test_deny_single_token_pool() {
         let (mut context, mut contract) = setup_contract();
         create_pool_with_liquidity(
@@ -547,7 +547,7 @@ mod tests {
 
     /// Deny pool with a single token
     #[test]
-    #[should_panic(expected = "ERR_TOO_MANY_TOKENS")]
+    #[should_panic(expected = "ERR_SHOULD_HAVE_2_TOKENS")]
     fn test_deny_too_many_tokens_pool() {
         let (mut context, mut contract) = setup_contract();
         create_pool_with_liquidity(

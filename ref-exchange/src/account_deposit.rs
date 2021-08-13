@@ -43,13 +43,20 @@ impl Account {
 
     /// Returns amount of $NEAR necessary to cover storage used by this data structure.
     pub fn storage_usage(&self) -> Balance {
-        (MIN_ACCOUNT_DEPOSIT_LENGTH + self.tokens.len() as u128 * (MAX_ACCOUNT_LENGTH + 16))
+        // [AUDIT_01]
+        (MIN_ACCOUNT_DEPOSIT_LENGTH + self.tokens.len() as u128 * (4 + MAX_ACCOUNT_LENGTH + 16))
             * env::storage_byte_cost()
     }
 
     /// Returns how much NEAR is available for storage.
     pub fn storage_available(&self) -> Balance {
-        self.near_amount - self.storage_usage()
+        // [AUDIT_01]
+        let locked = self.storage_usage();
+        if self.near_amount > locked {
+            self.near_amount - locked
+        } else {
+            0
+        }
     }
 
     /// Asserts there is sufficient amount of $NEAR to cover storage usage.

@@ -1,4 +1,4 @@
-use near_contract_standards::fungible_token::metadata::{FungibleTokenMetadata, FT_METADATA_SPEC};
+use near_contract_standards::fungible_token::metadata::{FungibleTokenMetadata};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{ext_contract, near_bindgen, Balance, PromiseOrValue};
 
@@ -50,6 +50,8 @@ impl Contract {
         amount: u128,
         memo: Option<String>,
     ) {
+        // [AUDIT_07]
+        assert_ne!(sender_id, receiver_id, "{}", ERR33_TRANSFER_TO_SELF);
         match parse_token_id(token_id) {
             TokenOrPool::Pool(pool_id) => {
                 let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
@@ -235,7 +237,8 @@ impl Contract {
     pub fn mft_metadata(&self, token_id: String) -> FungibleTokenMetadata {
         match parse_token_id(token_id) {
             TokenOrPool::Pool(pool_id) => FungibleTokenMetadata {
-                spec: FT_METADATA_SPEC.to_string(),
+                // [AUDIT_08]
+                spec: "mft-1.0.0".to_string(),
                 name: format!("ref-pool-{}", pool_id),
                 symbol: format!("REF-POOL-{}", pool_id),
                 icon: None,
