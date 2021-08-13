@@ -179,7 +179,8 @@ impl SimplePool {
             result.push(amount);
         }
         if prev_shares_amount == shares {
-            self.shares.remove(&sender_id);
+            // hotfix for freezing unregister
+            // self.shares.remove(&sender_id);
         } else {
             self.shares
                 .insert(&sender_id, &(prev_shares_amount - shares));
@@ -418,7 +419,7 @@ mod tests {
             shares_total_supply: 35967818779820559673547466,
             shares: LookupMap::new(b"s0".to_vec()),
         };
-        let mut amounts = vec![145782, 1];
+        let mut amounts = vec![145782, 0];
         let _ = pool.add_liquidity(&accounts(2).to_string(), &mut amounts);
     }
 }
