@@ -19,3 +19,5 @@ pub const ERR25_CALLBACK_POST_WITHDRAW_INVALID: &str =
 
 pub const ERR31_ZERO_AMOUNT: &str = "E31: adding zero amount";
 pub const ERR32_ZERO_SHARES: &str = "E32: minting zero shares";
+// [AUDIT_07]
+pub const ERR33_TRANSFER_TO_SELF: &str = "E33: transfer to self";

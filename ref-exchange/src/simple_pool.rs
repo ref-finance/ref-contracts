@@ -49,11 +49,8 @@ impl SimplePool {
             total_fee < FEE_DIVISOR && (exchange_fee + referral_fee) <= total_fee,
             "ERR_FEE_TOO_LARGE"
         );
-        assert_ne!(token_account_ids.len(), 1, "ERR_NOT_ENOUGH_TOKENS");
-        assert!(
-            token_account_ids.len() <= MAX_NUM_TOKENS,
-            "ERR_TOO_MANY_TOKENS"
-        );
+        // [AUDIT_10]
+        assert_eq!(token_account_ids.len(), MAX_NUM_TOKENS, "ERR_SHOULD_HAVE_2_TOKENS");
         Self {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
             amounts: vec![0u128; token_account_ids.len()],
