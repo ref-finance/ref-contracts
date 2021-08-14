@@ -2,10 +2,14 @@ use std::collections::HashMap;
 
 use near_contract_standards::storage_management::{StorageBalance, StorageBalanceBounds};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::collections::LookupMap;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{assert_one_yocto, env, log, AccountId, Balance, Promise, StorageUsage};
 use std::convert::TryInto;
+
+/// Max account length is 64 + 4 bytes for serialization.
+const MAX_ACCOUNT_LENGTH: u64 = 68;
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
@@ -19,14 +23,6 @@ pub struct Account {
 }
 
 impl Account {
-    pub fn new(near_amount: Balance) -> Self {
-        Self {
-            near_amount: U128(near_amount),
-            num_offers: 0,
-            amounts: HashMap::new(),
-        }
-    }
-
     pub fn add_offer(&mut self) {
         self.num_offers += 1;
         self.assert_storage();
@@ -56,7 +52,10 @@ impl Account {
 
     fn storage_used(&self) -> StorageUsage {
         // Single Offer is up to 320 bytes.
-        (self.amounts.len() as u64) * (64 + 16) + 16 + 4 + (self.num_offers as u64) * 320
+        (self.amounts.len() as u64) * (MAX_ACCOUNT_LENGTH + 16)
+            + 16
+            + 4
+            + (self.num_offers as u64) * 320
     }
 
     pub fn assert_storage(&self) {
@@ -68,6 +67,14 @@ impl Account {
 }
 
 impl AccountStorage for Account {
+    fn new(near_amount: Balance) -> Self {
+        Self {
+            near_amount: U128(near_amount),
+            num_offers: 0,
+            amounts: HashMap::new(),
+        }
+    }
+
     fn storage_total(&self) -> Balance {
         self.near_amount.0
     }
@@ -79,43 +86,83 @@ impl AccountStorage for Account {
     fn min_storage_usage() -> Balance {
         16 + 4
     }
+
+    fn remove(&self, _force: bool) {
+        // TODO: currently doesn't reassign.
+    }
 }
 
 /// Trait for account to manage it's internal storage.
-pub trait AccountStorage {
+pub trait AccountStorage: BorshSerialize + BorshDeserialize {
+    fn new(near_amount: Balance) -> Self;
     fn storage_total(&self) -> Balance;
     fn storage_available(&self) -> Balance;
     fn min_storage_usage() -> Balance;
+
+    /// Should handle removing account.
+    /// If not `force` can fail if account is not ready to be removed.
+    /// If `force` should re-assign any resources to owner or alternative and remove the account.
+    fn remove(&self, force: bool);
+}
+
+/// Manages user accounts in the contract.
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct AccountManager<Account>
+where
+    Account: AccountStorage,
+{
+    accounts: LookupMap<AccountId, Account>,
 }
 
 /// Generic account manager that handles storage and updates of accounts.
-pub trait AccountManager {
-    type Account: AccountStorage;
+impl<Account> AccountManager<Account>
+where
+    Account: AccountStorage,
+{
+    pub fn new() -> Self {
+        Self {
+            accounts: LookupMap::new(b"a".to_vec()),
+        }
+    }
 
-    fn new_account(&self, near_amount: Balance) -> Self::Account;
-    fn get_account(&self, account_id: &AccountId) -> Option<Self::Account>;
-    fn set_account(&mut self, account_id: &AccountId, account: &Self::Account);
-    fn remove_account(&mut self, account_id: &AccountId);
+    /// Get account from the storage.
+    pub fn get_account(&self, account_id: &AccountId) -> Option<Account> {
+        self.accounts.get(account_id)
+    }
 
-    fn get_account_or(&self, account_id: &AccountId) -> Self::Account {
+    /// Set account to the storage.
+    pub fn set_account(&mut self, account_id: &AccountId, account: &Account) {
+        self.accounts.insert(account_id, account);
+    }
+
+    /// Should handle removing account from storage.
+    /// If not `force` can fail if account is not ready to be removed.
+    /// If `force` should re-assign any resources to owner or alternative and remove the account.
+    pub fn remove_account(&mut self, account_id: &AccountId, force: bool) {
+        let account = self.get_account_or(account_id);
+        account.remove(force);
+        self.accounts.remove(account_id);
+    }
+
+    pub fn get_account_or(&self, account_id: &AccountId) -> Account {
         self.get_account(account_id).expect("ERR_MISSING_ACCOUNT")
     }
 
-    fn update_account<F>(&mut self, account_id: &AccountId, f: F)
+    pub fn update_account<F>(&mut self, account_id: &AccountId, f: F)
     where
-        F: Fn(&mut Self::Account),
+        F: Fn(&mut Account),
     {
         let mut account = self.get_account_or(account_id);
         f(&mut account);
         self.set_account(&account_id, &account);
     }
 
-    fn internal_register_account(&mut self, account_id: &AccountId, near_amount: Balance) {
-        let account = self.new_account(near_amount);
+    pub fn internal_register_account(&mut self, account_id: &AccountId, near_amount: Balance) {
+        let account = Account::new(near_amount);
         self.set_account(account_id, &account);
     }
 
-    fn internal_storage_deposit(
+    pub fn internal_storage_deposit(
         &mut self,
         account_id: Option<ValidAccountId>,
         registration_only: Option<bool>,
@@ -151,7 +198,7 @@ pub trait AccountManager {
             .unwrap()
     }
 
-    fn internal_storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
+    pub fn internal_storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
         assert_one_yocto();
         let account_id = env::predecessor_account_id();
         let account = self.get_account_or(&account_id);
@@ -164,14 +211,11 @@ pub trait AccountManager {
     }
 
     /// Unregisters the account.
-    /// Right now always forced. TODO
-    #[allow(unused_variables)]
-    fn internal_storage_unregister(&mut self, force: Option<bool>) -> bool {
+    pub fn internal_storage_unregister(&mut self, force: Option<bool>) -> bool {
         assert_one_yocto();
         let account_id = env::predecessor_account_id();
         if let Some(account) = self.get_account(&account_id) {
-            // TODO: figure out criteria when it's possible and not possible to unregister.
-            self.remove_account(&account_id);
+            self.remove_account(&account_id, force.unwrap_or(false));
             Promise::new(account_id.clone()).transfer(account.storage_total());
             true
         } else {
@@ -179,14 +223,17 @@ pub trait AccountManager {
         }
     }
 
-    fn internal_storage_balance_bounds(&self) -> StorageBalanceBounds {
+    pub fn internal_storage_balance_bounds(&self) -> StorageBalanceBounds {
         StorageBalanceBounds {
-            min: Self::Account::min_storage_usage().into(),
+            min: Account::min_storage_usage().into(),
             max: None,
         }
     }
 
-    fn internal_storage_balance_of(&self, account_id: ValidAccountId) -> Option<StorageBalance> {
+    pub fn internal_storage_balance_of(
+        &self,
+        account_id: ValidAccountId,
+    ) -> Option<StorageBalance> {
         self.get_account(account_id.as_ref())
             .map(|account| StorageBalance {
                 total: U128(account.storage_total()),

@@ -8,8 +8,8 @@ use near_sdk::collections::LookupMap;
 use near_sdk::json_types::{ValidAccountId, WrappedDuration, WrappedTimestamp, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
-    assert_one_yocto, env, ext_contract, near_bindgen, serde_json, AccountId, Balance, Gas,
-    PanicOnDefault, Promise, PromiseOrValue, PromiseResult,
+    assert_one_yocto, env, ext_contract, near_bindgen, serde_json, AccountId, Gas, PanicOnDefault,
+    Promise, PromiseOrValue, PromiseResult,
 };
 
 pub use crate::account::{Account, AccountManager};
@@ -66,7 +66,7 @@ pub struct Offer {
 pub struct Contract {
     last_offer_id: u32,
     offers: LookupMap<u32, Offer>,
-    accounts: LookupMap<AccountId, Account>,
+    account_manager: AccountManager<Account>,
 }
 
 #[near_bindgen]
@@ -76,7 +76,7 @@ impl Contract {
         Self {
             last_offer_id: 0,
             offers: LookupMap::new(b"o".to_vec()),
-            accounts: LookupMap::new(b"a".to_vec()),
+            account_manager: AccountManager::new(),
         }
     }
 
@@ -85,9 +85,9 @@ impl Contract {
     pub fn withdraw(&mut self, token_id: ValidAccountId, amount: U128) -> Promise {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
-        let mut account = self.accounts.get(&sender_id).expect("ERR_MISSING_ACCOUNT");
-        account.withdraw(token_id.as_ref(), amount.0);
-        self.accounts.insert(&sender_id, &account);
+        self.account_manager.update_account(&sender_id, |account| {
+            account.withdraw(token_id.as_ref(), amount.0);
+        });
         ext_fungible_token::ft_transfer(
             sender_id.clone(),
             amount,
@@ -123,9 +123,9 @@ impl Contract {
             PromiseResult::Successful(_) => {}
             PromiseResult::Failed => {
                 // This reverts the changes from withdraw function. If account doesn't exit, deposits to the owner's account.
-                if let Some(mut account) = self.accounts.get(&sender_id) {
+                if let Some(mut account) = self.account_manager.get_account(&sender_id) {
                     account.deposit(&token_id, amount.0);
-                    self.accounts.insert(&sender_id, &account);
+                    self.account_manager.set_account(&sender_id, &account);
                 } else {
                     // TODO: figure out where to send money in this case?
                     env::log(
@@ -152,10 +152,10 @@ impl Contract {
             "ERR_CAN_NOT_CLOSE_OFFER_YET"
         );
         self.offers.remove(&offer_id);
-        let mut account = self.accounts.get(&sender_id).expect("ERR_MISSING_ACCOUNT");
-        account.remove_offer();
-        account.deposit(&offer.offer_token_id, offer.offer_amount.0);
-        self.accounts.insert(&sender_id, &account);
+        self.account_manager.update_account(&sender_id, |account| {
+            account.remove_offer();
+            account.deposit(&offer.offer_token_id, offer.offer_amount.0);
+        });
     }
 
     pub fn get_offer(&self, offer_id: u32) -> Offer {
@@ -173,9 +173,7 @@ impl Contract {
     }
 
     pub fn get_account(&self, account_id: ValidAccountId) -> Account {
-        self.accounts
-            .get(account_id.as_ref())
-            .expect("ERR_MISSING_ACCOUNT")
+        self.account_manager.get_account_or(account_id.as_ref())
     }
 }
 
@@ -200,9 +198,10 @@ impl FungibleTokenReceiver for Contract {
                 max_offer_time,
             } => {
                 // Account must be registered and have enough space for an extra offer.
-                self.update_account(&sender_id.as_ref(), move |account| {
-                    account.add_offer();
-                });
+                self.account_manager
+                    .update_account(&sender_id.as_ref(), move |account| {
+                        account.add_offer();
+                    });
                 self.offers.insert(
                     &self.last_offer_id,
                     &Offer {
@@ -232,14 +231,13 @@ impl FungibleTokenReceiver for Contract {
                     env::block_timestamp() < offer.offer_max_expiry.0,
                     "ERR_OFFER_EXPIRED"
                 );
-                let mut offerer_account = self
-                    .accounts
-                    .get(&offer.offerer)
-                    .expect("ERR_MISSING_ACCOUNT");
-                let mut taker_account = self
-                    .accounts
-                    .get(sender_id.as_ref())
-                    .expect("ERR_MISSING_ACCOUNT");
+                assert_ne!(
+                    &offer.offerer,
+                    sender_id.as_ref(),
+                    "ERR_OFFER_CAN_NOT_SELF_TAKE"
+                );
+                let mut offerer_account = self.account_manager.get_account_or(&offer.offerer);
+                let mut taker_account = self.account_manager.get_account_or(sender_id.as_ref());
                 assert_eq!(offer.take_token_id, token_id, "ERR_WRONG_TAKE_TOKEN");
                 assert!(amount.0 >= offer.take_min_amount.0, "ERR_NOT_ENOUGH_AMOUNT");
                 if let Some(taker) = offer.taker {
@@ -249,32 +247,14 @@ impl FungibleTokenReceiver for Contract {
                 offerer_account.remove_offer();
                 offerer_account.deposit(&offer.take_token_id, amount.0);
                 taker_account.deposit(&offer.offer_token_id, offer.offer_amount.0);
-                self.accounts.insert(&offer.offerer, &offerer_account);
-                self.accounts.insert(sender_id.as_ref(), &taker_account);
+                self.account_manager
+                    .set_account(&offer.offerer, &offerer_account);
+                self.account_manager
+                    .set_account(sender_id.as_ref(), &taker_account);
 
                 PromiseOrValue::Value(U128(0))
             }
         }
-    }
-}
-
-impl AccountManager for Contract {
-    type Account = Account;
-
-    fn new_account(&self, near_amount: Balance) -> Self::Account {
-        Account::new(near_amount)
-    }
-
-    fn get_account(&self, account_id: &AccountId) -> Option<Self::Account> {
-        self.accounts.get(account_id)
-    }
-
-    fn set_account(&mut self, account_id: &AccountId, account: &Self::Account) {
-        self.accounts.insert(account_id, account);
-    }
-
-    fn remove_account(&mut self, account_id: &AccountId) {
-        self.accounts.remove(account_id);
     }
 }
 
@@ -286,24 +266,25 @@ impl StorageManagement for Contract {
         account_id: Option<ValidAccountId>,
         registration_only: Option<bool>,
     ) -> StorageBalance {
-        self.internal_storage_deposit(account_id, registration_only)
+        self.account_manager
+            .internal_storage_deposit(account_id, registration_only)
     }
 
     #[payable]
     fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
-        self.internal_storage_withdraw(amount)
+        self.account_manager.internal_storage_withdraw(amount)
     }
 
     #[payable]
     fn storage_unregister(&mut self, force: Option<bool>) -> bool {
-        self.internal_storage_unregister(force)
+        self.account_manager.internal_storage_unregister(force)
     }
 
     fn storage_balance_bounds(&self) -> StorageBalanceBounds {
-        self.internal_storage_balance_bounds()
+        self.account_manager.internal_storage_balance_bounds()
     }
 
     fn storage_balance_of(&self, account_id: ValidAccountId) -> Option<StorageBalance> {
-        self.internal_storage_balance_of(account_id)
+        self.account_manager.internal_storage_balance_of(account_id)
     }
 }
