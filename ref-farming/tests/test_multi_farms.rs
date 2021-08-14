@@ -35,7 +35,7 @@ fn multi_farm_in_single_seed() {
     println!("----->> Liquidity added by farmer.");
 
     // create farm with token1, max support 25 active farms in one seed
-    let (farming, farm_ids) = prepair_multi_farms(&root, &owner, &token1, to_yocto("10"), 10);
+    let (farming, farm_ids) = prepair_multi_farms(&root, &owner, &token1, to_yocto("10"), 20);
     let farm_id = farm_ids[farm_ids.len() - 1].clone();
     println!("----->> Farm till {} is ready.", farm_id.clone());
 
@@ -49,7 +49,7 @@ fn multi_farm_in_single_seed() {
     println!("----->> Registered farmer to {}.", farming_id());
     let out_come = call!(
         farmer,
-        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
+        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("0.5").into(), None, "".to_string()),
         deposit = 1
     );
     out_come.assert_success();
@@ -57,7 +57,7 @@ fn multi_farm_in_single_seed() {
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
     assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 0, 0, 0, 0, 0);
     let user_seeds = show_userseeds(&farming, farmer.account_id(), false);
-    assert_eq!(user_seeds.get(&String::from("swap@0")).unwrap().0, to_yocto("1"));
+    assert_eq!(user_seeds.get(&String::from("swap@0")).unwrap().0, to_yocto("0.5"));
     let unclaim = show_unclaim(&farming, farmer.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, 0_u128);
     show_seedsinfo(&farming, false);
@@ -103,17 +103,37 @@ fn multi_farm_in_single_seed() {
     assert_eq!(unclaim.0, 0_u128);
     println!("----->> Farmer claimed reward at #{}.", root.borrow_runtime().current_block().block_height);
 
-    let farms_info = show_farms_by_seed(&farming, String::from("swap@0"), false);
+    // chain goes for 60 blocks
+    if root.borrow_runtime_mut().produce_blocks(60).is_ok() {
+        println!();
+        println!("*** Chain goes for 60 blocks *** now height: {}", 
+            root.borrow_runtime().current_block().block_height,
+        );
+        let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+        assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 2, 1, to_yocto("1"), to_yocto("1"), 0);
+        let unclaim = show_unclaim(&farming, farmer.account_id(), farm_id.clone(), false);
+        assert_eq!(unclaim.0, to_yocto("1"));
+    }
 
-    // // chain goes for 60 blocks
-    // if root.borrow_runtime_mut().produce_blocks(60).is_ok() {
-    //     println!();
-    //     println!("*** Chain goes for 60 blocks *** now height: {}", 
-    //         root.borrow_runtime().current_block().block_height,
-    //     );
-    //     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-    //     assert_farming(&farm_info, "Ended".to_string(), to_yocto("10"), 10, 10, to_yocto("10"), 0);
-    // }
+    // add lptoken
+    println!();
+    println!("********** Farmer add seed ************");
+    let out_come = call!(
+        farmer,
+        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("0.5").into(), None, "".to_string()),
+        deposit = 1
+    );
+    out_come.assert_success();
+    println!("\ntokens_burnt: {} Near", (out_come.tokens_burnt()) as f64 / 1e24);
+    println!("Gas_burnt: {} TGas \n", (out_come.gas_burnt()) as f64 / 1e12);
+
+    let user_seeds = show_userseeds(&farming, farmer.account_id(), false);
+    assert_eq!(user_seeds.get(&String::from("swap@0")).unwrap().0, to_yocto("1"));
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 2, 2, to_yocto("2"), 0, 0);
+    let unclaim = show_unclaim(&farming, farmer.account_id(), farm_id.clone(), false);
+    assert_eq!(unclaim.0, 0_u128);
+    println!("----->> Farmer added seed at #{}.", root.borrow_runtime().current_block().block_height);
 
 }
 

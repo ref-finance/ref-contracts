@@ -100,7 +100,7 @@ impl Contract {
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
             owner_id: self.data().owner_id.clone(),
-            version: String::from("0.5.1"),
+            version: String::from("0.5.2"),
             farmer_count: self.data().farmer_count.into(),
             farm_count: self.data().farm_count.into(),
             seed_count: self.data().seeds.len().into(),
