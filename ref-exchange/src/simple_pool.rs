@@ -181,6 +181,7 @@ impl SimplePool {
         if prev_shares_amount == shares {
             // hotfix for freezing unregister
             // self.shares.remove(&sender_id);
+            self.shares.insert(&sender_id, &0);
         } else {
             self.shares
                 .insert(&sender_id, &(prev_shares_amount - shares));
