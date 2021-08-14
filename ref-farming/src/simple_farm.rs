@@ -224,7 +224,9 @@ impl SimpleFarm {
             * (U256::from_little_endian(&dis.rps) - U256::from_little_endian(user_rps))
             / U256::from(DENOM)).as_u128()
         } else {
-            0
+            (U256::from(*user_seeds) 
+            * (U256::from_little_endian(&self.last_distribution.rps) - U256::from_little_endian(user_rps))
+            / U256::from(DENOM)).as_u128()
         }
     }
 
