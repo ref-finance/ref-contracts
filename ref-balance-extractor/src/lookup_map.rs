@@ -16,20 +16,6 @@ pub struct LookupMap<K, V> {
     pub data: HashMap<K, V>,
 }
 
-impl<K, V> LookupMap<K, V> {
-    /// Create a new map. Use `key_prefix` as a unique prefix for keys.
-    pub fn new(key_prefix: Vec<u8>) -> Self {
-        Self {
-            key_prefix,
-            data: HashMap::new(),
-        }
-    }
-
-    pub fn raw_key_to_storage_key(&self, raw_key: &[u8]) -> Vec<u8> {
-        append_slice(&self.key_prefix, raw_key)
-    }
-}
-
 impl<K, V> LookupMap<K, V>
 where
     K: BorshSerialize + BorshDeserialize + std::cmp::Eq + Hash,
