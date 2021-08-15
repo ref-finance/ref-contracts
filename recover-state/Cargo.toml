@@ -1,0 +1,12 @@
+[package]
+name = "recover-state"
+version = "0.1.0"
+authors = ["temp"]
+edition = "2018"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077" }
