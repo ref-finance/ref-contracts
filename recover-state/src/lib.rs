@@ -10,6 +10,8 @@ pub extern "C" fn restore() {
     env::setup_panic_hook();
     env::set_blockchain_interface(Box::new(near_blockchain::NearBlockchain {}));
 
+    assert_eq!(env::current_account_id(), env::predecessor_account_id());
+
     let values: Vec<(&str, &str)> = vec![("AAA=", "A==")];
     for (key, value) in values {
         env::storage_write(
