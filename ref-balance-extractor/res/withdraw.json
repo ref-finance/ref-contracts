@@ -1,0 +1,367 @@
+[
+	{
+		"c0": "6b175474e89094c44da98b954eedeac495271d0f.factory.bridge.near",
+		"c1": "a.near",
+		"c2": "14850000000000000000000"
+	},
+	{
+		"c0": "6b175474e89094c44da98b954eedeac495271d0f.factory.bridge.near",
+		"c1": "phamthien.near",
+		"c2": "6000000000000000000000"
+	},
+	{
+		"c0": "c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2.factory.bridge.near",
+		"c1": "messagebox.near",
+		"c2": "5430599659945176361"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "phamthien.near",
+		"c2": "555387810769250014891187"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "icanfixit.near",
+		"c2": "268606577085873637996533"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "spider.near",
+		"c2": "148547930903443490798910"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "a.near",
+		"c2": "33144346970465620967730"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "khbw.near",
+		"c2": "4807738313117558178833"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "namtananh.near",
+		"c2": "4564979093288649941826"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "tanhle56.near",
+		"c2": "1078000000000000000000"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "vuhatyphu.near",
+		"c2": "572430093625330387951"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "graysnow93.near",
+		"c2": "517531335030971104729"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "huuquyen.near",
+		"c2": "371285361836727505505"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "zhangcheng.near",
+		"c2": "338297801886386230152"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "d0fb7d44b7b42a2d04a01fbf1357faab82a32e40e2b5011227ba3428b3d02f97",
+		"c2": "85675127729056569640"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "brianrausher.near",
+		"c2": "20818283890609207451"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "nguyenthang273.near",
+		"c2": "15710090095508659544"
+	},
+	{
+		"c0": "token.ref-finance.near",
+		"c1": "khanhlvspkt.near",
+		"c2": "548821432986874117"
+	},
+	{
+		"c0": "token.skyward.near",
+		"c1": "namtananh.near",
+		"c2": "854571492928366394103"
+	},
+	{
+		"c0": "token.skyward.near",
+		"c1": "khbw.near",
+		"c2": "409367740111877510919"
+	},
+	{
+		"c0": "token.skyward.near",
+		"c1": "spider.near",
+		"c2": "98125590968971271947"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "phamthien.near",
+		"c2": "237390481025583074932572670815"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "okok1234.near",
+		"c2": "133973248214141268649533103468"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "icanfixit.near",
+		"c2": "105104726441583628537948110998"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "spider.near",
+		"c2": "55852338333328115128019555867"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "vuhatyphu.near",
+		"c2": "21464046775403682110549884299"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "a.near",
+		"c2": "14850000000000000000000000000"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "namtananh.near",
+		"c2": "3122307120607905820669120208"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "tuannguyen261090.near",
+		"c2": "2843173698222397142450600498"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "joericsg.near",
+		"c2": "2343093311609141562536933627"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "simeon4real.near",
+		"c2": "1548665567954234719498882237"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "tanhle56.near",
+		"c2": "1171990552971811183371413711"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "messagebox.near",
+		"c2": "1111589260631351769997253174"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "darkpixel.near",
+		"c2": "870174880165819535498891364"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "viethai68.near",
+		"c2": "618700444998923403631080747"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "shyhaeky1.near",
+		"c2": "530026395610089059444333794"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "phuonghuy711.near",
+		"c2": "505380465977729867911960382"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "busdtosky.near",
+		"c2": "400000000000000000000000000"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "shuttlecockisclear.near",
+		"c2": "279827547739207021575380080"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "graysnow93.near",
+		"c2": "211609603477231721880904782"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "gold8888.near",
+		"c2": "208786830826872798396562908"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "hangocson.near",
+		"c2": "188757328224673666692585617"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "lucky8888.near",
+		"c2": "180573304071274705356055632"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "huuquyen.near",
+		"c2": "168520093067422643806244995"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "zhangcheng.near",
+		"c2": "147317894891942230593607469"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "baykal.near",
+		"c2": "144796369303050188105888388"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "dec0dos.near",
+		"c2": "129356748757681113776499498"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "anzelika.near",
+		"c2": "107947126858064845492616496"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "hieunmben100.near",
+		"c2": "84084524633339585884330371"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "huypq228.near",
+		"c2": "43403269526235843545330092"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "yunusemre.near",
+		"c2": "41824618230920787555547641"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "anhy.near",
+		"c2": "40507083737711096073336391"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "khoart.near",
+		"c2": "37419759939468121994905390"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "d0fb7d44b7b42a2d04a01fbf1357faab82a32e40e2b5011227ba3428b3d02f97",
+		"c2": "37288560245363928423226759"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "tranquy12.near",
+		"c2": "12542779856794243304068981"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "brianrausher.near",
+		"c2": "9918298893026898533322710"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "cathyvo.near",
+		"c2": "9710704418732880316090206"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "johnmental.near",
+		"c2": "7451404713468660284014670"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "canyi.near",
+		"c2": "4801947930282617935658480"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "quangtruong304.near",
+		"c2": "4380215550395671252623495"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "quyetthang311.near",
+		"c2": "4378099745377086891259152"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "yingphan.near",
+		"c2": "4069576739656403677104167"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "haibui.near",
+		"c2": "3379191981288209270867523"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "siddiq.near",
+		"c2": "1683819099113551627042923"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "domestos.near",
+		"c2": "1421967101946970450811525"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "veraliana16.near",
+		"c2": "852379003345616722750030"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "dlinkxx.near",
+		"c2": "681354133145763637058566"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "sendisetya1.near",
+		"c2": "618621568141073200925219"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "macbook27.near",
+		"c2": "500000000000000000000000"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "rb.near",
+		"c2": "420000000000000000000000"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "qr.near",
+		"c2": "412000000000000000000000"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "khanhlvspkt.near",
+		"c2": "189131543993212070377688"
+	},
+	{
+		"c0": "wrap.near",
+		"c1": "vinear44.near",
+		"c2": "100000000000000000000000"
+	}
+]

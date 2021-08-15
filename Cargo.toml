@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "./ref-balance-extractor",
     "./ref-exchange",
     "./test-token",
     "./ref-farming"
