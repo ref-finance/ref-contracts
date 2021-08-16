@@ -22,6 +22,8 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json;
 use near_sdk::{AccountId, Balance};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 
 // Deposits were generated using the following query:
 //
@@ -267,6 +269,25 @@ fn main() {
                     token_account_id,
                     format_token(&token_account_id, total_output - total_input)
                 );
+            }
+        }
+    }
+
+    let output_file = "output/balances.csv";
+    let mut file = File::create(output_file).expect("Failed to create the output file");
+    for account in accounts.values() {
+        for (token_account_id, balances) in account.tokens.iter() {
+            let total_input = balances.internal + balances.liquidity + balances.deposits;
+            let total_output = balances.withdrawals;
+            if total_input > total_output {
+                writeln!(
+                    file,
+                    "{},{},{}",
+                    account.account_id,
+                    token_account_id,
+                    total_input - total_output
+                )
+                .unwrap();
             }
         }
     }
