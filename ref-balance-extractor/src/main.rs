@@ -21,7 +21,7 @@ use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json;
 use near_sdk::{AccountId, Balance};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::Write;
 
@@ -271,6 +271,24 @@ fn main() {
                 );
             }
         }
+    }
+
+    let mut tokens: BTreeMap<TokenAccountId, Balance> = BTreeMap::new();
+
+    println!("Aggregated token balances");
+
+    for account in accounts.values() {
+        for (token_account_id, balances) in account.tokens.iter() {
+            let total_input = balances.internal + balances.liquidity + balances.deposits;
+            let total_output = balances.withdrawals;
+            if total_input > total_output {
+                *tokens.entry(token_account_id.clone()).or_default() += total_input - total_output;
+            }
+        }
+    }
+
+    for (token_account_id, balance) in tokens.into_iter() {
+        println!("{},{}", token_account_id, balance);
     }
 
     let output_file = "output/balances.csv";
