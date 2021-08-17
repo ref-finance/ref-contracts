@@ -8,7 +8,7 @@ use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
-    PromiseResult, StorageUsage,
+    PromiseResult, StorageUsage, BorshStorageKey
 };
 
 use crate::account_deposit::Account;
@@ -35,6 +35,14 @@ mod views;
 
 near_sdk::setup_alloc!();
 
+#[derive(BorshStorageKey, BorshSerialize)]
+pub(crate) enum StorageKey {
+    Pools,
+    Accounts,
+    Shares { pool_id: u32 },
+    Whitelist,
+}
+
 #[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 pub struct Contract {
@@ -60,9 +68,9 @@ impl Contract {
             owner_id: owner_id.as_ref().clone(),
             exchange_fee,
             referral_fee,
-            pools: Vector::new(b"p".to_vec()),
-            accounts: LookupMap::new(b"d".to_vec()),
-            whitelisted_tokens: UnorderedSet::new(b"w".to_vec()),
+            pools: Vector::new(StorageKey::Pools),
+            accounts: LookupMap::new(StorageKey::Accounts),
+            whitelisted_tokens: UnorderedSet::new(StorageKey::Whitelist),
         }
     }
 
@@ -78,6 +86,40 @@ impl Contract {
             self.exchange_fee,
             self.referral_fee,
         )))
+    }
+
+    /// [AUDIT_03_reject(NOPE action is allowed by design)] 
+    /// [AUDIT_04]
+    /// Executes generic set of actions.
+    /// If referrer provided, pays referral_fee to it.
+    /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
+    #[payable]
+    pub fn execute_actions(
+        &mut self,
+        actions: Vec<Action>,
+        referral_id: Option<ValidAccountId>,
+    ) -> ActionResult {
+        let sender_id = env::predecessor_account_id();
+        let mut account = self.get_account_deposits(&sender_id);
+        // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
+        if env::attached_deposit() == 0 {
+            for action in &actions {
+                for token in action.tokens() {
+                    assert!(
+                        account.tokens.contains_key(&token)
+                            || self.whitelisted_tokens.contains(&token),
+                        "{}",
+                        // [AUDIT_05]
+                        ERR27_DEPOSIT_NEEDED
+                    );
+                }
+            }
+        }
+        let referral_id = referral_id.map(|r| r.into());
+        let result =
+            self.internal_execute_actions(&mut account, &referral_id, &actions, ActionResult::None);
+        self.internal_save_account(&sender_id, account);
+        result
     }
 
     /// Execute set of swap actions between pools.
@@ -165,38 +207,6 @@ impl Contract {
 
 /// Internal methods implementation.
 impl Contract {
-
-    /// [AUDIT_03] [AUDIT_04]
-    /// Executes generic set of actions.
-    /// If referrer provided, pays referral_fee to it.
-    /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
-    fn execute_actions(
-        &mut self,
-        actions: Vec<Action>,
-        referral_id: Option<ValidAccountId>,
-    ) -> ActionResult {
-        let sender_id = env::predecessor_account_id();
-        let mut account = self.get_account_deposits(&sender_id);
-        // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
-        if env::attached_deposit() == 0 {
-            for action in &actions {
-                for token in action.tokens() {
-                    assert!(
-                        account.tokens.contains_key(&token)
-                            || self.whitelisted_tokens.contains(&token),
-                        "{}",
-                        // [AUDIT_05]
-                        ERR27_DEPOSIT_NEEDED
-                    );
-                }
-            }
-        }
-        let referral_id = referral_id.map(|r| r.into());
-        let result =
-            self.internal_execute_actions(&mut account, &referral_id, &actions, ActionResult::None);
-        self.internal_save_account(&sender_id, account);
-        result
-    }
 
     /// Check how much storage taken costs and refund the left over back.
     fn internal_check_storage(&self, prev_storage: StorageUsage) {
@@ -370,7 +380,7 @@ mod tests {
         deposit_tokens(context, contract, accounts(3), token_amounts.clone());
         testing_env!(context
             .predecessor_account_id(account_id.clone())
-            .attached_deposit(to_yocto("0.00067"))
+            .attached_deposit(to_yocto("0.0007"))
             .build());
         contract.add_liquidity(
             pool_id,
@@ -463,13 +473,13 @@ mod tests {
             .predecessor_account_id(accounts(3))
             .attached_deposit(to_yocto("0.0067"))
             .build());
-        contract.mft_register("0".to_string(), accounts(1));
+        contract.mft_register("#0".to_string(), accounts(1));
         testing_env!(context
             .predecessor_account_id(accounts(3))
             .attached_deposit(1)
             .build());
         // transfer 1m shares in pool 0 to acc 1.
-        contract.mft_transfer("0".to_string(), accounts(1), U128(1_000_000), None);
+        contract.mft_transfer("#0".to_string(), accounts(1), U128(1_000_000), None);
 
         testing_env!(context.predecessor_account_id(accounts(3)).build());
         contract.remove_liquidity(
@@ -509,7 +519,7 @@ mod tests {
             .attached_deposit(to_yocto("1"))
             .build());
         let id = contract.add_simple_pool(vec![accounts(1), accounts(2)], 25);
-        testing_env!(context.attached_deposit(to_yocto("0.00067")).build());
+        testing_env!(context.attached_deposit(to_yocto("0.0007")).build());
         contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("10"))], None);
         contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("50"))], None);
         testing_env!(context.attached_deposit(1).build());
@@ -618,12 +628,14 @@ mod tests {
             vec![(accounts(1), to_yocto("1")), (accounts(2), to_yocto("1"))],
         );
         let acc = ValidAccountId::try_from("test_user").unwrap();
+
         deposit_tokens(
             &mut context,
             &mut contract,
             acc.clone(),
             vec![(accounts(1), 1_000_000)],
         );
+
         testing_env!(context
             .predecessor_account_id(acc.clone())
             .attached_deposit(1)

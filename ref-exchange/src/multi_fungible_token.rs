@@ -32,10 +32,24 @@ enum TokenOrPool {
     Pool(u64),
 }
 
-/// [AUDIT_06_postpone]
-/// make digital to #nn partern to avoid conflict with possible token account id
+/// [AUDIT_06]
+/// This is used to parse token_id fields in mft protocol used in ref,
+/// So, if we choose #nn as a partern, should announce it in mft protocol.
+/// cause # is not allowed in a normal account id, it can be a partern leading char
+fn try_identify_pool_id(token_id: &String) ->Result<u64, &'static str> {
+    if token_id.starts_with("#") {
+        if let Ok(pool_id) = str::parse::<u64>(&token_id[1..token_id.len()]) {
+            Ok(pool_id)
+        } else {
+            Err("Illegal pool id")
+        }
+    } else {
+        Err("Illegal pool id")
+    }
+}
+
 fn parse_token_id(token_id: String) -> TokenOrPool {
-    if let Ok(pool_id) = str::parse::<u64>(&token_id) {
+    if let Ok(pool_id) = try_identify_pool_id(&token_id) {
         TokenOrPool::Pool(pool_id)
     } else {
         TokenOrPool::Token(token_id)

@@ -75,6 +75,7 @@ impl Contract {
 }
 
 #[near_bindgen]
+#[allow(unreachable_code)]
 impl FungibleTokenReceiver for Contract {
     /// Callback on receiving tokens by this contract.
     /// `msg` format is either "" for deposit or `TokenReceiverMessage`.
@@ -90,6 +91,9 @@ impl FungibleTokenReceiver for Contract {
             self.internal_deposit(sender_id.as_ref(), &token_in, amount.into());
             PromiseOrValue::Value(U128(0))
         } else {
+            // [AUDIT14] shutdown instant swap from interface
+            env::panic(b"Instant Swap Feature Not Open Yet");
+
             let message =
                 serde_json::from_str::<TokenReceiverMessage>(&msg).expect("ERR_MSG_WRONG_FORMAT");
             match message {
