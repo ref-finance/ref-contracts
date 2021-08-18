@@ -1,6 +1,5 @@
 //! A vector implemented on a trie. Unlike standard vector does not support insertion and removal
 //! of an element results in the last element being placed in the empty position.
-use std::marker::PhantomData;
 
 use crate::*;
 
@@ -10,8 +9,6 @@ use crate::*;
 pub struct Vector<T> {
     pub len: u64,
     pub prefix: Vec<u8>,
-    #[borsh_skip]
-    el: PhantomData<T>,
 
     #[borsh_skip]
     pub data: Vec<T>,
