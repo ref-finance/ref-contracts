@@ -13,7 +13,7 @@ use crate::*;
 // [AUDIT_01]
 const MAX_ACCOUNT_LENGTH: u128 = 64;
 const MAX_ACCOUNT_BYTES: u128 = MAX_ACCOUNT_LENGTH + 4;
-const MIN_ACCOUNT_DEPOSIT_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4;
+const MIN_ACCOUNT_DEPOSIT_LENGTH: u128 = 1 + MAX_ACCOUNT_BYTES + 16 + 4;
 
 /// Account deposits information and storage cost.
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
