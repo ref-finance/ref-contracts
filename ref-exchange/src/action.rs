@@ -46,13 +46,15 @@ pub enum ActionResult {
     /// No result.
     None,
     /// Amount of token was received.
-    Amount(Balance),
+    /// [AUDIT_02]
+    Amount(U128),
 }
 
 impl ActionResult {
     pub fn to_amount(self) -> Balance {
         match self {
-            ActionResult::Amount(result) => result,
+            // [AUDIT_02]
+            ActionResult::Amount(result) => result.0,
             _ => env::panic(ERR41_WRONG_ACTION_RESULT.as_bytes()),
         }
     }

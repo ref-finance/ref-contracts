@@ -1,4 +1,4 @@
-use near_contract_standards::fungible_token::metadata::{FungibleTokenMetadata, FT_METADATA_SPEC};
+use near_contract_standards::fungible_token::metadata::{FungibleTokenMetadata};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{ext_contract, near_bindgen, Balance, PromiseOrValue};
 
@@ -32,8 +32,24 @@ enum TokenOrPool {
     Pool(u64),
 }
 
+/// [AUDIT_06]
+/// This is used to parse token_id fields in mft protocol used in ref,
+/// So, if we choose #nn as a partern, should announce it in mft protocol.
+/// cause : is not allowed in a normal account id, it can be a partern leading char
+fn try_identify_pool_id(token_id: &String) ->Result<u64, &'static str> {
+    if token_id.starts_with(":") {
+        if let Ok(pool_id) = str::parse::<u64>(&token_id[1..token_id.len()]) {
+            Ok(pool_id)
+        } else {
+            Err("Illegal pool id")
+        }
+    } else {
+        Err("Illegal pool id")
+    }
+}
+
 fn parse_token_id(token_id: String) -> TokenOrPool {
-    if let Ok(pool_id) = str::parse::<u64>(&token_id) {
+    if let Ok(pool_id) = try_identify_pool_id(&token_id) {
         TokenOrPool::Pool(pool_id)
     } else {
         TokenOrPool::Token(token_id)
@@ -50,6 +66,8 @@ impl Contract {
         amount: u128,
         memo: Option<String>,
     ) {
+        // [AUDIT_07]
+        assert_ne!(sender_id, receiver_id, "{}", ERR33_TRANSFER_TO_SELF);
         match parse_token_id(token_id) {
             TokenOrPool::Pool(pool_id) => {
                 let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
@@ -235,7 +253,8 @@ impl Contract {
     pub fn mft_metadata(&self, token_id: String) -> FungibleTokenMetadata {
         match parse_token_id(token_id) {
             TokenOrPool::Pool(pool_id) => FungibleTokenMetadata {
-                spec: FT_METADATA_SPEC.to_string(),
+                // [AUDIT_08]
+                spec: "mft-1.0.0".to_string(),
                 name: format!("ref-pool-{}", pool_id),
                 symbol: format!("REF-POOL-{}", pool_id),
                 icon: None,

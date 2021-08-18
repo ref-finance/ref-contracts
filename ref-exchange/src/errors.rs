@@ -14,13 +14,17 @@ pub const ERR22_NOT_ENOUGH_TOKENS: &str = "E22: not enough tokens in deposit";
 pub const ERR24_NON_ZERO_TOKEN_BALANCE: &str = "E24: non-zero token balance";
 pub const ERR25_CALLBACK_POST_WITHDRAW_INVALID: &str =
     "E25: expected 1 promise result from withdraw";
-pub const ERR26_ACCESS_KEY_NOT_ALLOWED: &str = "E26: access key not allowed";
+// [AUDIT_05]
+// pub const ERR26_ACCESS_KEY_NOT_ALLOWED: &str = "E26: access key not allowed";
+pub const ERR27_DEPOSIT_NEEDED: &str = 
+    "E27: attach 1yN to swap tokens not in whitelist";
 
 // Liquidity operations.
 
 pub const ERR31_ZERO_AMOUNT: &str = "E31: adding zero amount";
 pub const ERR32_ZERO_SHARES: &str = "E32: minting zero shares";
-
+// [AUDIT_07]
+pub const ERR33_TRANSFER_TO_SELF: &str = "E33: transfer to self";
 // Action result.
 
 pub const ERR41_WRONG_ACTION_RESULT: &str = "E41: wrong action result type";

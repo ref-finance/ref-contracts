@@ -35,6 +35,8 @@ impl Contract {
     /// Migration function from v2 to v2.
     /// For next version upgrades, change this function.
     #[init(ignore_state)]
+    // [AUDIT_09]
+    #[private]
     pub fn migrate() -> Self {
         let contract: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
         contract

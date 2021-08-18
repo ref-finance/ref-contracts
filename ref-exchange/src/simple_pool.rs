@@ -4,6 +4,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance};
+use crate::StorageKey;
 
 use crate::errors::{
     ERR13_LP_NOT_REGISTERED, ERR14_LP_ALREADY_REGISTERED, ERR31_ZERO_AMOUNT, ERR32_ZERO_SHARES,
@@ -12,7 +13,7 @@ use crate::utils::{
     add_to_collection, integer_sqrt, SwapVolume, FEE_DIVISOR, INIT_SHARES_SUPPLY, U256,
 };
 
-const MAX_NUM_TOKENS: usize = 2;
+const NUM_TOKENS: usize = 2;
 
 /// Implementation of simple pool, that maintains constant product between balances of all the tokens.
 /// Similar in design to "Uniswap".
@@ -49,11 +50,8 @@ impl SimplePool {
             total_fee < FEE_DIVISOR && (exchange_fee + referral_fee) <= total_fee,
             "ERR_FEE_TOO_LARGE"
         );
-        assert_ne!(token_account_ids.len(), 1, "ERR_NOT_ENOUGH_TOKENS");
-        assert!(
-            token_account_ids.len() <= MAX_NUM_TOKENS,
-            "ERR_TOO_MANY_TOKENS"
-        );
+        // [AUDIT_10]
+        assert_eq!(token_account_ids.len(), NUM_TOKENS, "ERR_SHOULD_HAVE_2_TOKENS");
         Self {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
             amounts: vec![0u128; token_account_ids.len()],
@@ -61,7 +59,10 @@ impl SimplePool {
             total_fee,
             exchange_fee,
             referral_fee,
-            shares: LookupMap::new(format!("s{}", id).into_bytes()),
+            // [AUDIT_11]
+            shares: LookupMap::new(StorageKey::Shares {
+                pool_id: id,
+            }),
             shares_total_supply: 0,
         }
     }
@@ -182,7 +183,8 @@ impl SimplePool {
             result.push(amount);
         }
         if prev_shares_amount == shares {
-            self.shares.remove(&sender_id);
+            // [AUDIT_13] never unregister a LP when he remove liqudity.
+            self.shares.insert(&sender_id, &0);
         } else {
             self.shares
                 .insert(&sender_id, &(prev_shares_amount - shares));
@@ -419,7 +421,9 @@ mod tests {
             exchange_fee: 5,
             referral_fee: 1,
             shares_total_supply: 35967818779820559673547466,
-            shares: LookupMap::new(b"s0".to_vec()),
+            shares: LookupMap::new(StorageKey::Shares {
+                pool_id: 0,
+            }),
         };
         let mut amounts = vec![145782, 1];
         let _ = pool.add_liquidity(&accounts(2).to_string(), &mut amounts);
