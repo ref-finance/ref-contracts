@@ -13,7 +13,7 @@ use crate::utils::{
     add_to_collection, integer_sqrt, SwapVolume, FEE_DIVISOR, INIT_SHARES_SUPPLY, U256,
 };
 
-const MAX_NUM_TOKENS: usize = 2;
+const NUM_TOKENS: usize = 2;
 
 /// Implementation of simple pool, that maintains constant product between balances of all the tokens.
 /// Similar in design to "Uniswap".
@@ -51,7 +51,7 @@ impl SimplePool {
             "ERR_FEE_TOO_LARGE"
         );
         // [AUDIT_10]
-        assert_eq!(token_account_ids.len(), MAX_NUM_TOKENS, "ERR_SHOULD_HAVE_2_TOKENS");
+        assert_eq!(token_account_ids.len(), NUM_TOKENS, "ERR_SHOULD_HAVE_2_TOKENS");
         Self {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
             amounts: vec![0u128; token_account_ids.len()],

@@ -10,7 +10,8 @@ use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseR
 use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER};
 use crate::*;
 
-const MAX_ACCOUNT_LENGTH: u128 = 64;
+// [AUDIT_01]
+const MAX_ACCOUNT_LENGTH: u128 = 4 + 64;
 const MIN_ACCOUNT_DEPOSIT_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4;
 
 /// Account deposits information and storage cost.
@@ -43,8 +44,7 @@ impl Account {
 
     /// Returns amount of $NEAR necessary to cover storage used by this data structure.
     pub fn storage_usage(&self) -> Balance {
-        // [AUDIT_01]
-        (MIN_ACCOUNT_DEPOSIT_LENGTH + self.tokens.len() as u128 * (4 + MAX_ACCOUNT_LENGTH + 16))
+        (MIN_ACCOUNT_DEPOSIT_LENGTH + self.tokens.len() as u128 * (MAX_ACCOUNT_LENGTH + 16))
             * env::storage_byte_cost()
     }
 

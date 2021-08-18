@@ -17,7 +17,7 @@ pub const ERR25_CALLBACK_POST_WITHDRAW_INVALID: &str =
 // [AUDIT_05]
 // pub const ERR26_ACCESS_KEY_NOT_ALLOWED: &str = "E26: access key not allowed";
 pub const ERR27_DEPOSIT_NEEDED: &str = 
-    "E27: deposit needed when swapping with token not in whitelist";
+    "E27: attach 1yN to swap tokens not in whitelist";
 
 // Liquidity operations.
 

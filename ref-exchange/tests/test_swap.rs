@@ -169,13 +169,13 @@ fn test_swap() {
         }
     );
     assert_eq!(
-        view!(pool.mft_metadata("#0".to_string()))
+        view!(pool.mft_metadata(":0".to_string()))
             .unwrap_json::<FungibleTokenMetadata>()
             .name,
         "ref-pool-0"
     );
     assert_eq!(
-        view!(pool.mft_balance_of("#0".to_string(), to_va(root.account_id.clone())))
+        view!(pool.mft_balance_of(":0".to_string(), to_va(root.account_id.clone())))
             .unwrap_json::<U128>()
             .0,
         to_yocto("1")
