@@ -11,6 +11,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077" }
 near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077" }
+ref-components = { path = "../ref-components" }
 
 [dev-dependencies]
 near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077" }

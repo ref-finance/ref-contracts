@@ -9,17 +9,18 @@ use near_sdk::json_types::{ValidAccountId, WrappedDuration, WrappedTimestamp, U1
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
     assert_one_yocto, env, ext_contract, near_bindgen, serde_json, AccountId, Gas, PanicOnDefault,
-    Promise, PromiseOrValue, PromiseResult,
+    Promise, PromiseOrValue, PromiseResult, StorageUsage,
 };
-
-pub use crate::account::{Account, AccountManager};
-
-mod account;
+use ref_components::account::AccountManager;
+use ref_components::account_impl::Account;
 
 near_sdk::setup_alloc!();
 
 /// Amount of gas for fungible token transfers.
 pub const GAS_FOR_FT_TRANSFER: Gas = 10_000_000_000_000;
+
+/// Offer is up to 320 bytes.
+pub const OFFER_BYTES: StorageUsage = 320;
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
@@ -153,7 +154,7 @@ impl Contract {
         );
         self.offers.remove(&offer_id);
         self.account_manager.update_account(&sender_id, |account| {
-            account.remove_offer();
+            account.remove_storage(OFFER_BYTES);
             account.deposit(&offer.offer_token_id, offer.offer_amount.0);
         });
     }
@@ -200,7 +201,7 @@ impl FungibleTokenReceiver for Contract {
                 // Account must be registered and have enough space for an extra offer.
                 self.account_manager
                     .update_account(&sender_id.as_ref(), move |account| {
-                        account.add_offer();
+                        account.add_storage(OFFER_BYTES);
                     });
                 self.offers.insert(
                     &self.last_offer_id,
@@ -244,7 +245,7 @@ impl FungibleTokenReceiver for Contract {
                     assert_eq!(&taker, sender_id.as_ref(), "ERR_INCORRECT_TAKER");
                 }
                 self.offers.remove(&offer_id);
-                offerer_account.remove_offer();
+                offerer_account.remove_storage(OFFER_BYTES);
                 offerer_account.deposit(&offer.take_token_id, amount.0);
                 taker_account.deposit(&offer.offer_token_id, offer.offer_amount.0);
                 self.account_manager
