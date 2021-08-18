@@ -11,7 +11,8 @@ use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER};
 use crate::*;
 
 // [AUDIT_01]
-const MAX_ACCOUNT_LENGTH: u128 = 4 + 64;
+const MAX_ACCOUNT_LENGTH: u128 = 64;
+const MAX_ACCOUNT_BYTES: u128 = MAX_ACCOUNT_LENGTH + 4;
 const MIN_ACCOUNT_DEPOSIT_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4;
 
 /// Account deposits information and storage cost.
@@ -42,9 +43,10 @@ impl Account {
         self.tokens.insert(token.clone(), value - amount);
     }
 
+    // [AUDIT_01]
     /// Returns amount of $NEAR necessary to cover storage used by this data structure.
     pub fn storage_usage(&self) -> Balance {
-        (MIN_ACCOUNT_DEPOSIT_LENGTH + self.tokens.len() as u128 * (MAX_ACCOUNT_LENGTH + 16))
+        (MIN_ACCOUNT_DEPOSIT_LENGTH + self.tokens.len() as u128 * (MAX_ACCOUNT_BYTES + 16))
             * env::storage_byte_cost()
     }
 
