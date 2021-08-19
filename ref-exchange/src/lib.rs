@@ -11,7 +11,7 @@ use near_sdk::{
     PromiseResult, StorageUsage, BorshStorageKey
 };
 
-use crate::account_deposit::Account;
+use crate::account_deposit::{VAccount, Account};
 pub use crate::action::SwapAction;
 use crate::action::{Action, ActionResult};
 use crate::errors::*;
@@ -55,7 +55,7 @@ pub struct Contract {
     /// List of all the pools.
     pools: Vector<Pool>,
     /// Accounts registered, keeping track all the amounts deposited, storage and more.
-    accounts: LookupMap<AccountId, Account>,
+    accounts: LookupMap<AccountId, VAccount>,
     /// Set of whitelisted tokens by "owner".
     whitelisted_tokens: UnorderedSet<AccountId>,
 }
@@ -100,7 +100,7 @@ impl Contract {
         referral_id: Option<ValidAccountId>,
     ) -> ActionResult {
         let sender_id = env::predecessor_account_id();
-        let mut account = self.get_account_deposits(&sender_id);
+        let mut account = self.internal_unwrap_account(&sender_id);
         // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
         if env::attached_deposit() == 0 {
             for action in &actions {
@@ -164,7 +164,7 @@ impl Contract {
                 assert!(amount >= &min_amount.0, "ERR_MIN_AMOUNT");
             }
         }
-        let mut deposits = self.accounts.get(&sender_id).unwrap_or_default();
+        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
         let tokens = pool.tokens();
         // Subtract updated amounts from deposits. This will fail if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
@@ -192,7 +192,7 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        let mut deposits = self.accounts.get(&sender_id).unwrap_or_default();
+        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
         for i in 0..tokens.len() {
             deposits.deposit(&tokens[i], amounts[i]);
         }
