@@ -12,7 +12,7 @@ use near_sdk::{
     Promise, PromiseOrValue, PromiseResult, StorageUsage,
 };
 use ref_components::account::AccountManager;
-use ref_components::account_impl::Account;
+pub use ref_components::account_impl::Account;
 
 near_sdk::setup_alloc!();
 

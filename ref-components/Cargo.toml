@@ -1,0 +1,9 @@
+[package]
+name = "ref-components"
+version = "0.1.0"
+authors = ["referencedev <goi65io3903d@protonmail.com>"]
+edition = "2018"
+
+[dependencies]
+near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077" }
+near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077" }

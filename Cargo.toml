@@ -3,7 +3,8 @@ members = [
     "./ref-exchange",
     "./test-token",
     "./ref-farming",
-    "./ref-escrow"
+    "./ref-escrow",
+    "./ref-components"
 ]
 
 
