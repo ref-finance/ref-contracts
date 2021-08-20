@@ -25,15 +25,16 @@ const U32_STORAGE: StorageUsage = 4;
 const ACC_ID_STORAGE: StorageUsage = 64;
 /// As a key, 4 bytes length would be added to the head
 const ACC_ID_AS_KEY_STORAGE: StorageUsage = ACC_ID_STORAGE + 4;
-/// As a near_sdk::collection key, 1 byte prefiex would be added to the head, right?
+/// As a near_sdk::collection key, 1 byte for prefiex
 const ACC_ID_AS_CLT_KEY_STORAGE: StorageUsage = ACC_ID_AS_KEY_STORAGE + 1;
 
 // ACC_ID: the Contract accounts map key length
+// + VAccount enum: 1 byte
 // + U128_STORAGE: near_amount storage
 // + U32_STORAGE: tokens HashMap length
 // + U64_STORAGE: storage_used
 pub const INIT_ACCOUNT_STORAGE: StorageUsage =
-    ACC_ID_AS_CLT_KEY_STORAGE + U128_STORAGE + U32_STORAGE + U64_STORAGE;
+    ACC_ID_AS_CLT_KEY_STORAGE + 1 + U128_STORAGE + U32_STORAGE + U64_STORAGE;
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub enum VAccount {
