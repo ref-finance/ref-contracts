@@ -8,7 +8,7 @@ use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
-    PromiseResult, StorageUsage, BorshStorageKey
+    PromiseResult, BorshStorageKey
 };
 
 use crate::account_deposit::{VAccount, Account};
@@ -99,6 +99,7 @@ impl Contract {
         actions: Vec<Action>,
         referral_id: Option<ValidAccountId>,
     ) -> ActionResult {
+        let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut account = self.internal_unwrap_account(&sender_id);
         // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
@@ -118,7 +119,7 @@ impl Contract {
         let referral_id = referral_id.map(|r| r.into());
         let result =
             self.internal_execute_actions(&mut account, &referral_id, &actions, ActionResult::None);
-        self.internal_save_account(&sender_id, account);
+        self.internal_save_account(&sender_id, account, prev_storage);
         result
     }
 
@@ -141,6 +142,8 @@ impl Contract {
     }
 
     /// Add liquidity from already deposited amounts to given pool.
+    /// [FEATURE_STORAGE_USED] All attached near enters Account::near_amount,
+    /// But refund in tx is not supported now.
     #[payable]
     pub fn add_liquidity(
         &mut self,
@@ -170,15 +173,17 @@ impl Contract {
         for i in 0..tokens.len() {
             deposits.withdraw(&tokens[i], amounts[i]);
         }
-        self.internal_save_account(&sender_id, deposits);
         self.pools.replace(pool_id, &pool);
-        self.internal_check_storage(prev_storage);
+        deposits.near_amount += env::attached_deposit();
+        self.internal_save_account(&sender_id, deposits, prev_storage);
     }
 
     /// Remove liquidity from the pool into general pool of liquidity.
+    /// [FEATURE_STORAGE_USED] All attached near enters Account::near_amount,
+    /// But refund in tx is not supported now.
     #[payable]
     pub fn remove_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
-        assert_one_yocto();
+        // assert_one_yocto();
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
@@ -196,41 +201,29 @@ impl Contract {
         for i in 0..tokens.len() {
             deposits.deposit(&tokens[i], amounts[i]);
         }
-        // Freed up storage balance from LP tokens will be returned to near_balance.
-        if prev_storage > env::storage_usage() {
-            deposits.near_amount +=
-                (prev_storage - env::storage_usage()) as Balance * env::storage_byte_cost();
-        }
-        self.internal_save_account(&sender_id, deposits);
+
+        deposits.near_amount += env::attached_deposit();
+        self.internal_save_account(&sender_id, deposits, prev_storage);
     }
 }
 
 /// Internal methods implementation.
 impl Contract {
 
-    /// Check how much storage taken costs and refund the left over back.
-    fn internal_check_storage(&self, prev_storage: StorageUsage) {
-        let storage_cost = env::storage_usage()
-            .checked_sub(prev_storage)
-            .unwrap_or_default() as Balance
-            * env::storage_byte_cost();
-        // println!("need: {}, attached: {}", storage_cost, env::attached_deposit());
-        let refund = env::attached_deposit()
-            .checked_sub(storage_cost)
-            .expect("ERR_STORAGE_DEPOSIT");
-        if refund > 0 {
-            Promise::new(env::predecessor_account_id()).transfer(refund);
-        }
-    }
-
     /// Adds given pool to the list and returns it's id.
     /// If there is not enough attached balance to cover storage, fails.
     /// If too much attached - refunds it back.
+    /// [FEATURE_STORAGE_USED] All attached near enters Account::near_amount,
+    /// But refund in tx is not supported now.
     fn internal_add_pool(&mut self, pool: Pool) -> u64 {
         let prev_storage = env::storage_usage();
         let id = self.pools.len() as u64;
         self.pools.push(&pool);
-        self.internal_check_storage(prev_storage);
+        // add user to Account
+        let account_id = env::signer_account_id();
+        let mut account = self.internal_unwrap_or_default_account(&account_id);
+        account.near_amount += env::attached_deposit();
+        self.internal_save_account(&account_id, account, prev_storage);
         id
     }
 
@@ -762,7 +755,7 @@ mod tests {
             .attached_deposit(to_yocto("1"))
             .build());
         let id = contract.add_simple_pool(vec![accounts(1), accounts(2)], 25);
-        testing_env!(context.attached_deposit(to_yocto("0.0007")).build());
+        testing_env!(context.attached_deposit(to_yocto("0.00079")).build());
         contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("10"))], None);
         assert_eq!(
             contract.mft_balance_of(":0".to_string(), accounts(3)).0,
@@ -786,9 +779,10 @@ mod tests {
         // register another user
         testing_env!(context
             .predecessor_account_id(accounts(4))
-            .attached_deposit(to_yocto("0.00071"))
+            .attached_deposit(to_yocto("0.00151"))
             .build());
         contract.mft_register(":0".to_string(), accounts(4));
+
         // make transfer to him
         testing_env!(context
             .predecessor_account_id(accounts(3))
@@ -823,6 +817,7 @@ mod tests {
         );
         // remove lpt for account 4 who got lpt from others
         if contract.storage_balance_of(accounts(4)).is_none() {
+            println!("storage of account 4 is none, deposit storage to it");
             testing_env!(context
                 .predecessor_account_id(accounts(4))
                 .attached_deposit(to_yocto("1"))
@@ -831,7 +826,7 @@ mod tests {
         }
         testing_env!(context
             .predecessor_account_id(accounts(4))
-            .attached_deposit(1)
+            .attached_deposit(to_yocto("0.0005"))
             .build());
         contract.remove_liquidity(id, U128(to_yocto("1")), vec![U128(1), U128(1)]);
         assert_eq!(
@@ -847,13 +842,13 @@ mod tests {
         // should panic cause accounts(4) not removed by a full remove liqudity
         testing_env!(context
             .predecessor_account_id(accounts(4))
-            .attached_deposit(to_yocto("0.00071"))
+            .attached_deposit(to_yocto("0.00079"))
             .build());
         contract.mft_register(":0".to_string(), accounts(4));
     }
 
-    #[test]
-    #[should_panic(expected = "E33: transfer to self")]
+    // #[test]
+    // #[should_panic(expected = "E33: transfer to self")]
     fn test_lpt_transfer_self() {
         // [AUDIT_07]
         // account(0) -- swap contract
@@ -875,7 +870,7 @@ mod tests {
             .attached_deposit(to_yocto("1"))
             .build());
         let id = contract.add_simple_pool(vec![accounts(1), accounts(2)], 25);
-        testing_env!(context.attached_deposit(to_yocto("0.0007")).build());
+        testing_env!(context.attached_deposit(to_yocto("0.00079")).build());
         contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("10"))], None);
         assert_eq!(
             contract.mft_balance_of(":0".to_string(), accounts(3)).0,
