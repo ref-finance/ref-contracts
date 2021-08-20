@@ -34,7 +34,6 @@ impl Contract {
     ) -> Vec<(AccountId, Balance)> {
         // [AUDIT_12] always save back account for a resident user
         let mut is_resident_user: bool = true;
-        let prev_storage = env::storage_usage();
         let mut initial_account: Account = self.accounts.get(sender_id).unwrap_or_else(|| {
             is_resident_user = false;
             if !force {
@@ -69,7 +68,7 @@ impl Contract {
         // [AUDIT_12] always save back account for a resident user
         if is_resident_user {
             // To avoid race conditions, we actually going to insert 0 to all changed tokens and save that.
-            self.internal_save_account(sender_id, account, prev_storage);
+            self.internal_save_account(sender_id, account);
         }
         result
     }

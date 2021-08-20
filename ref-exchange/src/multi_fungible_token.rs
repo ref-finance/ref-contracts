@@ -95,10 +95,8 @@ impl Contract {
                 
                 sender_account.withdraw(&token_id, amount);
                 receiver_account.deposit(&token_id, amount);
-                // we can make sure that those two account storage won't change,
-                // so, pass zero as prev_storage to indicate untouch storage_used.
-                self.internal_save_account(&sender_id, sender_account, 0);
-                self.internal_save_account(&receiver_id, receiver_account, 0);
+                self.internal_save_account(&sender_id, sender_account);
+                self.internal_save_account(&receiver_id, receiver_account);
                 log!(
                     "Transfer {}: {} from {} to {}",
                     token_id,
@@ -143,8 +141,6 @@ impl Contract {
 
     /// Register LP token of given pool for given account.
     /// Fails if token_id is not a pool.
-    /// [FEATURE_STORAGE_USED] All attached near enters Account::near_amount,
-    /// But refund in tx is not supported now.
     #[payable]
     pub fn mft_register(&mut self, token_id: String, account_id: ValidAccountId) {
         let prev_storage = env::storage_usage();
@@ -154,10 +150,7 @@ impl Contract {
                 let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
                 pool.share_register(account_id.as_ref());
                 self.pools.replace(pool_id, &pool);
-                // add user to Account
-                let mut account = self.internal_unwrap_or_default_account(account_id.as_ref());
-                account.near_amount += env::attached_deposit();
-                self.internal_save_account(account_id.as_ref(), account, prev_storage);
+                self.internal_check_storage(prev_storage);
             }
         }
     }
