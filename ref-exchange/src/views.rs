@@ -96,8 +96,9 @@ impl Contract {
     pub fn get_deposits(&self, account_id: ValidAccountId) -> HashMap<AccountId, U128> {
         self.accounts
             .get(account_id.as_ref())
-            .map(|d| {
-                d.tokens
+            .map(|va| {
+                let a: Account = va.into(); 
+                a.tokens
                     .into_iter()
                     .map(|(acc, bal)| (acc, U128(bal)))
                     .collect()
@@ -133,7 +134,10 @@ impl Contract {
     pub fn get_user_whitelisted_tokens(&self, account_id: &AccountId) -> Vec<AccountId> {
         self.accounts
             .get(&account_id)
-            .map(|d| d.tokens.keys().cloned().collect())
+            .map(|va| {
+                let a: Account = va.into();
+                a.tokens.keys().cloned().collect()
+            })
             .unwrap_or_default()
     }
 }

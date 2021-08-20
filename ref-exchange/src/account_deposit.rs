@@ -5,15 +5,56 @@ use std::collections::HashMap;
 use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult};
+use near_sdk::{
+    assert_one_yocto, env, near_bindgen, 
+    AccountId, Balance, PromiseResult, StorageUsage,
+};
 
 use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER};
 use crate::*;
 
 // [AUDIT_01]
-const MAX_ACCOUNT_LENGTH: u128 = 64;
-const MAX_ACCOUNT_BYTES: u128 = MAX_ACCOUNT_LENGTH + 4;
-const MIN_ACCOUNT_DEPOSIT_LENGTH: u128 = 1 + MAX_ACCOUNT_BYTES + 16 + 4;
+// const MAX_ACCOUNT_LENGTH: u128 = 64;
+// const MAX_ACCOUNT_BYTES: u128 = MAX_ACCOUNT_LENGTH + 4;
+// const MIN_ACCOUNT_DEPOSIT_LENGTH: u128 = 1 + MAX_ACCOUNT_BYTES + 16 + 4;
+
+const U128_STORAGE: StorageUsage = 16;
+const U64_STORAGE: StorageUsage = 8;
+const U32_STORAGE: StorageUsage = 4;
+/// max length of account id is 64 bytes. We charge per byte.
+const ACC_ID_STORAGE: StorageUsage = 64;
+/// As a key, 4 bytes length would be added to the head
+const ACC_ID_AS_KEY_STORAGE: StorageUsage = ACC_ID_STORAGE + 4;
+/// As a near_sdk::collection key, 1 byte for prefiex
+const ACC_ID_AS_CLT_KEY_STORAGE: StorageUsage = ACC_ID_AS_KEY_STORAGE + 1;
+
+// ACC_ID: the Contract accounts map key length
+// + VAccount enum: 1 byte
+// + U128_STORAGE: near_amount storage
+// + U32_STORAGE: tokens HashMap length
+// + U64_STORAGE: storage_used
+pub const INIT_ACCOUNT_STORAGE: StorageUsage =
+    ACC_ID_AS_CLT_KEY_STORAGE + 1 + U128_STORAGE + U32_STORAGE + U64_STORAGE;
+
+#[derive(BorshDeserialize, BorshSerialize)]
+pub enum VAccount {
+    Current(Account),
+}
+
+impl From<Account> for VAccount {
+    fn from(account: Account) -> Self {
+        VAccount::Current(account)
+    }
+}
+
+impl From<VAccount> for Account {
+    fn from(v_account: VAccount) -> Self {
+        match v_account {
+            VAccount::Current(account) => {account},
+        }
+    }
+}
+
 
 /// Account deposits information and storage cost.
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
@@ -23,7 +64,11 @@ pub struct Account {
     pub near_amount: Balance,
     /// Amounts of various tokens deposited to this account.
     pub tokens: HashMap<AccountId, Balance>,
+    pub storage_used: StorageUsage,
 }
+
+
+
 
 impl Account {
     /// Deposit amount to the balance of given token.
@@ -46,7 +91,8 @@ impl Account {
     // [AUDIT_01]
     /// Returns amount of $NEAR necessary to cover storage used by this data structure.
     pub fn storage_usage(&self) -> Balance {
-        (MIN_ACCOUNT_DEPOSIT_LENGTH + self.tokens.len() as u128 * (MAX_ACCOUNT_BYTES + 16))
+        (INIT_ACCOUNT_STORAGE + 
+            self.tokens.len() as u64 * (ACC_ID_AS_KEY_STORAGE + U128_STORAGE)) as u128
             * env::storage_byte_cost()
     }
 
@@ -72,7 +118,7 @@ impl Account {
 
     /// Returns minimal account deposit storage usage possible.
     pub fn min_storage_usage() -> Balance {
-        MIN_ACCOUNT_DEPOSIT_LENGTH * env::storage_byte_cost()
+        INIT_ACCOUNT_STORAGE as Balance * env::storage_byte_cost()
     }
 
     /// Registers given token and set balance to 0.
@@ -102,7 +148,7 @@ impl Contract {
     pub fn register_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
-        let mut deposits = self.get_account_deposits(&sender_id);
+        let mut deposits = self.internal_unwrap_account(&sender_id);
         deposits.register(&token_ids);
         self.internal_save_account(&sender_id, deposits);
     }
@@ -113,7 +159,7 @@ impl Contract {
     pub fn unregister_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
-        let mut deposits = self.get_account_deposits(&sender_id);
+        let mut deposits = self.internal_unwrap_account(&sender_id);
         for token_id in token_ids {
             deposits.unregister(token_id.as_ref());
         }
@@ -134,7 +180,7 @@ impl Contract {
         let token_id: AccountId = token_id.into();
         let amount: u128 = amount.into();
         let sender_id = env::predecessor_account_id();
-        let mut deposits = self.get_account_deposits(&sender_id);
+        let mut deposits = self.internal_unwrap_account(&sender_id);
         // Note: subtraction and deregistration will be reverted if the promise fails.
         deposits.withdraw(&token_id, amount);
         if unregister == Some(true) {
@@ -162,7 +208,8 @@ impl Contract {
             PromiseResult::Successful(_) => {}
             PromiseResult::Failed => {
                 // This reverts the changes from withdraw function. If account doesn't exit, deposits to the owner's account.
-                if let Some(mut account) = self.accounts.get(&sender_id) {
+                if let Some(va) = self.accounts.get(&sender_id) {
+                    let mut account: Account = va.into();
                     account.deposit(&token_id, amount.0);
                     self.internal_save_account(&sender_id, account);
                 } else {
@@ -173,7 +220,7 @@ impl Contract {
                         )
                         .as_bytes(),
                     );
-                    let mut owner_account = self.get_account_deposits(&self.owner_id);
+                    let mut owner_account = self.internal_unwrap_account(&self.owner_id);
                     owner_account.deposit(&token_id, amount.0);
                     self.internal_save_account(&self.owner_id.clone(), owner_account);
                 }
@@ -183,18 +230,19 @@ impl Contract {
 }
 
 impl Contract {
+
     /// Checks that account has enough storage to be stored and saves it into collection.
     /// This should be only place to directly use `self.accounts`.
     pub(crate) fn internal_save_account(&mut self, account_id: &AccountId, account: Account) {
         account.assert_storage_usage();
-        self.accounts.insert(&account_id, &account);
+        self.accounts.insert(&account_id, &account.into());
     }
 
     /// Registers account in deposited amounts with given amount of $NEAR.
     /// If account already exists, adds amount to it.
     /// This should be used when it's known that storage is prepaid.
     pub(crate) fn internal_register_account(&mut self, account_id: &AccountId, amount: Balance) {
-        let mut account = self.accounts.get(&account_id).unwrap_or_default();
+        let mut account = self.internal_unwrap_or_default_account(&account_id);
         account.near_amount += amount;
         self.internal_save_account(&account_id, account);
     }
@@ -207,7 +255,7 @@ impl Contract {
         token_id: &AccountId,
         amount: Balance,
     ) {
-        let mut account = self.get_account_deposits(sender_id);
+        let mut account = self.internal_unwrap_account(sender_id);
         assert!(
             self.whitelisted_tokens.contains(token_id) || account.tokens.contains_key(token_id),
             "{}",
@@ -217,10 +265,18 @@ impl Contract {
         self.internal_save_account(&sender_id, account);
     }
 
-    // Returns `from` AccountDeposit.
-    #[inline]
-    pub(crate) fn get_account_deposits(&self, from: &AccountId) -> Account {
-        self.accounts.get(from).expect(ERR10_ACC_NOT_REGISTERED)
+    pub fn internal_unwrap_account(&self, account_id: &AccountId) -> Account {
+        self.accounts
+            .get(account_id)
+            .expect(errors::ERR10_ACC_NOT_REGISTERED)
+            .into()
+    }
+
+    pub fn internal_unwrap_or_default_account(&self, account_id: &AccountId) -> Account {
+        self.accounts
+            .get(account_id)
+            .unwrap_or(Account::default().into())
+            .into()
     }
 
     /// Returns current balance of given token for given user. If there is nothing recorded, returns 0.
@@ -231,7 +287,7 @@ impl Contract {
     ) -> Balance {
         self.accounts
             .get(sender_id)
-            .and_then(|d| d.tokens.get(token_id).cloned())
+            .and_then(|va| {let a: Account = va.into(); a.tokens.get(token_id).cloned()})
             .unwrap_or_default()
     }
 

@@ -82,14 +82,17 @@ impl Contract {
                 );
             }
             TokenOrPool::Token(token_id) => {
-                let mut sender_account = self
+                let mut sender_account: Account = self
                     .accounts
                     .get(&sender_id)
-                    .expect(ERR10_ACC_NOT_REGISTERED);
-                let mut receiver_account = self
+                    .expect(ERR10_ACC_NOT_REGISTERED)
+                    .into();
+                let mut receiver_account: Account = self
                     .accounts
                     .get(receiver_id)
-                    .expect(ERR10_ACC_NOT_REGISTERED);
+                    .expect(ERR10_ACC_NOT_REGISTERED)
+                    .into();
+                
                 sender_account.withdraw(&token_id, amount);
                 receiver_account.deposit(&token_id, amount);
                 self.internal_save_account(&sender_id, sender_account);

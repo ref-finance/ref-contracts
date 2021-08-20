@@ -34,14 +34,14 @@ impl Contract {
     ) -> Vec<(AccountId, Balance)> {
         // [AUDIT_12] always save back account for a resident user
         let mut is_resident_user: bool = true;
-        let mut initial_account = self.accounts.get(sender_id).unwrap_or_else(|| {
+        let mut initial_account: Account = self.accounts.get(sender_id).unwrap_or_else(|| {
             is_resident_user = false;
             if !force {
                 env::panic(ERR10_ACC_NOT_REGISTERED.as_bytes());
             } else {
-                Account::default()
+                Account::default().into()
             }
-        });
+        }).into();
         initial_account.deposit(&token_in, amount_in);
         let mut account = initial_account.clone();
         let _ = self.internal_execute_actions(

@@ -44,7 +44,7 @@ impl StorageManagement for Contract {
     fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
         assert_one_yocto();
         let account_id = env::predecessor_account_id();
-        let account_deposit = self.get_account_deposits(&account_id);
+        let account_deposit = self.internal_unwrap_account(&account_id);
         let available = account_deposit.storage_available();
         let amount = amount.map(|a| a.0).unwrap_or(available);
         assert!(amount <= available, "ERR_STORAGE_WITHDRAW_TOO_MUCH");
@@ -60,6 +60,7 @@ impl StorageManagement for Contract {
         let account_id = env::predecessor_account_id();
         if let Some(account_deposit) = self.accounts.get(&account_id) {
             // TODO: figure out force option logic.
+            let account_deposit: Account = account_deposit.into();
             assert!(
                 account_deposit.tokens.is_empty(),
                 "ERR_STORAGE_UNREGISTER_TOKENS_NOT_EMPTY"
@@ -82,9 +83,13 @@ impl StorageManagement for Contract {
     fn storage_balance_of(&self, account_id: ValidAccountId) -> Option<StorageBalance> {
         self.accounts
             .get(account_id.as_ref())
-            .map(|deposits| StorageBalance {
-                total: U128(deposits.near_amount),
-                available: U128(deposits.storage_available()),
-            })
+            .map(|deposits| 
+                { 
+                    let account: Account = deposits.into(); 
+                    StorageBalance {
+                        total: U128(account.near_amount),
+                        available: U128(account.storage_available()),
+                    } 
+                })
     }
 }
