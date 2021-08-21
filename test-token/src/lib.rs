@@ -24,7 +24,9 @@ impl Contract {
     }
 
     pub fn mint(&mut self, account_id: ValidAccountId, amount: U128) {
-        self.token.internal_register_account(account_id.as_ref());
+        if !self.token.accounts.contains_key(account_id.as_ref()) {
+            self.token.internal_register_account(account_id.as_ref());
+        }
         self.token
             .internal_deposit(account_id.as_ref(), amount.into());
     }

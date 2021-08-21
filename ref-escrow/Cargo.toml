@@ -1,0 +1,17 @@
+[package]
+name = "ref-escrow"
+version = "0.1.0"
+authors = ["referencedev <goi65io3903d@protonmail.com>"]
+edition = "2018"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077" }
+near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077" }
+
+[dev-dependencies]
+near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "9d99077" }
+test-token = { path = "../test-token" }
