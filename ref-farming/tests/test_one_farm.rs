@@ -24,7 +24,7 @@ fn one_farm_whole_lifecycle() {
     // farmer1 add liqidity 
     add_liqudity(&farmer, &pool, &token1, &token2, 0);
     assert_eq!(
-        view!(pool.mft_balance_of("0".to_string(), to_va(farmer.account_id.clone())))
+        view!(pool.mft_balance_of(":0".to_string(), to_va(farmer.account_id.clone())))
             .unwrap_json::<U128>()
             .0,
         to_yocto("1")
@@ -34,7 +34,7 @@ fn one_farm_whole_lifecycle() {
     // farmer2 add liqidity 
     add_liqudity(&farmer2, &pool, &token1, &token2, 0);
     assert_eq!(
-        view!(pool.mft_balance_of("0".to_string(), to_va(farmer2.account_id.clone())))
+        view!(pool.mft_balance_of(":0".to_string(), to_va(farmer2.account_id.clone())))
             .unwrap_json::<U128>()
             .0,
         to_yocto("1")
@@ -47,7 +47,7 @@ fn one_farm_whole_lifecycle() {
     println!("----->> Farm {} is ready.", farm_id.clone());
 
     // register LP token to farming contract
-    call!(root, pool.mft_register("0".to_string(), to_va(farming_id())), deposit = to_yocto("1"))
+    call!(root, pool.mft_register(":0".to_string(), to_va(farming_id())), deposit = to_yocto("1"))
     .assert_success();
     println!("----->> Registered LP 0 to {}.", farming_id());
 
@@ -57,7 +57,7 @@ fn one_farm_whole_lifecycle() {
     println!("----->> Registered farmer to {}.", farming_id());
     let out_come = call!(
         farmer,
-        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
         deposit = 1
     );
     out_come.assert_success();
@@ -77,7 +77,7 @@ fn one_farm_whole_lifecycle() {
     println!("----->> Registered farmer2 to {}.", farming_id());
     let out_come = call!(
         farmer2,
-        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
         deposit = 1
     );
     out_come.assert_success();
@@ -186,7 +186,7 @@ fn one_farm_one_farmer() {
     // farmer1 add liqidity 
     add_liqudity(&farmer1, &pool, &token1, &token2, 0);
     assert_eq!(
-        view!(pool.mft_balance_of("0".to_string(), to_va(farmer1.account_id.clone())))
+        view!(pool.mft_balance_of(":0".to_string(), to_va(farmer1.account_id.clone())))
             .unwrap_json::<U128>()
             .0,
         to_yocto("1")
@@ -200,7 +200,7 @@ fn one_farm_one_farmer() {
     println!("----->> Farm {} is ready.", farm_id.clone());
 
     // register LP for farming contract
-    call!(root, pool.mft_register("0".to_string(), to_va(farming_id())), deposit = to_yocto("1"))
+    call!(root, pool.mft_register(":0".to_string(), to_va(farming_id())), deposit = to_yocto("1"))
     .assert_success();
     println!("Registered LP 0 for {}.", farming_id());
     // farmer1 register and stake liquidity token
@@ -208,7 +208,7 @@ fn one_farm_one_farmer() {
     .assert_success();
     let out_come = call!(
         farmer1,
-        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
         deposit = 1
     );
     out_come.assert_success();
@@ -361,7 +361,7 @@ fn one_farm_two_farmers() {
     // farmer1 add liqidity 
     add_liqudity(&farmer1, &pool, &token1, &token2, 0);
     assert_eq!(
-        view!(pool.mft_balance_of("0".to_string(), to_va(farmer1.account_id.clone())))
+        view!(pool.mft_balance_of(":0".to_string(), to_va(farmer1.account_id.clone())))
             .unwrap_json::<U128>()
             .0,
         to_yocto("1")
@@ -371,7 +371,7 @@ fn one_farm_two_farmers() {
     // farmer2 add liqidity 
     add_liqudity(&farmer2, &pool, &token1, &token2, 0);
     assert_eq!(
-        view!(pool.mft_balance_of("0".to_string(), to_va(farmer2.account_id.clone())))
+        view!(pool.mft_balance_of(":0".to_string(), to_va(farmer2.account_id.clone())))
             .unwrap_json::<U128>()
             .0,
         to_yocto("1")
@@ -384,7 +384,7 @@ fn one_farm_two_farmers() {
     println!("----->> Farm {} is ready.", farm_id.clone());
 
     // register LP for farming contract
-    call!(root, pool.mft_register("0".to_string(), to_va(farming_id())), deposit = to_yocto("1"))
+    call!(root, pool.mft_register(":0".to_string(), to_va(farming_id())), deposit = to_yocto("1"))
     .assert_success();
     println!("Registered LP 0 for {}.", farming_id());
     // farmer1 register and stake liquidity token
@@ -392,7 +392,7 @@ fn one_farm_two_farmers() {
     .assert_success();
     let out_come = call!(
         farmer1,
-        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
         deposit = 1
     );
     out_come.assert_success();
@@ -423,7 +423,7 @@ fn one_farm_two_farmers() {
     .assert_success();
     let out_come = call!(
         farmer2,
-        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
         deposit = 1
     );
     out_come.assert_success();
@@ -551,7 +551,7 @@ fn one_farm_before_farmer() {
     // farmer1 add liqidity 
     add_liqudity(&farmer1, &pool, &token1, &token2, 0);
     assert_eq!(
-        view!(pool.mft_balance_of("0".to_string(), to_va(farmer1.account_id.clone())))
+        view!(pool.mft_balance_of(":0".to_string(), to_va(farmer1.account_id.clone())))
             .unwrap_json::<U128>()
             .0,
         to_yocto("1")
@@ -565,7 +565,7 @@ fn one_farm_before_farmer() {
     println!("----->> Farm {} is ready.", farm_id.clone());
 
     // register LP for farming contract
-    call!(root, pool.mft_register("0".to_string(), to_va(farming_id())), deposit = to_yocto("1"))
+    call!(root, pool.mft_register(":0".to_string(), to_va(farming_id())), deposit = to_yocto("1"))
     .assert_success();
     println!("Registered LP 0 for {}.", farming_id());
 
@@ -600,7 +600,7 @@ fn one_farm_before_farmer() {
     .assert_success();
     let out_come = call!(
         farmer1,
-        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
         deposit = 1
     );
     out_come.assert_success();

@@ -16,6 +16,7 @@ pub const ERR31_SEED_NOT_EXIST: &str = "E31: seed not exist";
 pub const ERR32_NOT_ENOUGH_SEED: &str = "E32: not enough amount of seed";
 pub const ERR33_INVALID_SEED_ID: &str = "E33: invalid seed id";
 pub const ERR34_BELOW_MIN_SEED_DEPOSITED: &str = "E34: below min_deposit of this seed";
+pub const ERR35_ILLEGAL_TOKEN_ID: &str = "E35: illegal token_id in mft_transfer_call";
 
 // farm errors //
 pub const ERR41_FARM_NOT_EXIST: &str = "E41: farm not exist";

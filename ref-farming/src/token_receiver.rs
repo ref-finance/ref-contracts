@@ -104,8 +104,21 @@ enum TokenOrPool {
     Pool(u64),
 }
 
+/// a sub token would use a format ":<u64>"
+fn try_identify_sub_token_id(token_id: &String) ->Result<u64, &'static str> {
+    if token_id.starts_with(":") {
+        if let Ok(pool_id) = str::parse::<u64>(&token_id[1..token_id.len()]) {
+            Ok(pool_id)
+        } else {
+            Err("Illegal pool id")
+        }
+    } else {
+        Err("Illegal pool id")
+    }
+}
+
 fn parse_token_id(token_id: String) -> TokenOrPool {
-    if let Ok(pool_id) = str::parse::<u64>(&token_id) {
+    if let Ok(pool_id) = try_identify_sub_token_id(&token_id) {
         TokenOrPool::Pool(pool_id)
     } else {
         TokenOrPool::Token(token_id)
@@ -134,7 +147,8 @@ impl MFTTokenReceiver for Contract {
                 seed_id = format!("{}{}{}", env::predecessor_account_id(), MFT_TAG, pool_id);
             }
             TokenOrPool::Token(_) => {
-                seed_id = env::predecessor_account_id();
+                // for seed deposit, using mft to transfer 'root' token is not supported.
+                env::panic(ERR35_ILLEGAL_TOKEN_ID.as_bytes());
             }
         }
 

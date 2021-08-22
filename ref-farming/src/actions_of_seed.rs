@@ -50,7 +50,7 @@ impl Contract {
             SeedType::MFT => {
                 let (receiver_id, token_id) = parse_seed_id(&seed_id);
                 ext_multi_fungible_token::mft_transfer(
-                    token_id,
+                    format!(":{}", token_id),
                     sender_id.clone().try_into().unwrap(),
                     amount.into(),
                     None,

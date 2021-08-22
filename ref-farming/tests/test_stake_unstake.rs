@@ -26,7 +26,7 @@ fn one_farm_staking() {
     // farmer1 add liqidity 
     add_liqudity(&farmer1, &pool, &token1, &token2, 0);
     assert_eq!(
-        view!(pool.mft_balance_of("0".to_string(), to_va(farmer1.account_id.clone())))
+        view!(pool.mft_balance_of(":0".to_string(), to_va(farmer1.account_id.clone())))
             .unwrap_json::<U128>()
             .0,
         to_yocto("1")
@@ -41,7 +41,7 @@ fn one_farm_staking() {
 
     // register LP for farming contract
     println!("---->> Registering LP 0 for {}.", farming_id());
-    call!(root, pool.mft_register("0".to_string(), to_va(farming_id())), deposit = to_yocto("1"))
+    call!(root, pool.mft_register(":0".to_string(), to_va(farming_id())), deposit = to_yocto("1"))
     .assert_success();
     
     // farmer1 register and stake liquidity token
@@ -50,7 +50,7 @@ fn one_farm_staking() {
     .assert_success();
     let out_come = call!(
         farmer1,
-        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
         deposit = 1
     );
     out_come.assert_success();
@@ -81,7 +81,7 @@ fn one_farm_staking() {
     assert_farming(&farm_info, "Running".to_string(), to_yocto("500"), 3, 1, to_yocto("1"), to_yocto("2"), 0);
     let out_come = call!(
         farmer1,
-        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("0.5").into(), None, "".to_string()),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.5").into(), None, "".to_string()),
         deposit = 1
     );
     out_come.assert_success();
@@ -94,7 +94,7 @@ fn one_farm_staking() {
     println!("  Chain goes for 60 blocks *** now height: {}", root.borrow_runtime().current_block().block_height);
     let out_come = call!(
         farmer1,
-        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("0.5").into(), None, "".to_string()),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.5").into(), None, "".to_string()),
         deposit = 1
     );
     out_come.assert_success();
@@ -133,7 +133,7 @@ fn one_farm_staking() {
     println!("  Chain goes for 60 blocks *** now height: {}", root.borrow_runtime().current_block().block_height);
     let out_come = call!(
         farmer1,
-        pool.mft_transfer_call("0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
         deposit = 1
     );
     out_come.assert_success();
