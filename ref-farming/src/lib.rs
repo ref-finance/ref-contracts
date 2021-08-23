@@ -41,6 +41,7 @@ near_sdk::setup_alloc!();
 #[derive(BorshStorageKey, BorshSerialize)]
 pub enum StorageKeys {
     Seed,
+    Farm,
     OutdatedFarm,
     Farmer,
     RewardInfo,
@@ -61,11 +62,11 @@ pub struct ContractData {
     // farmers: LookupMap<AccountId, Farmer>,
     farmers: LookupMap<AccountId, VersionedFarmer>,
 
+    farms: UnorderedMap<FarmId, Farm>,
     outdated_farms: UnorderedMap<FarmId, Farm>,
 
     // for statistic
     farmer_count: u64,
-    farm_count: u64,
     reward_info: UnorderedMap<AccountId, Balance>,
 }
 
@@ -93,9 +94,9 @@ impl Contract {
             data: VersionedContractData::Current(ContractData {
                 owner_id: owner_id.into(),
                 farmer_count: 0,
-                farm_count: 0,
                 seeds: UnorderedMap::new(StorageKeys::Seed),
                 farmers: LookupMap::new(StorageKeys::Farmer),
+                farms: UnorderedMap::new(StorageKeys::Farm),
                 outdated_farms: UnorderedMap::new(StorageKeys::OutdatedFarm),
                 reward_info: UnorderedMap::new(StorageKeys::RewardInfo),
             }),
@@ -122,8 +123,8 @@ mod tests {
 
     use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
     use near_sdk::test_utils::{accounts, VMContextBuilder};
-    use near_sdk::{testing_env, Balance, MockedBlockchain, BlockHeight};
-    use near_sdk::json_types::{ValidAccountId, U64, U128};
+    use near_sdk::{testing_env, Balance, MockedBlockchain};
+    use near_sdk::json_types::{ValidAccountId, U128};
     use simple_farm::{HRSimpleFarmTerms};
     use near_contract_standards::storage_management::{StorageBalance, StorageManagement};
 
@@ -148,7 +149,7 @@ mod tests {
         // storage needed: 341
         testing_env!(context
             .predecessor_account_id(accounts(0))
-            .attached_deposit(env::storage_byte_cost() * 500)
+            .attached_deposit(env::storage_byte_cost() * 559)
             .build());
         contract.create_simple_farm(HRSimpleFarmTerms {
             seed_id: seed.into(),
@@ -273,7 +274,7 @@ mod tests {
         assert_eq!(farm_info.start_at, 100);
 
         // Farmer accounts(0) come in round 1
-        let sb = register_farmer(&mut context, &mut contract, accounts(0));
+        register_farmer(&mut context, &mut contract, accounts(0));
         deposit_seed(&mut context, &mut contract, accounts(0), 160, 10);
         let unclaimed = contract.get_unclaimed_reward(accounts(0), farm_id.clone());
         assert_eq!(unclaimed, U128(0));
@@ -295,7 +296,7 @@ mod tests {
         assert_eq!(farm_info.last_round, 1);
 
         // Farmer accounts(3) come in 
-        let sb = register_farmer(&mut context, &mut contract, accounts(3));
+        register_farmer(&mut context, &mut contract, accounts(3));
         // deposit seed
         deposit_seed(&mut context, &mut contract, accounts(3), 260, 10);
         let unclaimed = contract.get_unclaimed_reward(accounts(3), farm_id.clone());

@@ -23,7 +23,7 @@ impl Contract {
         let mut farmer = self.get_farmer(&sender_id);
         let (seed_id, _) = parse_farm_id(&farm_id);
         let farm_seed = self.get_seed(&seed_id);
-        if !farm_seed.get_ref().farms.contains_key(&farm_id) {
+        if !farm_seed.get_ref().farms.contains(&farm_id) {
             farmer.get_ref_mut().remove_rps(&farm_id);
             self.data_mut().farmers.insert(&sender_id, &farmer);
             true
@@ -162,13 +162,15 @@ impl Contract {
         let mut farmer = self.get_farmer(sender_id);
         if let Some(mut farm_seed) = self.get_seed_wrapped(seed_id) {
             let amount = farm_seed.get_ref().amount;
-            for farm in &mut farm_seed.get_ref_mut().farms.values_mut() {
+            for farm_id in &mut farm_seed.get_ref_mut().farms.iter() {
+                let mut farm = self.data().farms.get(farm_id).unwrap();
                 claim_user_reward_from_farm(
-                    farm, 
+                    &mut farm, 
                     farmer.get_ref_mut(),  
                     &amount,
                     true,
                 );
+                self.data_mut().farms.insert(farm_id, &farm);
             }
             self.data_mut().seeds.insert(seed_id, &farm_seed);
             self.data_mut().farmers.insert(sender_id, &farmer);
@@ -183,16 +185,16 @@ impl Contract {
 
         let (seed_id, _) = parse_farm_id(farm_id);
 
-        if let Some(mut farm_seed) = self.get_seed_wrapped(&seed_id) {
+        if let Some(farm_seed) = self.get_seed_wrapped(&seed_id) {
             let amount = farm_seed.get_ref().amount;
-            if let Some(farm) = farm_seed.get_ref_mut().farms.get_mut(farm_id) {
+            if let Some(mut farm) = self.data().farms.get(farm_id) {
                 claim_user_reward_from_farm(
-                    farm, 
+                    &mut farm, 
                     farmer.get_ref_mut(), 
                     &amount,
                     false,
                 );
-                self.data_mut().seeds.insert(&seed_id, &farm_seed);
+                self.data_mut().farms.insert(farm_id, &farm);
                 self.data_mut().farmers.insert(sender_id, &farmer);
             }
         }

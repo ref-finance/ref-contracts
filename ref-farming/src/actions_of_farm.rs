@@ -72,13 +72,11 @@ impl Contract {
             farm_id.clone(),
             terms.into(),
         ));
-
-        // farm_seed.get_ref_mut().farms.push(farm);
-        farm_seed.get_ref_mut().farms.insert(farm_id.clone(), farm);
+        
+        farm_seed.get_ref_mut().farms.insert(farm_id.clone());
         farm_seed.get_ref_mut().next_index += 1;
         self.data_mut().seeds.insert(&terms.seed_id, &farm_seed);
-
-        self.data_mut().farm_count += 1;
+        self.data_mut().farms.insert(&farm_id.clone(), &farm);
         farm_id
     }
 
@@ -88,15 +86,17 @@ impl Contract {
 
         let mut farm_seed = self.get_seed(&seed_id);
         let mut removable_farms: Vec<String> = vec![];
-        for farm in farm_seed.get_ref().farms.values() {
+        for farm_id in farm_seed.get_ref().farms.iter() {
+            let farm = self.data().farms.get(farm_id).expect(ERR41_FARM_NOT_EXIST);
             if farm.can_be_removed() {
                 removable_farms.push(farm.get_farm_id());
             }
         }
         for farm_id in &removable_farms {
-            let mut farm = farm_seed.get_ref_mut().farms.remove(farm_id).unwrap();
+            let mut farm = self.data_mut().farms.remove(farm_id).unwrap();
             farm.move_to_clear();
             self.data_mut().outdated_farms.insert(farm_id, &farm);
+            farm_seed.get_ref_mut().farms.remove(farm_id);
         }
         if removable_farms.len() > 0 {
             self.data_mut().seeds.insert(&seed_id, &farm_seed);
@@ -107,15 +107,16 @@ impl Contract {
         let (seed_id, _) = parse_farm_id(farm_id);
         let mut removable = false;
         if let Some(mut farm_seed) = self.get_seed_wrapped(&seed_id) {
-            if let Some(farm) = farm_seed.get_ref_mut().farms.get_mut(farm_id) {
+            if let Some(farm) = self.data().farms.get(farm_id) {
                 if force || farm.can_be_removed() {
                     removable = true;
                 }
             }
             if removable {
-                let mut farm = farm_seed.get_ref_mut().farms.remove(farm_id).unwrap();
+                let mut farm = self.data_mut().farms.get(farm_id).expect(ERR41_FARM_NOT_EXIST);
                 farm.move_to_clear();
                 self.data_mut().outdated_farms.insert(farm_id, &farm);
+                farm_seed.get_ref_mut().farms.remove(farm_id);
                 self.data_mut().seeds.insert(&seed_id, &farm_seed);
                 return true;
             }

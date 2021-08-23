@@ -109,7 +109,7 @@ impl Contract {
             owner_id: self.data().owner_id.clone(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             farmer_count: self.data().farmer_count.into(),
-            farm_count: self.data().farm_count.into(),
+            farm_count: self.data().farms.len().into(),
             seed_count: self.data().seeds.len().into(),
             reward_count: self.data().reward_info.len().into(),
         }
@@ -117,50 +117,57 @@ impl Contract {
 
     /// Returns number of farms.
     pub fn get_number_of_farms(&self) -> u64 {
-        self.data().seeds.values().fold(0_u64, |acc, farm_seed| {
-            if farm_seed.need_upgrade() {
-                acc + farm_seed.upgrade().get_ref().farms.len() as u64
-            } else {
-                acc + farm_seed.get_ref().farms.len() as u64
-            }
-        })
+        self.data().farms.len()
+    }
+
+    pub fn get_number_of_outdated_farms(&self) -> u64 {
+        self.data().outdated_farms.len()
     }
 
     /// Returns list of farms of given length from given start index.
-    #[allow(unused_variables)]
     pub fn list_farms(&self, from_index: u64, limit: u64) -> Vec<FarmInfo> {
-        // TODO: how to page that
-        let mut res = vec![];
-        for farm_seed in self.data().seeds.values() {
-            let sf;
-            if farm_seed.need_upgrade() {
-                sf = self.list_farms_by_seed(farm_seed.upgrade().get_ref().seed_id.clone());
-            } else {
-                sf = self.list_farms_by_seed(farm_seed.get_ref().seed_id.clone());
-            }
-            res.push(sf);
-        }
-        res.concat()
+        let keys = self.data().farms.keys_as_vector();
+
+        (from_index..std::cmp::min(from_index + limit, keys.len()))
+            .map(|index| 
+                (&self.data().farms.get(&keys.get(index).unwrap()).unwrap()).into()
+            )
+            .collect()
+    }
+
+    pub fn list_outdated_farms(&self, from_index: u64, limit: u64) -> Vec<FarmInfo> {
+        let keys = self.data().outdated_farms.keys_as_vector();
+
+        (from_index..std::cmp::min(from_index + limit, keys.len()))
+            .map(|index| 
+                (&self.data().outdated_farms.get(&keys.get(index).unwrap()).unwrap()).into()
+            )
+            .collect()
     }
 
     pub fn list_farms_by_seed(&self, seed_id: SeedId) -> Vec<FarmInfo> {
         self.get_seed(&seed_id)
             .get_ref()
             .farms
-            .values()
-            .map(|farm| farm.into())
+            .iter()
+            .map(|farm_id| 
+                (&self.data().farms.get(&farm_id).unwrap()).into()
+            )
             .collect()
     }
 
     /// Returns information about specified farm.
     pub fn get_farm(&self, farm_id: FarmId) -> Option<FarmInfo> {
-        let (seed_id, _) = parse_farm_id(&farm_id);
-        if let Some(farm_seed) = self.get_seed_wrapped(&seed_id) {
-            if let Some(farm) = farm_seed.get_ref().farms.get(&farm_id) {
-                Some(farm.into())
-            } else {
-                None
-            }
+        if let Some(farm) = self.data().farms.get(&farm_id) {
+            Some((&farm).into())
+        } else {
+            None
+        }
+    }
+
+    pub fn get_outdated_farm(&self, farm_id: FarmId) -> Option<FarmInfo> {
+        if let Some(farm) = self.data().outdated_farms.get(&farm_id) {
+            Some((&farm).into())
         } else {
             None
         }
@@ -206,7 +213,7 @@ impl Contract {
             self.get_farmer_wrapped(account_id.as_ref()),
             self.get_seed_wrapped(&seed_id),
         ) {
-            if let Some(farm) = farm_seed.get_ref().farms.get(&farm_id) {
+            if let Some(farm) = self.data().farms.get(&farm_id) {
                 let reward_amount = farm.view_farmer_unclaimed_reward(
                     &farmer.get_ref().get_rps(&farm.get_farm_id()),
                     farmer.get_ref().seeds.get(&seed_id).unwrap_or(&0_u128),
