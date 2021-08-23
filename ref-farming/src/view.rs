@@ -11,6 +11,13 @@ use crate::utils::parse_farm_id;
 use crate::simple_farm::DENOM;
 use crate::*;
 
+use uint::construct_uint;
+
+construct_uint! {
+    /// 256-bit unsigned integer.
+    pub struct U256(4);
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct Metadata {
@@ -30,13 +37,13 @@ pub struct FarmInfo {
     pub farm_status: String,
     pub seed_id: SeedId,
     pub reward_token: AccountId,
-    pub start_at: U64,
+    pub start_at: u32,
     pub reward_per_session: U128,
-    pub session_interval: U64,
+    pub session_interval: u32,
 
     pub total_reward: U128,
-    pub cur_round: U64,
-    pub last_round: U64,
+    pub cur_round: u32,
+    pub last_round: u32,
     pub claimed_reward: U128,
     pub unclaimed_reward: U128,
     pub beneficiary_reward: U128,
@@ -50,7 +57,7 @@ impl From<&Farm> for FarmInfo {
                 if let Some(dis) = farm.try_distribute(&DENOM) {
                     let mut farm_status: String = (&farm.status).into();
                     if farm_status == "Running".to_string()
-                        && dis.undistributed < farm.terms.reward_per_session
+                        && dis.undistributed == 0
                     {
                         farm_status = "Ended".to_string();
                     }
@@ -60,9 +67,9 @@ impl From<&Farm> for FarmInfo {
                         farm_status,
                         seed_id: farm.terms.seed_id.clone(),
                         reward_token: farm.terms.reward_token.clone(),
-                        start_at: farm.terms.start_at.into(),
+                        start_at: farm.terms.start_at,
                         reward_per_session: farm.terms.reward_per_session.into(),
-                        session_interval: farm.terms.session_interval.into(),
+                        session_interval: farm.terms.session_interval,
 
                         total_reward: farm.amount_of_reward.into(),
                         cur_round: dis.rr.into(),
@@ -100,7 +107,7 @@ impl Contract {
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
             owner_id: self.data().owner_id.clone(),
-            version: String::from("0.5.2"),
+            version: env!("CARGO_PKG_VERSION").to_string(),
             farmer_count: self.data().farmer_count.into(),
             farm_count: self.data().farm_count.into(),
             seed_count: self.data().seeds.len().into(),
@@ -262,5 +269,14 @@ impl Contract {
                 )
             })
             .collect()
+    }
+
+    pub fn get_user_rps(&self, account_id: ValidAccountId, farm_id: FarmId) -> String {
+        let farmer = self.get_farmer(account_id.as_ref());
+        if let Some(rps) = farmer.get().user_rps.get(&farm_id) {
+            format!("{}", U256::from_little_endian(&rps))
+        } else {
+            String::from("")
+        }
     }
 }

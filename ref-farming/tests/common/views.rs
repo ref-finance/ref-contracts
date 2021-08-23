@@ -1,4 +1,4 @@
-use near_sdk::json_types::{U128, U64};
+use near_sdk::json_types::{U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk_sim::{view, ContractAccount};
 
@@ -32,15 +32,15 @@ pub(crate) fn show_farms_by_seed(
             );
             println!(
                 "  StartAt:{}, SessionReward:{}, SessionInterval:{}",
-                farm_info.start_at.0, farm_info.reward_per_session.0, farm_info.session_interval.0
+                farm_info.start_at, farm_info.reward_per_session.0, farm_info.session_interval
             );
             println!(
                 "  TotalReward:{}, Claimed:{}, Unclaimed:{}, LastRound:{}, CurRound:{}",
                 farm_info.total_reward.0,
                 farm_info.claimed_reward.0,
                 farm_info.unclaimed_reward.0,
-                farm_info.last_round.0,
-                farm_info.cur_round.0
+                farm_info.last_round,
+                farm_info.cur_round
             );
         }
     }
@@ -61,15 +61,15 @@ pub(crate) fn show_farminfo(
         );
         println!(
             "  StartAt:{}, SessionReward:{}, SessionInterval:{}",
-            farm_info.start_at.0, farm_info.reward_per_session.0, farm_info.session_interval.0
+            farm_info.start_at, farm_info.reward_per_session.0, farm_info.session_interval
         );
         println!(
             "  TotalReward:{}, Claimed:{}, Unclaimed:{}, LastRound:{}, CurRound:{}",
             farm_info.total_reward.0,
             farm_info.claimed_reward.0,
             farm_info.unclaimed_reward.0,
-            farm_info.last_round.0,
-            farm_info.cur_round.0
+            farm_info.last_round,
+            farm_info.cur_round
         );
     }
     farm_info
@@ -113,7 +113,7 @@ pub(crate) fn show_unclaim(
     if show_print {
         println!(
             "User Unclaimed for {}@{}:[CRR:{}, LRR:{}] {}",
-            user_id, farm_id, farm_info.cur_round.0, farm_info.last_round.0, ret.0
+            user_id, farm_id, farm_info.cur_round, farm_info.last_round, ret.0
         );
     }
     ret
@@ -135,16 +135,16 @@ pub(crate) fn assert_farming(
     farm_info: &FarmInfo,
     farm_status: String,
     total_reward: u128,
-    cur_round: u64,
-    last_round: u64,
+    cur_round: u32,
+    last_round: u32,
     claimed_reward: u128,
     unclaimed_reward: u128,
     beneficiary_reward: u128,
 ) {
     assert_eq!(farm_info.farm_status, farm_status);
     assert_eq!(farm_info.total_reward.0, total_reward);
-    assert_eq!(farm_info.cur_round.0, cur_round);
-    assert_eq!(farm_info.last_round.0, last_round);
+    assert_eq!(farm_info.cur_round, cur_round);
+    assert_eq!(farm_info.last_round, last_round);
     assert_eq!(farm_info.claimed_reward.0, claimed_reward);
     assert_eq!(farm_info.unclaimed_reward.0, unclaimed_reward);
     assert_eq!(farm_info.beneficiary_reward.0, beneficiary_reward);

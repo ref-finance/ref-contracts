@@ -174,7 +174,7 @@ impl Contract {
             farmer.get_ref_mut().amount += amount;
             self.data_mut().farmers.insert(&account_id, &farmer);
         } else {
-            self.data_mut().farmers.insert(&account_id, &VersionedFarmer::new(amount));
+            self.data_mut().farmers.insert(&account_id, &VersionedFarmer::new(account_id.clone(), amount));
             self.data_mut().farmer_count += 1;
         }
     }

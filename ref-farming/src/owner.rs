@@ -7,17 +7,22 @@ use crate::utils::{GAS_FOR_DEPLOY_CALL, GAS_FOR_UPGRADE_CALL};
 #[near_bindgen]
 impl Contract {
     pub fn set_owner(&mut self, owner_id: ValidAccountId) {
-
         self.assert_owner();
-
         self.data_mut().owner_id = owner_id.into();
     }
 
+    /// clean all farms that has ended and unclaimed reward is 0
     pub fn clean_farm_by_seed(&mut self, seed_id: String) {
         self.assert_owner();
         if let Some(_) = self.get_seed_wrapped(&seed_id) {
-            self.internal_remove_farm(&seed_id);
+            self.internal_remove_farm_by_seed_id(&seed_id);
         }
+    }
+
+    /// force clean 
+    pub fn force_clean_farm(&mut self, farm_id: String) -> bool {
+        self.assert_owner();
+        self.internal_remove_farm_by_farm_id(&farm_id, true)
     }
 
     pub fn modify_seed_min_deposit(&mut self, seed_id: String, min_deposit: U128) {

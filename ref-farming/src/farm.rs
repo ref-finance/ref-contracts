@@ -85,4 +85,10 @@ impl Farm {
         }
     }
 
+    pub fn move_to_clear(&mut self) -> bool {
+        match self {
+            Farm::SimpleFarm(farm) => farm.move_to_clear(),
+        }
+    }
+
 }

@@ -214,8 +214,8 @@ fn one_farm_one_farmer() {
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-    assert_eq!(farm_info.cur_round.0, 0_u64);
-    assert_eq!(farm_info.last_round.0, 0_u64);
+    assert_eq!(farm_info.cur_round, 0);
+    assert_eq!(farm_info.last_round, 0);
     assert_eq!(farm_info.claimed_reward.0, 0_u128);
     assert_eq!(farm_info.unclaimed_reward.0, 0_u128);
     let user_seeds = show_userseeds(&farming, farmer1.account_id(), false);
@@ -398,8 +398,8 @@ fn one_farm_two_farmers() {
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-    assert_eq!(farm_info.cur_round.0, 0_u64);
-    assert_eq!(farm_info.last_round.0, 0_u64);
+    assert_eq!(farm_info.cur_round, 0);
+    assert_eq!(farm_info.last_round, 0);
     assert_eq!(farm_info.claimed_reward.0, 0_u128);
     assert_eq!(farm_info.unclaimed_reward.0, 0_u128);
     let user_seeds = show_userseeds(&farming, farmer1.account_id(), false);
@@ -429,8 +429,8 @@ fn one_farm_two_farmers() {
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-    assert_eq!(farm_info.cur_round.0, 1_u64);
-    assert_eq!(farm_info.last_round.0, 1_u64);
+    assert_eq!(farm_info.cur_round, 1);
+    assert_eq!(farm_info.last_round, 1);
     assert_eq!(farm_info.claimed_reward.0, 0_u128);
     assert_eq!(farm_info.unclaimed_reward.0, to_yocto("1"));
     let user_seeds = show_userseeds(&farming, farmer2.account_id(), false);
@@ -463,8 +463,8 @@ fn one_farm_two_farmers() {
     );
     out_come.assert_success();
     let farm_info = show_farminfo(&farming, farm_id.clone(), false);
-    assert_eq!(farm_info.cur_round.0, 2_u64);
-    assert_eq!(farm_info.last_round.0, 2_u64);
+    assert_eq!(farm_info.cur_round, 2);
+    assert_eq!(farm_info.last_round, 2);
     assert_eq!(farm_info.claimed_reward.0, to_yocto("1.5"));
     assert_eq!(farm_info.unclaimed_reward.0, to_yocto("0.5"));
     let user_seeds = show_userseeds(&farming, farmer1.account_id(), false);

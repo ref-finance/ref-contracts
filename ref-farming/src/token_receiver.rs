@@ -39,7 +39,6 @@ impl FungibleTokenReceiver for Contract {
                 )
             }
 
-            self.remove_unused_rps(&sender);
             self.internal_seed_deposit(
                 &env::predecessor_account_id(), 
                 &sender, 
@@ -138,8 +137,6 @@ impl MFTTokenReceiver for Contract {
     ) -> PromiseOrValue<U128> {
 
         self.assert_storage_usage(&sender_id);
-
-        self.remove_unused_rps(&sender_id);
  
         let seed_id: String;
         match parse_token_id(token_id.clone()) {

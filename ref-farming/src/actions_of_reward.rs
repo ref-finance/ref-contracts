@@ -16,17 +16,31 @@ construct_uint! {
 #[near_bindgen]
 impl Contract {
 
+    /// Clean invalid rps,
+    /// return false if the rps is still valid.
+    pub fn remove_user_rps_by_farm(&mut self, farm_id: FarmId) -> bool {
+        let sender_id = env::predecessor_account_id();
+        let mut farmer = self.get_farmer(&sender_id);
+        let (seed_id, _) = parse_farm_id(&farm_id);
+        let farm_seed = self.get_seed(&seed_id);
+        if !farm_seed.get_ref().farms.contains_key(&farm_id) {
+            farmer.get_ref_mut().remove_rps(&farm_id);
+            self.data_mut().farmers.insert(&sender_id, &farmer);
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn claim_reward_by_farm(&mut self, farm_id: FarmId) {
         let sender_id = env::predecessor_account_id();
         self.assert_storage_usage(&sender_id);
-        self.remove_unused_rps(&sender_id);
         self.internal_claim_user_reward_by_farm_id(&sender_id, &farm_id);
     }
 
     pub fn claim_reward_by_seed(&mut self, seed_id: SeedId) {
         let sender_id = env::predecessor_account_id();
         self.assert_storage_usage(&sender_id);
-        self.remove_unused_rps(&sender_id);
         self.internal_claim_user_reward_by_seed_id(&sender_id, &seed_id);
     }
 
@@ -40,8 +54,6 @@ impl Contract {
 
         let sender_id = env::predecessor_account_id();
         self.assert_storage_usage(&sender_id);
-        
-        self.remove_unused_rps(&sender_id);
 
         let mut farmer = self.get_farmer(&sender_id);
 
@@ -143,26 +155,6 @@ fn claim_user_reward_from_farm(
 
 impl Contract {
 
-    /// When a farm is removed, each farmer can free storage used by user_rps,
-    /// which takes a key (farm_id as max 64 bytes) and a U256 (user_rps as 32 bytes),
-    /// this clean method would be invoked in claim reward interface called by farmer.
-    pub(crate) fn remove_unused_rps(&mut self, sender_id: &AccountId) {
-        let mut farmer = self.get_farmer(sender_id);
-        let mut changed = false;
-        let farm_ids: Vec<String> = farmer.get_ref().user_rps.keys().map(|x| x.clone()).collect();
-        for farm_id in farm_ids {
-            let (seed_id, _) = parse_farm_id(&farm_id);
-            let farm_seed = self.get_seed(&seed_id);
-            if !farm_seed.get_ref().farms.contains_key(&farm_id) {
-                farmer.get_ref_mut().user_rps.remove(&farm_id);
-                changed = true;
-            }
-        }
-        if changed {
-            self.data_mut().farmers.insert(sender_id, &farmer);
-        }
-    }
-
     pub(crate) fn internal_claim_user_reward_by_seed_id(
         &mut self, 
         sender_id: &AccountId,
@@ -221,7 +213,7 @@ impl Contract {
 
     #[inline]
     pub(crate) fn get_farmer_default(&self, from: &AccountId) -> VersionedFarmer {
-        let orig = self.data().farmers.get(from).unwrap_or(VersionedFarmer::new(0));
+        let orig = self.data().farmers.get(from).unwrap_or(VersionedFarmer::new(from.clone(), 0));
         if orig.need_upgrade() {
             orig.upgrade()
         } else {

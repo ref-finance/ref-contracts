@@ -1,9 +1,11 @@
 
 use near_sdk::json_types::{U128};
-use near_sdk::{env, ext_contract, Gas};
+use near_sdk::{env, ext_contract, Gas, Timestamp};
 use uint::construct_uint;
 use crate::{SeedId, FarmId};
 use crate::errors::*;
+
+pub type TimestampSec = u32;
 
 pub const MIN_SEED_DEPOSIT: u128 = 1_000_000_000_000_000_000;
 pub const MAX_ACCOUNT_LENGTH: u128 = 64;
@@ -85,5 +87,13 @@ pub fn parse_farm_id(farm_id: &FarmId) -> (String, usize) {
 
 pub fn gen_farm_id(seed_id: &SeedId, index: usize) -> FarmId {
     format!("{}#{}", seed_id, index)
+}
+
+pub(crate) fn to_nano(timestamp: TimestampSec) -> Timestamp {
+    Timestamp::from(timestamp) * 10u64.pow(9)
+}
+
+pub(crate) fn to_sec(timestamp: Timestamp) -> TimestampSec {
+    (timestamp / 10u64.pow(9)) as u32
 }
 

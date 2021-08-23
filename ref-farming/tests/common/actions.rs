@@ -47,9 +47,9 @@ pub(crate) fn prepair_farm(
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", swap()),
             reward_token: to_va(token.account_id()),
-            start_at: U64(0),
+            start_at: 0,
             reward_per_session: to_yocto("1").into(),
-            session_interval: U64(60),
+            session_interval: 60,
         }, Some(U128(1000000000000000000))),
         deposit = to_yocto("1")
     );
@@ -106,9 +106,9 @@ pub(crate) fn prepair_multi_farms(
             farming.create_simple_farm(HRSimpleFarmTerms{
                 seed_id: format!("{}@0", swap()),
                 reward_token: to_va(token.account_id()),
-                start_at: U64(0),
+                start_at: 0,
                 reward_per_session: to_yocto("1").into(),
-                session_interval: U64(60),
+                session_interval: 60,
             }, Some(U128(1000000000000000000))),
             deposit = to_yocto("1")
         );

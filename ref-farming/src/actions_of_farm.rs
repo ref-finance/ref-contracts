@@ -2,7 +2,7 @@
 use near_sdk::{env, near_bindgen, Promise};
 use near_sdk::json_types::{U128};
 use simple_farm::{SimpleFarm, HRSimpleFarmTerms};
-use crate::utils::{gen_farm_id, MIN_SEED_DEPOSIT};
+use crate::utils::{gen_farm_id, MIN_SEED_DEPOSIT, parse_farm_id};
 use crate::errors::*;
 use crate::*;
 
@@ -84,7 +84,7 @@ impl Contract {
 
     /// when farm's status is Ended, and unclaimed reward is 0, 
     /// the farm can be remove to reduce storage usage
-    pub(crate) fn internal_remove_farm(&mut self, seed_id: &SeedId) {
+    pub(crate) fn internal_remove_farm_by_seed_id(&mut self, seed_id: &SeedId) {
 
         let mut farm_seed = self.get_seed(&seed_id);
         let mut removable_farms: Vec<String> = vec![];
@@ -94,11 +94,32 @@ impl Contract {
             }
         }
         for farm_id in &removable_farms {
-            farm_seed.get_ref_mut().farms.remove(farm_id);
+            let mut farm = farm_seed.get_ref_mut().farms.remove(farm_id).unwrap();
+            farm.move_to_clear();
+            self.data_mut().outdated_farms.insert(farm_id, &farm);
         }
         if removable_farms.len() > 0 {
             self.data_mut().seeds.insert(&seed_id, &farm_seed);
         }
-        
+    }
+
+    pub(crate) fn internal_remove_farm_by_farm_id(&mut self, farm_id: &FarmId, force: bool) -> bool {
+        let (seed_id, _) = parse_farm_id(farm_id);
+        let mut removable = false;
+        if let Some(mut farm_seed) = self.get_seed_wrapped(&seed_id) {
+            if let Some(farm) = farm_seed.get_ref_mut().farms.get_mut(farm_id) {
+                if force || farm.can_be_removed() {
+                    removable = true;
+                }
+            }
+            if removable {
+                let mut farm = farm_seed.get_ref_mut().farms.remove(farm_id).unwrap();
+                farm.move_to_clear();
+                self.data_mut().outdated_farms.insert(farm_id, &farm);
+                self.data_mut().seeds.insert(&seed_id, &farm_seed);
+                return true;
+            }
+        }
+        false
     }
 }

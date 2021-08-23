@@ -175,9 +175,9 @@ fn multi_farm_with_different_state() {
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", swap()),
             reward_token: to_va(token1.account_id()),
-            start_at: U64(0),
+            start_at: 0,
             reward_per_session: to_yocto("1").into(),
-            session_interval: U64(50),
+            session_interval: 50,
         }, Some(U128(1000000000000000000))),
         deposit = to_yocto("1")
     );
@@ -203,9 +203,9 @@ fn multi_farm_with_different_state() {
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", swap()),
             reward_token: to_va(token1.account_id()),
-            start_at: U64(0),
+            start_at: 0,
             reward_per_session: to_yocto("1").into(),
-            session_interval: U64(50),
+            session_interval: 50,
         }, Some(U128(1000000000000000000))),
         deposit = to_yocto("1")
     );
@@ -224,9 +224,9 @@ fn multi_farm_with_different_state() {
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", swap()),
             reward_token: to_va(token1.account_id()),
-            start_at: U64(300),
+            start_at: 300,
             reward_per_session: to_yocto("1").into(),
-            session_interval: U64(50),
+            session_interval: 50,
         }, Some(U128(1000000000000000000))),
         deposit = to_yocto("1")
     );
