@@ -314,7 +314,10 @@ impl SimpleFarm {
     }
 
     /// Move an Ended farm to Cleared, if any unclaimed reward exists, go to beneficiary
-    pub(crate) fn move_to_clear(&mut self) -> bool {
+    pub(crate) fn move_to_clear(&mut self, total_seeds: &Balance) -> bool {
+        if let SimpleFarmStatus::Running = self.status {
+            self.distribute(total_seeds, true);
+        }
         if let SimpleFarmStatus::Ended = self.status {
             if self.last_distribution.unclaimed > 0 {
                 self.amount_of_claimed += self.last_distribution.unclaimed;
@@ -328,15 +331,21 @@ impl SimpleFarm {
         }
     }
 
-    pub fn can_be_removed(&self) -> bool {
-        if let SimpleFarmStatus::Ended = self.status {
-            if self.amount_of_claimed == self.amount_of_reward {
-                true
-            } else {
-                false
-            }
-        } else {
-            false
+    pub fn can_be_removed(&self, total_seeds: &Balance) -> bool {
+        match self.status {
+            SimpleFarmStatus::Ended => true,
+            SimpleFarmStatus::Running => {
+                if let Some(dis) = self.try_distribute(total_seeds) {
+                    if dis.undistributed == 0 {
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            },
+            _ => false,
         }
     }
 
