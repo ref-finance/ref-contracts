@@ -80,42 +80,21 @@ impl Contract {
         farm_id
     }
 
-    /// when farm's status is Ended, and unclaimed reward is 0, 
-    /// the farm can be remove to reduce storage usage
-    pub(crate) fn internal_remove_farm_by_seed_id(&mut self, seed_id: &SeedId) {
-
-        let mut farm_seed = self.get_seed(&seed_id);
-        let mut removable_farms: Vec<String> = vec![];
-        for farm_id in farm_seed.get_ref().farms.iter() {
-            let farm = self.data().farms.get(farm_id).expect(ERR41_FARM_NOT_EXIST);
-            if farm.can_be_removed() {
-                removable_farms.push(farm.get_farm_id());
-            }
-        }
-        for farm_id in &removable_farms {
-            let mut farm = self.data_mut().farms.remove(farm_id).unwrap();
-            farm.move_to_clear();
-            self.data_mut().outdated_farms.insert(farm_id, &farm);
-            farm_seed.get_ref_mut().farms.remove(farm_id);
-        }
-        if removable_farms.len() > 0 {
-            self.data_mut().seeds.insert(&seed_id, &farm_seed);
-        }
-    }
-
-    pub(crate) fn internal_remove_farm_by_farm_id(&mut self, farm_id: &FarmId, force: bool) -> bool {
+    pub(crate) fn internal_remove_farm_by_farm_id(&mut self, farm_id: &FarmId) -> bool {
         let (seed_id, _) = parse_farm_id(farm_id);
         let mut removable = false;
         if let Some(mut farm_seed) = self.get_seed_wrapped(&seed_id) {
+            let seed_amount = farm_seed.get_ref().amount;
             if let Some(farm) = self.data().farms.get(farm_id) {
-                if force || farm.can_be_removed() {
+                if farm.can_be_removed(&seed_amount) {
                     removable = true;
                 }
             }
             if removable {
                 let mut farm = self.data_mut().farms.get(farm_id).expect(ERR41_FARM_NOT_EXIST);
-                farm.move_to_clear();
+                farm.move_to_clear(&seed_amount);
                 self.data_mut().outdated_farms.insert(farm_id, &farm);
+                self.data_mut().farms.remove(farm_id);
                 farm_seed.get_ref_mut().farms.remove(farm_id);
                 self.data_mut().seeds.insert(&seed_id, &farm_seed);
                 return true;

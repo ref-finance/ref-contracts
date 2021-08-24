@@ -163,6 +163,7 @@ mod tests {
     fn deposit_reward(
         context: &mut VMContextBuilder,
         contract: &mut Contract,
+        amount: u128,
         time_stamp: u32,
     ) {
         testing_env!(context
@@ -170,7 +171,7 @@ mod tests {
             .block_timestamp(to_nano(time_stamp))
             .attached_deposit(1)
             .build());
-        contract.ft_on_transfer(accounts(0), U128(50000), String::from("bob#0"));
+        contract.ft_on_transfer(accounts(0), U128(amount), String::from("bob#0"));
     }
 
     fn register_farmer(
@@ -233,13 +234,28 @@ mod tests {
         contract.claim_reward_by_farm(String::from("bob#0"));
     }
 
+    fn claim_reward_by_seed(
+        context: &mut VMContextBuilder,
+        contract: &mut Contract,
+        farmer: ValidAccountId,
+        time_stamp: u32
+    ) {
+        testing_env!(context
+            .predecessor_account_id(farmer)
+            .is_view(false)
+            .block_timestamp(to_nano(time_stamp))
+            .attached_deposit(1)
+            .build());
+        contract.claim_reward_by_seed(String::from("bob"));
+    }
+
     fn remove_farm(context: &mut VMContextBuilder, contract: &mut Contract, time_stamp: u32) {
         testing_env!(context
             .predecessor_account_id(accounts(0))
             .is_view(false)
             .block_timestamp(to_nano(time_stamp))
             .build());
-        contract.clean_farm_by_seed(accounts(1).into());
+        contract.force_clean_farm(String::from("bob#0"));
     }
 
     fn remove_user_rps(context: &mut VMContextBuilder, contract: &mut Contract, farmer: ValidAccountId, farm_id: String, time_stamp: u32) -> bool {
@@ -249,6 +265,18 @@ mod tests {
             .block_timestamp(to_nano(time_stamp))
             .build());
         contract.remove_user_rps_by_farm(farm_id)
+    }
+
+    fn to_yocto(value: &str) -> u128 {
+        let vals: Vec<_> = value.split('.').collect();
+        let part1 = vals[0].parse::<u128>().unwrap() * 10u128.pow(24);
+        if vals.len() > 1 {
+            let power = vals[1].len() as u32;
+            let part2 = vals[1].parse::<u128>().unwrap() * 10u128.pow(24 - power);
+            part1 + part2
+        } else {
+            part1
+        }
     }
 
     #[test]
@@ -268,7 +296,7 @@ mod tests {
         assert_eq!(farm_info.session_interval, 50);
 
         // deposit 50k, can last 10 rounds from 0 to 9
-        deposit_reward(&mut context, &mut contract, 100);
+        deposit_reward(&mut context, &mut contract, 50000, 100);
         let farm_info = contract.get_farm(farm_id.clone()).expect("Error");
         assert_eq!(farm_info.farm_status, String::from("Running"));
         assert_eq!(farm_info.start_at, 100);
@@ -447,6 +475,144 @@ mod tests {
         assert_eq!(rewarded, U128(20000));
         let rewarded = contract.get_reward(accounts(3), accounts(2));
         assert_eq!(rewarded, U128(15000));
+        
+    }
+
+    #[test]
+    fn test_unclaimed_rewards() {
+
+        let (mut context, mut contract) = setup_contract();
+        // seed is bob, reward is charlie
+        let farm_id = create_farm(&mut context, &mut contract,
+            accounts(1), accounts(2), to_yocto("1"), 50);
+        assert_eq!(farm_id, String::from("bob#0"));
+
+        // deposit 10, can last 10 rounds from 0 to 9
+        deposit_reward(&mut context, &mut contract, to_yocto("10"), 100);
+
+        // Farmer1 accounts(0) come in round 0
+        register_farmer(&mut context, &mut contract, accounts(0));
+        deposit_seed(&mut context, &mut contract, accounts(0), 110, to_yocto("1"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(0), farm_id.clone());
+        assert_eq!(unclaimed, U128(0));
+        let farm_info = contract.get_farm(farm_id.clone()).expect("Error");
+        assert_eq!(farm_info.cur_round, 0);
+        assert_eq!(farm_info.last_round, 0);
+        assert_eq!(farm_info.claimed_reward.0, 0);
+        assert_eq!(farm_info.unclaimed_reward.0, 0);
+
+        // move to round 1,
+        testing_env!(context
+            .predecessor_account_id(accounts(0))
+            .block_timestamp(to_nano(160))
+            .is_view(true)
+            .build());
+        let unclaimed = contract.get_unclaimed_reward(accounts(0), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("1"));
+        let farm_info = contract.get_farm(farm_id.clone()).expect("Error");
+        assert_eq!(farm_info.cur_round, 1);
+        assert_eq!(farm_info.last_round, 0);
+        assert_eq!(farm_info.claimed_reward.0, to_yocto("0"));
+        assert_eq!(farm_info.unclaimed_reward.0, to_yocto("1"));
+
+        // Farmer2 accounts(3) come in round 1
+        register_farmer(&mut context, &mut contract, accounts(3));
+        // deposit seed
+        deposit_seed(&mut context, &mut contract, accounts(3), 180, to_yocto("1"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(0), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("1"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(3), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("0"));
+
+        // move to round 2,
+        testing_env!(context
+            .predecessor_account_id(accounts(0))
+            .block_timestamp(to_nano(210))
+            .is_view(true)
+            .build());
+        let unclaimed = contract.get_unclaimed_reward(accounts(0), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("1.5"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(3), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("0.5"));
+        let farm_info = contract.get_farm(farm_id.clone()).expect("Error");
+        assert_eq!(farm_info.cur_round, 2);
+        assert_eq!(farm_info.last_round, 1);
+        assert_eq!(farm_info.claimed_reward.0, to_yocto("0"));
+        assert_eq!(farm_info.unclaimed_reward.0, to_yocto("2"));
+
+        // farmer1 claim reward by farm_id at round 3
+        claim_reward(&mut context, &mut contract, accounts(0), 260);
+        let unclaimed = contract.get_unclaimed_reward(accounts(0), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("0"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(3), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("1"));
+        let farm_info = contract.get_farm(farm_id.clone()).expect("Error");
+        assert_eq!(farm_info.cur_round, 3);
+        assert_eq!(farm_info.last_round, 3);
+        assert_eq!(farm_info.claimed_reward.0, to_yocto("2"));
+        assert_eq!(farm_info.unclaimed_reward.0, to_yocto("1"));
+
+        // farmer2 claim reward by seed_id at round 4
+        claim_reward_by_seed(&mut context, &mut contract, accounts(3), 310);
+        let unclaimed = contract.get_unclaimed_reward(accounts(0), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("0.5"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(3), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("0"));
+        let farm_info = contract.get_farm(farm_id.clone()).expect("Error");
+        assert_eq!(farm_info.cur_round, 4);
+        assert_eq!(farm_info.last_round, 4);
+        assert_eq!(farm_info.claimed_reward.0, to_yocto("3.5"));
+        assert_eq!(farm_info.unclaimed_reward.0, to_yocto("0.5"));
+
+        // farmer1 unstake half lpt at round 5
+        withdraw_seed(&mut context, &mut contract, accounts(0), 360, to_yocto("0.4"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(0), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("0"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(3), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("0.5"));
+        let farm_info = contract.get_farm(farm_id.clone()).expect("Error");
+        assert_eq!(farm_info.cur_round, 5);
+        assert_eq!(farm_info.last_round, 5);
+        assert_eq!(farm_info.claimed_reward.0, to_yocto("4.5"));
+        assert_eq!(farm_info.unclaimed_reward.0, to_yocto("0.5"));
+
+        // farmer2 unstake all his lpt at round 6
+        withdraw_seed(&mut context, &mut contract, accounts(3), 410, to_yocto("1"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(0), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("0.375"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(3), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("0"));
+        let farm_info = contract.get_farm(farm_id.clone()).expect("Error");
+        assert_eq!(farm_info.cur_round, 6);
+        assert_eq!(farm_info.last_round, 6);
+        assert_eq!(farm_info.claimed_reward.0, to_yocto("5.625"));
+        assert_eq!(farm_info.unclaimed_reward.0, to_yocto("0.375"));
+
+        // move to round 7
+        testing_env!(context
+            .predecessor_account_id(accounts(0))
+            .block_timestamp(to_nano(460))
+            .is_view(true)
+            .build());
+        let unclaimed = contract.get_unclaimed_reward(accounts(0), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("1.374999999999999999999999"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(3), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("0"));
+        let farm_info = contract.get_farm(farm_id.clone()).expect("Error");
+        assert_eq!(farm_info.cur_round, 7);
+        assert_eq!(farm_info.last_round, 6);
+        assert_eq!(farm_info.claimed_reward.0, to_yocto("5.625"));
+        assert_eq!(farm_info.unclaimed_reward.0, to_yocto("1.375"));
+        withdraw_seed(&mut context, &mut contract, accounts(0), 470, to_yocto("0.6"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(0), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("0"));
+        let unclaimed = contract.get_unclaimed_reward(accounts(3), farm_id.clone());
+        assert_eq!(unclaimed.0, to_yocto("0"));
+        let farm_info = contract.get_farm(farm_id.clone()).expect("Error");
+        assert_eq!(farm_info.cur_round, 7);
+        assert_eq!(farm_info.last_round, 7);
+        assert_eq!(farm_info.claimed_reward.0, to_yocto("6.999999999999999999999999"));
+        assert_eq!(farm_info.unclaimed_reward.0, 1);
         
     }
 

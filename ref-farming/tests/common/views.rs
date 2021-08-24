@@ -75,6 +75,34 @@ pub(crate) fn show_farminfo(
     farm_info
 }
 
+pub(crate) fn show_outdated_farminfo(
+    farming: &ContractAccount<Farming>,
+    farm_id: String,
+    show_print: bool,
+) -> FarmInfo {
+    let farm_info = get_outdated_farminfo(farming, farm_id);
+    if show_print {
+        println!("Farm Info ===>");
+        println!(
+            "  ID:{}, Status:{}, Seed:{}, Reward:{}",
+            farm_info.farm_id, farm_info.farm_status, farm_info.seed_id, farm_info.reward_token
+        );
+        println!(
+            "  StartAt:{}, SessionReward:{}, SessionInterval:{}",
+            farm_info.start_at, farm_info.reward_per_session.0, farm_info.session_interval
+        );
+        println!(
+            "  TotalReward:{}, Claimed:{}, Unclaimed:{}, LastRound:{}, CurRound:{}",
+            farm_info.total_reward.0,
+            farm_info.claimed_reward.0,
+            farm_info.unclaimed_reward.0,
+            farm_info.last_round,
+            farm_info.cur_round
+        );
+    }
+    farm_info
+}
+
 pub(crate) fn show_seedsinfo(
     farming: &ContractAccount<Farming>,
     show_print: bool,
@@ -123,10 +151,13 @@ pub(crate) fn show_reward(
     farming: &ContractAccount<Farming>,
     user_id: String,
     reward_id: String,
+    show_print: bool,
 ) -> U128 {
     let ret = view!(farming.get_reward(to_va(user_id.clone()), to_va(reward_id.clone())))
         .unwrap_json::<U128>();
-    println!("Reward {} for {}: {}", reward_id, user_id, ret.0);
+    if show_print {
+        println!("Reward {} for {}: {}", reward_id, user_id, ret.0);
+    }
     ret
 }
 
@@ -153,4 +184,8 @@ pub(crate) fn assert_farming(
 // =============  internal methods ================
 fn get_farminfo(farming: &ContractAccount<Farming>, farm_id: String) -> FarmInfo {
     view!(farming.get_farm(farm_id)).unwrap_json::<FarmInfo>()
+}
+
+fn get_outdated_farminfo(farming: &ContractAccount<Farming>, farm_id: String) -> FarmInfo {
+    view!(farming.get_outdated_farm(farm_id)).unwrap_json::<FarmInfo>()
 }

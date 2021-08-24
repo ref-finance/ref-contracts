@@ -471,7 +471,7 @@ fn one_farm_two_farmers() {
     assert_eq!(user_seeds.get(&String::from("swap@0")).unwrap().0, to_yocto("1"));
     let unclaim = show_unclaim(&farming, farmer1.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, 0_u128);
-    let claimed = show_reward(&farming, farmer1.account_id(), dai());
+    let claimed = show_reward(&farming, farmer1.account_id(), dai(), false);
     assert_eq!(claimed.0, to_yocto("1.5"));
     println!("----->> Farmer1 claimed reward at #{}.", root.borrow_runtime().current_block().block_height);
 
@@ -503,7 +503,7 @@ fn one_farm_two_farmers() {
     assert_eq!(unclaim.0, 0_u128);
     let unclaim = show_unclaim(&farming, farmer2.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, to_yocto("1"));
-    let claimed = show_reward(&farming, farmer1.account_id(), dai());
+    let claimed = show_reward(&farming, farmer1.account_id(), dai(), false);
     assert_eq!(claimed.0, to_yocto("2"));
     println!("----->> Farmer1 unstake seeds at #{}.", root.borrow_runtime().current_block().block_height);
 
@@ -522,7 +522,7 @@ fn one_farm_two_farmers() {
     // farmer1 withdraw reward
     println!();
     println!("********** Farmer1 withdraw reward ************");
-    let claimed = show_reward(&farming, farmer1.account_id(), dai());
+    let claimed = show_reward(&farming, farmer1.account_id(), dai(), false);
     assert_eq!(claimed.0, to_yocto("2"));
     let out_come = call!(
         farmer1,
@@ -531,7 +531,7 @@ fn one_farm_two_farmers() {
     );
     out_come.assert_success();
     println!("----->> Farmer1 withdraw reward at #{}.", root.borrow_runtime().current_block().block_height);
-    let claimed = show_reward(&farming, farmer1.account_id(), dai());
+    let claimed = show_reward(&farming, farmer1.account_id(), dai(), false);
     assert_eq!(claimed.0, 0_u128);
 }
 

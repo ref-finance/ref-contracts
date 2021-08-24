@@ -52,12 +52,6 @@ impl Farm {
         }
     }
 
-    pub fn can_be_removed(&self) -> bool {
-        match self {
-            Farm::SimpleFarm(farm) => farm.can_be_removed(),
-        }
-    }
-
     /// Returns how many reward tokens can given farmer claim.
     pub fn view_farmer_unclaimed_reward(
         &self,
@@ -85,9 +79,15 @@ impl Farm {
         }
     }
 
-    pub fn move_to_clear(&mut self) -> bool {
+    pub fn can_be_removed(&self, total_seeds: &Balance) -> bool {
         match self {
-            Farm::SimpleFarm(farm) => farm.move_to_clear(),
+            Farm::SimpleFarm(farm) => farm.can_be_removed(total_seeds),
+        }
+    }
+
+    pub fn move_to_clear(&mut self, total_seeds: &Balance) -> bool {
+        match self {
+            Farm::SimpleFarm(farm) => farm.move_to_clear(total_seeds),
         }
     }
 
