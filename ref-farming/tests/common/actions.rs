@@ -13,6 +13,30 @@ use near_sdk::serde_json::Value;
 use super::init::*;
 use super::utils::*;
 
+
+pub(crate) fn prepair_pool_and_liquidity(
+    root: &UserAccount, 
+    owner: &UserAccount,
+    farming_id: String,
+    lps: Vec<&UserAccount>,
+) -> (ContractAccount<TestRef>, ContractAccount<TestToken>, ContractAccount<TestToken>) {
+    let pool = deploy_pool(&root, swap(), owner.account_id());
+    let token1 = deploy_token(&root, dai(), vec![swap()]);
+    let token2 = deploy_token(&root, eth(), vec![swap()]);
+    call!(owner, pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth())]))
+    .assert_success();
+    call!(root,
+        pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 25),
+        deposit = to_yocto("1")
+    ).assert_success();
+    call!(root, pool.mft_register(":0".to_string(), to_va(farming_id)), deposit = to_yocto("1"))
+    .assert_success();
+    for lp in lps {
+        add_liqudity(lp, &pool, &token1, &token2, 0);
+    }
+    (pool,token1, token2)
+}
+
 pub(crate) fn prepair_pool(
     root: &UserAccount, 
     owner: &UserAccount, 
