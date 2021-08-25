@@ -19,7 +19,6 @@ impl Contract {
     pub fn withdraw_seed(&mut self, seed_id: SeedId, amount: U128) {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
-        self.assert_storage_usage(&sender_id);
 
         let amount: Balance = amount.into();
 

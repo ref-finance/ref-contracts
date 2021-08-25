@@ -25,8 +25,6 @@ impl FungibleTokenReceiver for Contract {
         if msg.is_empty() {
             // ****** seed Token deposit in ********
 
-            self.assert_storage_usage(&sender);
-
             // if seed not exist, it will panic
             let seed_farm = self.get_seed(&env::predecessor_account_id());
             if amount < seed_farm.get_ref().min_deposit {
@@ -46,6 +44,9 @@ impl FungibleTokenReceiver for Contract {
                 amount.into(), 
                 SeedType::FT
             );
+            
+            self.assert_storage_usage(&sender);
+
             env::log(
                 format!(
                     "{} deposit FT seed {} with amount {}.",
@@ -130,8 +131,6 @@ impl MFTTokenReceiver for Contract {
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
-
-        self.assert_storage_usage(&sender_id);
  
         let seed_id: String;
         match parse_token_id(token_id.clone()) {
@@ -161,6 +160,8 @@ impl MFTTokenReceiver for Contract {
         }
         
         self.internal_seed_deposit(&seed_id, &sender_id, amount, SeedType::MFT);
+
+        self.assert_storage_usage(&sender_id);
 
         env::log(
             format!(

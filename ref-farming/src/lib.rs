@@ -187,6 +187,19 @@ mod tests {
         contract.storage_deposit(Some(farmer), Some(true))
     }
 
+    fn storage_withdraw(
+        context: &mut VMContextBuilder,
+        contract: &mut Contract,
+        farmer: ValidAccountId,
+    ) -> StorageBalance {
+        testing_env!(context
+            .predecessor_account_id(farmer.clone())
+            .is_view(false)
+            .attached_deposit(1)
+            .build());
+        contract.storage_withdraw(None)
+    }
+
     fn deposit_seed(
         context: &mut VMContextBuilder,
         contract: &mut Contract,
@@ -616,4 +629,21 @@ mod tests {
         
     }
 
+    #[test]
+    #[should_panic(expected = "E11: insufficient $NEAR storage deposit")]
+    fn test_storage_withdraw() {
+        let (mut context, mut contract) = setup_contract();
+        // Farmer1 accounts(0) come in round 0
+        register_farmer(&mut context, &mut contract, accounts(0));
+        // println!("locked: {}, deposited: {}", sb.total.0, sb.available.0);
+        let sb = storage_withdraw(&mut context, &mut contract, accounts(0));
+        // println!("locked: {}, deposited: {}", sb.total.0, sb.available.0);
+        assert_eq!(sb.total.0, sb.available.0);
+
+        let farm_id = create_farm(&mut context, &mut contract,
+            accounts(1), accounts(2), 5000, 50);
+        assert_eq!(farm_id, String::from("bob#0"));
+
+        deposit_seed(&mut context, &mut contract, accounts(0), 60, 10);
+    }
 }
