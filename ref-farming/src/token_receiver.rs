@@ -24,7 +24,9 @@ impl FungibleTokenReceiver for Contract {
         let amount: u128 = amount.into();
         if msg.is_empty() {
             // ****** seed Token deposit in ********
-            
+
+            self.assert_storage_usage(&sender);
+
             // if seed not exist, it will panic
             let seed_farm = self.get_seed(&env::predecessor_account_id());
             if amount < seed_farm.get_ref().min_deposit {
