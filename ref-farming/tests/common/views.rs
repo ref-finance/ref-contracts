@@ -17,6 +17,13 @@ pub struct SeedInfo {
     pub min_deposit: U128,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub struct StorageBalance {
+    pub total: U128,
+    pub available: U128,
+}
+
 pub(crate) fn show_farms_by_seed(
     farming: &ContractAccount<Farming>,
     seed_id: String,
@@ -157,6 +164,14 @@ pub(crate) fn show_reward(
         .unwrap_json::<U128>();
     if show_print {
         println!("Reward {} for {}: {}", reward_id, user_id, ret.0);
+    }
+    ret
+}
+
+pub(crate) fn show_storage_balance(farming: &ContractAccount<Farming>, farmer: String, show_print: bool) -> StorageBalance {
+    let ret = view!(farming.storage_balance_of(to_va(farmer.clone()))).unwrap_json::<StorageBalance>();
+    if show_print {
+        println!("total {}, available {}", ret.total.0, ret.available.0);
     }
     ret
 }
