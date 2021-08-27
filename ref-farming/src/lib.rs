@@ -470,13 +470,13 @@ mod tests {
         println!("----> remove user rps");
         testing_env!(context.predecessor_account_id(accounts(0))
             .block_timestamp(to_nano(760)).is_view(true).build());
-        let prev_locked = contract.storage_balance_of(accounts(0)).expect("Error").total.0;
+        let prev_available = contract.storage_balance_of(accounts(0)).expect("Error").available.0;
         let ret = remove_user_rps(&mut context, &mut contract, accounts(0).into(), String::from("bob#0"), 770);
         assert!(ret);
         testing_env!(context.predecessor_account_id(accounts(0))
             .block_timestamp(to_nano(780)).is_view(true).build());
-        let post_locked = contract.storage_balance_of(accounts(0)).expect("Error").total.0;
-        assert_eq!(prev_locked - post_locked, 165*10_u128.pow(19));
+        let post_available = contract.storage_balance_of(accounts(0)).expect("Error").available.0;
+        assert_eq!(post_available - prev_available, 165*10_u128.pow(19));
 
         // withdraw seed
         println!("----> accounts(0) and accounts(3) withdraw seed");
@@ -638,7 +638,8 @@ mod tests {
         // println!("locked: {}, deposited: {}", sb.total.0, sb.available.0);
         let sb = storage_withdraw(&mut context, &mut contract, accounts(0));
         // println!("locked: {}, deposited: {}", sb.total.0, sb.available.0);
-        assert_eq!(sb.total.0, sb.available.0);
+        assert_eq!(sb.total.0, 920000000000000000000);
+        assert_eq!(sb.available.0, 0);
 
         let farm_id = create_farm(&mut context, &mut contract,
             accounts(1), accounts(2), 5000, 50);

@@ -93,7 +93,8 @@ impl From<&Farm> for FarmInfo {
                         cur_round: farm.last_distribution.rr.into(),
                         last_round: farm.last_distribution.rr.into(),
                         claimed_reward: farm.amount_of_claimed.into(),
-                        unclaimed_reward: (farm.amount_of_reward - farm.amount_of_claimed).into(),
+                        // unclaimed_reward: (farm.amount_of_reward - farm.amount_of_claimed).into(),
+                        unclaimed_reward: farm.last_distribution.unclaimed.into(),
                         beneficiary_reward: farm.amount_of_beneficiary.into(),
                     }
                 }                

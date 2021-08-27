@@ -1,5 +1,5 @@
 
-use near_sdk::json_types::{U128, U64};
+use near_sdk::json_types::{U128};
 use near_sdk::{Balance};
 use near_sdk_sim::{call, to_yocto, ContractAccount, UserAccount};
 
@@ -13,7 +13,7 @@ use near_sdk::serde_json::Value;
 use super::init::*;
 use super::utils::*;
 
-
+#[allow(dead_code)]
 pub(crate) fn prepair_pool_and_liquidity(
     root: &UserAccount, 
     owner: &UserAccount,
@@ -37,6 +37,7 @@ pub(crate) fn prepair_pool_and_liquidity(
     (pool,token1, token2)
 }
 
+#[allow(dead_code)]
 pub(crate) fn prepair_pool(
     root: &UserAccount, 
     owner: &UserAccount, 
@@ -57,6 +58,7 @@ pub(crate) fn prepair_pool(
     (pool, token1, token2)
 }
 
+#[allow(dead_code)]
 pub(crate) fn prepair_farm(
     root: &UserAccount, 
     owner: &UserAccount,
@@ -84,7 +86,7 @@ pub(crate) fn prepair_farm(
     } else {
         farm_id = String::from("N/A");
     }
-    println!("    Farm {} created at Height#{}", farm_id.clone(), root.borrow_runtime().current_block().block_height);
+    // println!("    Farm {} created at Height#{}", farm_id.clone(), root.borrow_runtime().current_block().block_height);
     
     // deposit reward token
     call!(
@@ -99,11 +101,12 @@ pub(crate) fn prepair_farm(
         deposit = 1
     )
     .assert_success();
-    println!("    Farm running at Height#{}", root.borrow_runtime().current_block().block_height);
+    // println!("    Farm running at Height#{}", root.borrow_runtime().current_block().block_height);
 
     (farming, farm_id)
 }
 
+#[allow(dead_code)]
 pub(crate) fn prepair_multi_farms(
     root: &UserAccount, 
     owner: &UserAccount,
