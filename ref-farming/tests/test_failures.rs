@@ -1,6 +1,5 @@
 use near_sdk_sim::{call, init_simulator, to_yocto};
 use near_sdk::json_types::{U128};
-use near_sdk::serde_json::Value;
 use ref_farming::{HRSimpleFarmTerms};
 
 use crate::common::utils::*;
@@ -26,7 +25,7 @@ fn failure_e10_stake_before_register() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -64,7 +63,7 @@ fn failure_e10_unstake_before_register() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -100,7 +99,7 @@ fn failure_e10_claim_before_register() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -169,7 +168,7 @@ fn failure_e11_create_farm() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -177,6 +176,7 @@ fn failure_e11_create_farm() {
         deposit = to_yocto("0.00001")
     );
     assert!(!out_come.is_ok());
+    // println!("{:#?}", out_come.promise_results());
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
     assert!(ex_status.contains("E11: insufficient $NEAR storage deposit"));
 }
@@ -218,7 +218,7 @@ fn failure_e11_stake() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -258,7 +258,7 @@ fn failure_e11_claim() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -304,11 +304,9 @@ fn failure_e11_claim() {
 
     let out_come = call!(farmer1, farming.storage_deposit(None, None), deposit = to_yocto("1"));
     out_come.assert_success();
-    if let Value::Object(sb) = out_come.unwrap_json_value() {
-        if let Value::String(available) = sb.get("available").unwrap() {
-            assert_eq!(available, &String::from("1000000000000000000000000"));
-        }
-    }
+    let sb = out_come.unwrap_json::<StorageBalance>();
+    assert_eq!(sb.total.0, to_yocto("1.00341"));
+    assert_eq!(sb.available.0, to_yocto("1"));
     
     let out_come = call!(
         farmer1,
@@ -337,7 +335,7 @@ fn failure_e12_e13() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -430,7 +428,7 @@ fn failure_e21_e22() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -464,7 +462,7 @@ fn failure_e21_e22() {
 
     let out_come = call!(
         farmer1,
-        farming.withdraw_reward(to_va(token1.account_id()), None),
+        farming.withdraw_reward(token1.valid_account_id(), None),
         deposit = 1
     );
     assert!(!out_come.is_ok());
@@ -483,7 +481,7 @@ fn failure_e21_e22() {
 
     let out_come = call!(
         farmer1,
-        farming.withdraw_reward(to_va(token1.account_id()), Some(U128(to_yocto("1.1")))),
+        farming.withdraw_reward(token1.valid_account_id(), Some(U128(to_yocto("1.1")))),
         deposit = 1
     );
     assert!(!out_come.is_ok());
@@ -492,7 +490,7 @@ fn failure_e21_e22() {
 
     let out_come = call!(
         farmer1,
-        farming.withdraw_reward(to_va(token1.account_id()), None),
+        farming.withdraw_reward(token1.valid_account_id(), None),
         deposit = 1
     );
     out_come.assert_success();
@@ -522,7 +520,7 @@ fn failure_e25_withdraw_reward() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -568,7 +566,7 @@ fn failure_e25_withdraw_reward() {
 
     let out_come = call!(
         farmer1,
-        farming.withdraw_reward(to_va(token1.account_id()), None),
+        farming.withdraw_reward(token1.valid_account_id(), None),
         deposit = 1
     );
     out_come.assert_success();
@@ -589,7 +587,7 @@ fn failure_e25_withdraw_seed_ft() {
     let (_, token1, token2) = prepair_pool(&root, &owner);
 
     call!(
-        root, token2.mint(to_va(farmer1.account_id.clone()), to_yocto("10000").into())
+        root, token2.mint(farmer1.valid_account_id(), to_yocto("10000").into())
     )
     .assert_success();
 
@@ -601,7 +599,7 @@ fn failure_e25_withdraw_seed_ft() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}", token2.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -650,7 +648,7 @@ fn failure_e31_unstake_seed() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -718,7 +716,7 @@ fn failure_e32_unstake_over_balance() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -764,7 +762,7 @@ fn failure_e33() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0@3", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,
@@ -794,7 +792,7 @@ fn failure_e34_stake_below_minimum() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", pool.account_id()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 60,

@@ -1,5 +1,5 @@
 use near_sdk_sim::{call, init_simulator, to_yocto, view};
-use near_sdk::json_types::{U128, U64};
+use near_sdk::json_types::{U128};
 use near_sdk::serde_json::Value;
 
 use ref_farming::{HRSimpleFarmTerms};
@@ -34,8 +34,8 @@ fn multi_farm_in_single_seed() {
     );
     println!("----->> Liquidity added by farmer.");
 
-    // create farm with token1, max support 25 active farms in one seed
-    let (farming, farm_ids) = prepair_multi_farms(&root, &owner, &token1, to_yocto("10"), 20);
+    // create farm with token1
+    let (farming, farm_ids) = prepair_multi_farms(&root, &owner, &token1, to_yocto("10"), 32);
     let farm_id = farm_ids[farm_ids.len() - 1].clone();
     println!("----->> Farm till {} is ready.", farm_id.clone());
 
@@ -174,7 +174,7 @@ fn multi_farm_with_different_state() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", swap()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 50,
@@ -202,7 +202,7 @@ fn multi_farm_with_different_state() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", swap()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 0,
             reward_per_session: to_yocto("1").into(),
             session_interval: 50,
@@ -223,7 +223,7 @@ fn multi_farm_with_different_state() {
         owner,
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", swap()),
-            reward_token: to_va(token1.account_id()),
+            reward_token: token1.valid_account_id(),
             start_at: 300,
             reward_per_session: to_yocto("1").into(),
             session_interval: 50,

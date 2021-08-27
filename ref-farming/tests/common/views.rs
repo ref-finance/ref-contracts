@@ -17,13 +17,14 @@ pub struct SeedInfo {
     pub min_deposit: U128,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct StorageBalance {
     pub total: U128,
     pub available: U128,
 }
 
+#[allow(dead_code)]
 pub(crate) fn show_farms_by_seed(
     farming: &ContractAccount<Farming>,
     seed_id: String,
@@ -54,6 +55,7 @@ pub(crate) fn show_farms_by_seed(
     farms_info
 }
 
+#[allow(dead_code)]
 pub(crate) fn show_farminfo(
     farming: &ContractAccount<Farming>,
     farm_id: String,
@@ -82,6 +84,7 @@ pub(crate) fn show_farminfo(
     farm_info
 }
 
+#[allow(dead_code)]
 pub(crate) fn show_outdated_farminfo(
     farming: &ContractAccount<Farming>,
     farm_id: String,
@@ -110,6 +113,7 @@ pub(crate) fn show_outdated_farminfo(
     farm_info
 }
 
+#[allow(dead_code)]
 pub(crate) fn show_seedsinfo(
     farming: &ContractAccount<Farming>,
     show_print: bool,
@@ -123,6 +127,7 @@ pub(crate) fn show_seedsinfo(
     ret
 }
 
+#[allow(dead_code)]
 pub(crate) fn show_userseeds(
     farming: &ContractAccount<Farming>,
     user_id: String,
@@ -136,6 +141,7 @@ pub(crate) fn show_userseeds(
     ret
 }
 
+#[allow(dead_code)]
 pub(crate) fn show_unclaim(
     farming: &ContractAccount<Farming>,
     user_id: String,
@@ -154,6 +160,7 @@ pub(crate) fn show_unclaim(
     ret
 }
 
+#[allow(dead_code)]
 pub(crate) fn show_reward(
     farming: &ContractAccount<Farming>,
     user_id: String,
@@ -168,6 +175,7 @@ pub(crate) fn show_reward(
     ret
 }
 
+#[allow(dead_code)]
 pub(crate) fn show_storage_balance(farming: &ContractAccount<Farming>, farmer: String, show_print: bool) -> StorageBalance {
     let ret = view!(farming.storage_balance_of(to_va(farmer.clone()))).unwrap_json::<StorageBalance>();
     if show_print {
@@ -177,6 +185,7 @@ pub(crate) fn show_storage_balance(farming: &ContractAccount<Farming>, farmer: S
 }
 
 // =============  Assertions  ===============
+#[allow(dead_code)]
 pub(crate) fn assert_farming(
     farm_info: &FarmInfo,
     farm_status: String,
