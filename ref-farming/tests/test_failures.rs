@@ -1115,8 +1115,7 @@ fn failure_e43() {
     );
     calldata.assert_success();
     let ex_status = format!("{:?}", calldata.promise_errors()[0].as_ref().unwrap().status());
-    println!("{:#?}", calldata);
-    println!("{}", ex_status);
+    assert!(ex_status.contains("E43: invalid farm status"));
 }
 
 #[test]
