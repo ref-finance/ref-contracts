@@ -1050,3 +1050,115 @@ fn failure_e42_when_remove_user_rps_and_view_unclaim_reward() {
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
     assert!(ex_status.contains("E42: invalid farm id"));
 }
+
+#[test]
+fn failure_e43() {
+    let root = init_simulator(None);
+
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let farmer1 = root.create_user("farmer1".to_string(), to_yocto("100"));
+
+    let (pool, token1, _) = prepair_pool_and_liquidity(
+        &root, &owner, farming_id(), vec![&farmer1]);
+
+    let farm_id = "swap@0#0".to_string();
+    let farming = deploy_farming(&root, farming_id(), owner.account_id());
+    call!(farmer1, farming.storage_deposit(None, None), deposit = to_yocto("1")).assert_success();
+
+    let out_come = call!(
+        owner,
+        farming.create_simple_farm(HRSimpleFarmTerms{
+            seed_id: format!("{}@0", pool.account_id()),
+            reward_token: to_va(token1.account_id()),
+            start_at: 0,
+            reward_per_session: to_yocto("1").into(),
+            session_interval: 60,
+        }, None),
+        deposit = to_yocto("1")
+    );
+    out_come.assert_success();
+
+    // deposit reward
+    call!(
+        root,
+        token1.storage_deposit(Some(to_va(farming_id())), None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    let calldata = call!(
+        root,
+        token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("1")), None, farm_id.clone()),
+        deposit = 1
+    );
+    calldata.assert_success();
+
+    // farmer1 staking lpt 
+    println!("----->> Farmer1 staking lpt.");
+    let out_come = call!(
+        farmer1,
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("1").into(), None, "".to_string()),
+        deposit = 1
+    );
+    out_come.assert_success();
+
+    // move to 90 seconds later
+    assert!(root.borrow_runtime_mut().produce_blocks(90).is_ok());
+
+    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    assert_farming(&farm_info, "Ended".to_string(), to_yocto("1"), 1, 0, 0, to_yocto("1"), 0);
+
+    // should panic when trying to deposit again
+    let calldata = call!(
+        root,
+        token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("1")), None, farm_id.clone()),
+        deposit = 1
+    );
+    calldata.assert_success();
+    let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
+    println!("{:#?}", calldata);
+    println!("{}", ex_status);
+}
+
+#[test]
+fn failure_e44() {
+    let root = init_simulator(None);
+
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let farmer1 = root.create_user("farmer1".to_string(), to_yocto("100"));
+
+    let (pool, token1, token2) = prepair_pool_and_liquidity(
+        &root, &owner, farming_id(), vec![&farmer1]);
+
+    let farm_id = "swap@0#0".to_string();
+    let farming = deploy_farming(&root, farming_id(), owner.account_id());
+    call!(farmer1, farming.storage_deposit(None, None), deposit = to_yocto("1")).assert_success();
+
+    let out_come = call!(
+        owner,
+        farming.create_simple_farm(HRSimpleFarmTerms{
+            seed_id: format!("{}@0", pool.account_id()),
+            reward_token: to_va(token1.account_id()),
+            start_at: 0,
+            reward_per_session: to_yocto("1").into(),
+            session_interval: 60,
+        }, None),
+        deposit = to_yocto("1")
+    );
+    out_come.assert_success();
+
+    // deposit wrong reward
+    call!(
+        root,
+        token2.storage_deposit(Some(to_va(farming_id())), None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    let calldata = call!(
+        root,
+        token2.ft_transfer_call(to_va(farming_id()), U128(to_yocto("1")), None, farm_id.clone()),
+        deposit = 1
+    );
+    calldata.assert_success();
+    let ex_status = format!("{:?}", calldata.promise_errors()[0].as_ref().unwrap().status());
+    assert!(ex_status.contains("E44: invalid reward token for this farm"));
+}
