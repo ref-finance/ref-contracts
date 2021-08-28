@@ -1114,7 +1114,7 @@ fn failure_e43() {
         deposit = 1
     );
     calldata.assert_success();
-    let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
+    let ex_status = format!("{:?}", calldata.promise_errors()[0].as_ref().unwrap().status());
     println!("{:#?}", calldata);
     println!("{}", ex_status);
 }
