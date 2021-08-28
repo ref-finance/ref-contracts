@@ -154,6 +154,12 @@ impl SimpleFarm {
                 Some(self.last_distribution.undistributed)
             },
             SimpleFarmStatus::Running => {
+                if let Some(dis) = self.try_distribute(&DENOM) {
+                    if dis.undistributed == 0 {
+                        // farm has ended actually
+                        return None;
+                    }
+                }
                 // For a running farm, can add reward to extend duration
                 self.amount_of_reward += amount;
                 self.last_distribution.undistributed += amount;
