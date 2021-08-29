@@ -62,6 +62,7 @@ fn single_farm_startat_0() {
         deposit = to_yocto("1")
     )
     .assert_success();
+    mint_token(&token1, &root, to_yocto("10"));
     call!(
         root,
         token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("10")), None, farm_id.clone()),
@@ -441,6 +442,7 @@ fn single_farm_startat_180() {
         deposit = to_yocto("1")
     )
     .assert_success();
+    mint_token(&token1, &root, to_yocto("10"));
     call!(
         root,
         token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("5.1")), None, farm_id.clone()),

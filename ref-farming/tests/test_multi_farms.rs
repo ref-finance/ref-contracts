@@ -189,6 +189,7 @@ fn multi_farm_with_different_state() {
         farm0_id = String::from("N/A");
     }
     println!("    Farm {} created at Height#{}", farm0_id.clone(), root.borrow_runtime().current_block().block_height);
+    mint_token(&token1, &root, to_yocto("5000"));
     call!(
         root,
         token1.ft_transfer_call(to_va(farming_id()), to_yocto("500").into(), None, farm0_id.clone()),
