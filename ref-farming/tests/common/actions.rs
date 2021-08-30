@@ -95,6 +95,7 @@ pub(crate) fn prepair_farm(
         deposit = to_yocto("1")
     )
     .assert_success();
+    mint_token(&token, &root, total_reward.into());
     call!(
         root,
         token.ft_transfer_call(to_va(farming_id()), total_reward.into(), None, farm_id.clone()),
@@ -127,6 +128,8 @@ pub(crate) fn prepair_multi_farms(
     )
     .assert_success();
 
+    mint_token(&token, &root, to_yocto("100000"));
+
     for _ in 0..farm_count {
         let out_come = call!(
             owner,
@@ -146,7 +149,6 @@ pub(crate) fn prepair_multi_farms(
         } else {
             farm_id = String::from("N/A");
         }
-
         call!(
             root,
             token.ft_transfer_call(to_va(farming_id()), total_reward.into(), None, farm_id.clone()),

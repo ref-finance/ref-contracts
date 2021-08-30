@@ -273,6 +273,7 @@ fn failure_e11_claim() {
         deposit = to_yocto("1")
     )
     .assert_success();
+    mint_token(&token1, &root, to_yocto("10"));
     call!(
         root,
         token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("10")), None, farm_id.clone()),
@@ -350,6 +351,7 @@ fn failure_e12_e13() {
         deposit = to_yocto("1")
     )
     .assert_success();
+    mint_token(&token1, &root, to_yocto("10"));
     call!(
         root,
         token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("10")), None, farm_id.clone()),
@@ -443,6 +445,7 @@ fn failure_e21_e22() {
         deposit = to_yocto("1")
     )
     .assert_success();
+    mint_token(&token1, &root, to_yocto("10"));
     call!(
         root,
         token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("10")), None, farm_id.clone()),
@@ -535,6 +538,7 @@ fn failure_e25_withdraw_reward() {
         deposit = to_yocto("1")
     )
     .assert_success();
+    mint_token(&token1, &root, to_yocto("10"));
     call!(
         root,
         token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("10")), None, farm_id.clone()),
@@ -771,7 +775,7 @@ fn failure_e33() {
     );
     assert!(!out_come.is_ok());
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
-    println!("ex_status: {}", ex_status);
+    // println!("ex_status: {}", ex_status);
     assert!(ex_status.contains("E33: invalid seed id"));
 }
 
@@ -848,6 +852,7 @@ fn failure_e41_when_deposit_reward_token() {
     )
     .assert_success();
     // call with INVALID farm id
+    mint_token(&token1, &root, to_yocto("10"));
     let calldata = call!(
         root,
         token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("1")), None, "swap@0#1".to_string().clone()),
@@ -892,6 +897,7 @@ fn failure_e42_when_force_clean_farm() {
         deposit = to_yocto("1")
     )
     .assert_success();
+    mint_token(&token1, &root, to_yocto("10"));
     let calldata = call!(
         root,
         token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("1")), None, farm_id.clone()),
@@ -957,6 +963,7 @@ fn failure_e42_when_claim_reward() {
         deposit = to_yocto("1")
     )
     .assert_success();
+    mint_token(&token1, &root, to_yocto("10"));
     let calldata = call!(
         root,
         token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("1")), None, farm_id.clone()),
@@ -1016,6 +1023,7 @@ fn failure_e42_when_remove_user_rps_and_view_unclaim_reward() {
         deposit = to_yocto("1")
     )
     .assert_success();
+    mint_token(&token1, &root, to_yocto("10"));
     let calldata = call!(
         root,
         token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("1")), None, farm_id.clone()),
@@ -1085,6 +1093,7 @@ fn failure_e43() {
         deposit = to_yocto("1")
     )
     .assert_success();
+    mint_token(&token1, &root, to_yocto("10"));
     let calldata = call!(
         root,
         token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto("1")), None, farm_id.clone()),
@@ -1146,6 +1155,7 @@ fn failure_e44() {
     out_come.assert_success();
 
     // deposit wrong reward
+    mint_token(&token2, &root, to_yocto("10"));
     call!(
         root,
         token2.storage_deposit(Some(to_va(farming_id())), None),
