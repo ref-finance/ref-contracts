@@ -775,7 +775,7 @@ fn failure_e33() {
     );
     assert!(!out_come.is_ok());
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
-    println!("ex_status: {}", ex_status);
+    // println!("ex_status: {}", ex_status);
     assert!(ex_status.contains("E33: invalid seed id"));
 }
 

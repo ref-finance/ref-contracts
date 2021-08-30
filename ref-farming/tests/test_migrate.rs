@@ -1,6 +1,5 @@
 use std::convert::TryFrom;
 
-use near_sdk::borsh::{self, BorshSerialize};
 use near_sdk::json_types::ValidAccountId;
 use near_sdk_sim::{deploy, init_simulator, to_yocto};
 
@@ -8,14 +7,9 @@ use ref_farming::ContractContract as Farming;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     PREV_FARMING_WASM_BYTES => "../res/ref_farming_local.wasm",
-    FARMING_WASM_BYTES => "../res/ref_farming_local.wasm",
+    FARMING_WASM_BYTES => "../res/ref_farming_release.wasm",
 }
 
-#[derive(BorshSerialize)]
-struct UpgradeArgs {
-    code: Vec<u8>,
-    migrate: bool,
-}
 
 #[test]
 fn test_upgrade() {
@@ -28,16 +22,13 @@ fn test_upgrade() {
         signer_account: root,
         init_method: new(ValidAccountId::try_from(root.account_id.clone()).unwrap())
     );
-    let args_nomigration = UpgradeArgs {
-        code: FARMING_WASM_BYTES.to_vec(),
-        migrate: false,
-    };
+
     // Failed upgrade with no permissions.
     let result = test_user
         .call(
             farming.user_account.account_id.clone(),
             "upgrade",
-            &args_nomigration.try_to_vec().unwrap(),
+            &PREV_FARMING_WASM_BYTES,
             near_sdk_sim::DEFAULT_GAS,
             0,
         )
@@ -45,14 +36,10 @@ fn test_upgrade() {
     assert!(format!("{:?}", result).contains("ERR_NOT_ALLOWED"));
 
     // Upgrade with calling migration. Should fail as currently migration not implemented
-    let args = UpgradeArgs {
-        code: FARMING_WASM_BYTES.to_vec(),
-        migrate: true,
-    };
     root.call(
         farming.user_account.account_id.clone(),
         "upgrade",
-        &args.try_to_vec().unwrap(),
+        &FARMING_WASM_BYTES,
         near_sdk_sim::DEFAULT_GAS,
         0,
     )
@@ -62,7 +49,7 @@ fn test_upgrade() {
     root.call(
         farming.user_account.account_id.clone(),
         "upgrade",
-        &args_nomigration.try_to_vec().unwrap(),
+        &FARMING_WASM_BYTES,
         near_sdk_sim::DEFAULT_GAS,
         0,
     )
