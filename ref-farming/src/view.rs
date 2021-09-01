@@ -284,7 +284,7 @@ impl Contract {
         if let Some(rps) = farmer.get().user_rps.get(&farm_id) {
             format!("{}", U256::from_little_endian(&rps))
         } else {
-            String::from("")
+            String::from("0")
         }
     }
 }

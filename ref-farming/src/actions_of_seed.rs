@@ -5,7 +5,7 @@ use near_sdk::{AccountId, Balance, PromiseResult};
 
 use crate::utils::{
     assert_one_yocto, ext_multi_fungible_token, ext_fungible_token, 
-    ext_self, parse_seed_id, GAS_FOR_FT_TRANSFER
+    ext_self, wrap_mft_token_id, parse_seed_id, GAS_FOR_FT_TRANSFER
 };
 use crate::errors::*;
 use crate::farm_seed::SeedType;
@@ -47,7 +47,7 @@ impl Contract {
             SeedType::MFT => {
                 let (receiver_id, token_id) = parse_seed_id(&seed_id);
                 ext_multi_fungible_token::mft_transfer(
-                    format!(":{}", token_id),
+                    wrap_mft_token_id(&token_id),
                     sender_id.clone().try_into().unwrap(),
                     amount.into(),
                     None,

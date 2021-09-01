@@ -60,6 +60,11 @@ pub fn assert_one_yocto() {
     assert_eq!(env::attached_deposit(), 1, "Requires attached deposit of exactly 1 yoctoNEAR")
 }
 
+/// wrap token_id into correct format in MFT standard
+pub fn wrap_mft_token_id(token_id: &str) -> String {
+    format!(":{}", token_id)
+}
+
 // return receiver_id, token_id
 pub fn parse_seed_id(lpt_id: &str) -> (String, String) {
     let v: Vec<&str> = lpt_id.split(MFT_TAG).collect();
