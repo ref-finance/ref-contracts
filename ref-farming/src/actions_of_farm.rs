@@ -91,10 +91,9 @@ impl Contract {
                 }
             }
             if removable {
-                let mut farm = self.data_mut().farms.get(farm_id).expect(ERR41_FARM_NOT_EXIST);
+                let mut farm = self.data_mut().farms.remove(farm_id).expect(ERR41_FARM_NOT_EXIST);
                 farm.move_to_clear(&seed_amount);
                 self.data_mut().outdated_farms.insert(farm_id, &farm);
-                self.data_mut().farms.remove(farm_id);
                 farm_seed.get_ref_mut().farms.remove(farm_id);
                 self.data_mut().seeds.insert(&seed_id, &farm_seed);
                 return true;

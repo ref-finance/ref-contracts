@@ -55,7 +55,7 @@ mod upgrade {
     const BLOCKCHAIN_INTERFACE_NOT_SET_ERR: &str = "Blockchain interface not set.";
 
     /// Gas for calling migration call.
-    pub const GAS_FOR_MIGRATE_CALL: Gas = 5_000_000_000_000;
+    pub const GAS_FOR_MIGRATE_CALL: Gas = 10_000_000_000_000;
 
     /// Self upgrade and call migrate, optimizes gas by not loading into memory the code.
     /// Takes as input non serialized set of bytes of the code.
