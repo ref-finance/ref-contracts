@@ -11,6 +11,13 @@ use crate::utils::parse_farm_id;
 use crate::simple_farm::DENOM;
 use crate::*;
 
+use uint::construct_uint;
+
+construct_uint! {
+    /// 256-bit unsigned integer.
+    pub struct U256(4);
+}
+
 #[derive(Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct Metadata {
@@ -30,13 +37,13 @@ pub struct FarmInfo {
     pub farm_status: String,
     pub seed_id: SeedId,
     pub reward_token: AccountId,
-    pub start_at: U64,
+    pub start_at: u32,
     pub reward_per_session: U128,
-    pub session_interval: U64,
+    pub session_interval: u32,
 
     pub total_reward: U128,
-    pub cur_round: U64,
-    pub last_round: U64,
+    pub cur_round: u32,
+    pub last_round: u32,
     pub claimed_reward: U128,
     pub unclaimed_reward: U128,
     pub beneficiary_reward: U128,
@@ -50,7 +57,7 @@ impl From<&Farm> for FarmInfo {
                 if let Some(dis) = farm.try_distribute(&DENOM) {
                     let mut farm_status: String = (&farm.status).into();
                     if farm_status == "Running".to_string()
-                        && dis.undistributed < farm.terms.reward_per_session
+                        && dis.undistributed == 0
                     {
                         farm_status = "Ended".to_string();
                     }
@@ -60,9 +67,9 @@ impl From<&Farm> for FarmInfo {
                         farm_status,
                         seed_id: farm.terms.seed_id.clone(),
                         reward_token: farm.terms.reward_token.clone(),
-                        start_at: farm.terms.start_at.into(),
+                        start_at: farm.terms.start_at,
                         reward_per_session: farm.terms.reward_per_session.into(),
-                        session_interval: farm.terms.session_interval.into(),
+                        session_interval: farm.terms.session_interval,
 
                         total_reward: farm.amount_of_reward.into(),
                         cur_round: dis.rr.into(),
@@ -86,7 +93,8 @@ impl From<&Farm> for FarmInfo {
                         cur_round: farm.last_distribution.rr.into(),
                         last_round: farm.last_distribution.rr.into(),
                         claimed_reward: farm.amount_of_claimed.into(),
-                        unclaimed_reward: (farm.amount_of_reward - farm.amount_of_claimed).into(),
+                        // unclaimed_reward: (farm.amount_of_reward - farm.amount_of_claimed).into(),
+                        unclaimed_reward: farm.last_distribution.unclaimed.into(),
                         beneficiary_reward: farm.amount_of_beneficiary.into(),
                     }
                 }                
@@ -100,9 +108,9 @@ impl Contract {
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
             owner_id: self.data().owner_id.clone(),
-            version: String::from("0.5.2"),
+            version: env!("CARGO_PKG_VERSION").to_string(),
             farmer_count: self.data().farmer_count.into(),
-            farm_count: self.data().farm_count.into(),
+            farm_count: self.data().farms.len().into(),
             seed_count: self.data().seeds.len().into(),
             reward_count: self.data().reward_info.len().into(),
         }
@@ -110,50 +118,57 @@ impl Contract {
 
     /// Returns number of farms.
     pub fn get_number_of_farms(&self) -> u64 {
-        self.data().seeds.values().fold(0_u64, |acc, farm_seed| {
-            if farm_seed.need_upgrade() {
-                acc + farm_seed.upgrade().get_ref().farms.len() as u64
-            } else {
-                acc + farm_seed.get_ref().farms.len() as u64
-            }
-        })
+        self.data().farms.len()
+    }
+
+    pub fn get_number_of_outdated_farms(&self) -> u64 {
+        self.data().outdated_farms.len()
     }
 
     /// Returns list of farms of given length from given start index.
-    #[allow(unused_variables)]
     pub fn list_farms(&self, from_index: u64, limit: u64) -> Vec<FarmInfo> {
-        // TODO: how to page that
-        let mut res = vec![];
-        for farm_seed in self.data().seeds.values() {
-            let sf;
-            if farm_seed.need_upgrade() {
-                sf = self.list_farms_by_seed(farm_seed.upgrade().get_ref().seed_id.clone());
-            } else {
-                sf = self.list_farms_by_seed(farm_seed.get_ref().seed_id.clone());
-            }
-            res.push(sf);
-        }
-        res.concat()
+        let keys = self.data().farms.keys_as_vector();
+
+        (from_index..std::cmp::min(from_index + limit, keys.len()))
+            .map(|index| 
+                (&self.data().farms.get(&keys.get(index).unwrap()).unwrap()).into()
+            )
+            .collect()
+    }
+
+    pub fn list_outdated_farms(&self, from_index: u64, limit: u64) -> Vec<FarmInfo> {
+        let keys = self.data().outdated_farms.keys_as_vector();
+
+        (from_index..std::cmp::min(from_index + limit, keys.len()))
+            .map(|index| 
+                (&self.data().outdated_farms.get(&keys.get(index).unwrap()).unwrap()).into()
+            )
+            .collect()
     }
 
     pub fn list_farms_by_seed(&self, seed_id: SeedId) -> Vec<FarmInfo> {
         self.get_seed(&seed_id)
             .get_ref()
             .farms
-            .values()
-            .map(|farm| farm.into())
+            .iter()
+            .map(|farm_id| 
+                (&self.data().farms.get(&farm_id).unwrap()).into()
+            )
             .collect()
     }
 
     /// Returns information about specified farm.
     pub fn get_farm(&self, farm_id: FarmId) -> Option<FarmInfo> {
-        let (seed_id, _) = parse_farm_id(&farm_id);
-        if let Some(farm_seed) = self.get_seed_wrapped(&seed_id) {
-            if let Some(farm) = farm_seed.get_ref().farms.get(&farm_id) {
-                Some(farm.into())
-            } else {
-                None
-            }
+        if let Some(farm) = self.data().farms.get(&farm_id) {
+            Some((&farm).into())
+        } else {
+            None
+        }
+    }
+
+    pub fn get_outdated_farm(&self, farm_id: FarmId) -> Option<FarmInfo> {
+        if let Some(farm) = self.data().outdated_farms.get(&farm_id) {
+            Some((&farm).into())
         } else {
             None
         }
@@ -199,7 +214,7 @@ impl Contract {
             self.get_farmer_wrapped(account_id.as_ref()),
             self.get_seed_wrapped(&seed_id),
         ) {
-            if let Some(farm) = farm_seed.get_ref().farms.get(&farm_id) {
+            if let Some(farm) = self.data().farms.get(&farm_id) {
                 let reward_amount = farm.view_farmer_unclaimed_reward(
                     &farmer.get_ref().get_rps(&farm.get_farm_id()),
                     farmer.get_ref().seeds.get(&seed_id).unwrap_or(&0_u128),
@@ -262,5 +277,14 @@ impl Contract {
                 )
             })
             .collect()
+    }
+
+    pub fn get_user_rps(&self, account_id: ValidAccountId, farm_id: FarmId) -> String {
+        let farmer = self.get_farmer(account_id.as_ref());
+        if let Some(rps) = farmer.get().user_rps.get(&farm_id) {
+            format!("{}", U256::from_little_endian(&rps))
+        } else {
+            String::from("0")
+        }
     }
 }

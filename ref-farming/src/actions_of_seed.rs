@@ -5,7 +5,7 @@ use near_sdk::{AccountId, Balance, PromiseResult};
 
 use crate::utils::{
     assert_one_yocto, ext_multi_fungible_token, ext_fungible_token, 
-    ext_self, parse_seed_id, GAS_FOR_FT_TRANSFER
+    ext_self, wrap_mft_token_id, parse_seed_id, GAS_FOR_FT_TRANSFER
 };
 use crate::errors::*;
 use crate::farm_seed::SeedType;
@@ -19,9 +19,6 @@ impl Contract {
     pub fn withdraw_seed(&mut self, seed_id: SeedId, amount: U128) {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
-        self.assert_storage_usage(&sender_id);
-
-        self.remove_unused_rps(&sender_id);
 
         let amount: Balance = amount.into();
 
@@ -50,7 +47,7 @@ impl Contract {
             SeedType::MFT => {
                 let (receiver_id, token_id) = parse_seed_id(&seed_id);
                 ext_multi_fungible_token::mft_transfer(
-                    token_id,
+                    wrap_mft_token_id(&token_id),
                     sender_id.clone().try_into().unwrap(),
                     amount.into(),
                     None,
@@ -234,8 +231,8 @@ impl Contract {
 
         if farmer_seed_remain == 0 {
             // remove farmer rps of relative farm
-            for farm in &mut farm_seed.get_ref_mut().farms.values_mut() {
-                farmer.get_ref_mut().user_rps.remove(&farm.get_farm_id());
+            for farm_id in farm_seed.get_ref().farms.iter() {
+                farmer.get_ref_mut().remove_rps(farm_id);
             }
         }
         self.data_mut().farmers.insert(sender_id, &farmer);

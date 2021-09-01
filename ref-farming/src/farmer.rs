@@ -6,11 +6,13 @@
 
 
 use std::collections::HashMap;
+use near_sdk::collections::LookupMap;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{env, AccountId, Balance};
 use crate::{SeedId, FarmId, RPS};
 use crate::errors::*;
 use crate::utils::MAX_ACCOUNT_LENGTH;
+use crate::StorageKeys;
 /// each entry cost MAX_ACCOUNT_LENGTH bytes, 
 /// amount: Balance cost 16 bytes
 /// each empty hashmap cost 4 bytes
@@ -28,7 +30,8 @@ pub struct Farmer {
     /// Amounts of various seed tokens the farmer staked.
     pub seeds: HashMap<SeedId, Balance>,
     /// record user_last_rps of farms
-    pub user_rps: HashMap<FarmId, RPS>,
+    pub user_rps: LookupMap<FarmId, RPS>,
+    pub rps_count: u32,
 }
 
 impl Farmer {
@@ -82,24 +85,33 @@ impl Farmer {
     }
 
     pub fn get_rps(&self, farm_id: &FarmId) -> RPS {
-        self.user_rps.get(farm_id).unwrap_or(&RPS::default()).clone()
+        self.user_rps.get(farm_id).unwrap_or(RPS::default()).clone()
     }
 
     pub fn set_rps(&mut self, farm_id: &FarmId, rps: RPS) {
-        self.user_rps.insert(farm_id.clone(), rps);
+        if !self.user_rps.contains_key(farm_id) {
+            self.rps_count += 1;
+        } 
+        self.user_rps.insert(farm_id, &rps);
+    }
+
+    pub fn remove_rps(&mut self, farm_id: &FarmId) {
+        if self.user_rps.contains_key(farm_id) {
+            self.user_rps.remove(farm_id);
+            self.rps_count -= 1;
+        }
     }
 
     /// Returns amount of yocto near necessary to cover storage used by this data structure.
     pub fn storage_usage(&self) -> Balance {
         (
             MIN_FARMER_LENGTH 
-            + self.rewards.len() as u128 * (MAX_ACCOUNT_LENGTH + 16)
-            + self.seeds.len() as u128 * (MAX_ACCOUNT_LENGTH + 16)
-            + self.user_rps.len() as u128 * (MAX_ACCOUNT_LENGTH + 32)
+            + self.rewards.len() as u128 * (4 + MAX_ACCOUNT_LENGTH + 16)
+            + self.seeds.len() as u128 * (4 + MAX_ACCOUNT_LENGTH + 16)
+            + self.rps_count as u128 * (4 + 1 + 2 * MAX_ACCOUNT_LENGTH + 32)
         )
         * env::storage_byte_cost()
     }
-
 }
 
 
@@ -114,12 +126,15 @@ pub enum VersionedFarmer {
 
 impl VersionedFarmer {
 
-    pub fn new(amount: Balance) -> Self {
+    pub fn new(farmer_id: AccountId, amount: Balance) -> Self {
         VersionedFarmer::V101(Farmer {
             amount: amount,
             rewards: HashMap::new(),
             seeds: HashMap::new(),
-            user_rps: HashMap::new(),
+            user_rps: LookupMap::new(StorageKeys::UserRps {
+                account_id: farmer_id.clone(),
+            }),
+            rps_count: 0,
         })
     }
 

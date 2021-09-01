@@ -2,7 +2,6 @@ use crate::*;
 use crate::errors::*;
 use near_sdk::PromiseOrValue;
 use near_sdk::json_types::{U128};
-use crate::utils::parse_farm_id;
 use crate::utils::MFT_TAG;
 use crate::farm_seed::SeedType;
 
@@ -25,7 +24,7 @@ impl FungibleTokenReceiver for Contract {
         let amount: u128 = amount.into();
         if msg.is_empty() {
             // ****** seed Token deposit in ********
-            
+
             // if seed not exist, it will panic
             let seed_farm = self.get_seed(&env::predecessor_account_id());
             if amount < seed_farm.get_ref().min_deposit {
@@ -39,13 +38,15 @@ impl FungibleTokenReceiver for Contract {
                 )
             }
 
-            self.remove_unused_rps(&sender);
             self.internal_seed_deposit(
                 &env::predecessor_account_id(), 
                 &sender, 
                 amount.into(), 
                 SeedType::FT
             );
+            
+            self.assert_storage_usage(&sender);
+
             env::log(
                 format!(
                     "{} deposit FT seed {} with amount {}.",
@@ -58,21 +59,15 @@ impl FungibleTokenReceiver for Contract {
         } else {  
             // ****** reward Token deposit in ********
             let farm_id = msg.parse::<FarmId>().expect(&format!("{}", ERR42_INVALID_FARM_ID));
-            let (seed_id, _) = parse_farm_id(&farm_id);
-
-            let mut farm_seed = self.get_seed(&seed_id);
-            let farm = farm_seed.get_ref_mut().farms.get_mut(&farm_id).expect(&format!("{}", ERR41_FARM_NOT_EXIST));
+            let mut farm = self.data().farms.get(&farm_id).expect(ERR41_FARM_NOT_EXIST);
 
             // update farm
-            assert_eq!(
-                farm.get_reward_token(), 
-                env::predecessor_account_id(), 
-                "{}", ERR44_INVALID_FARM_REWARD
-            );
+            assert_eq!(farm.get_reward_token(), env::predecessor_account_id(), "{}", ERR44_INVALID_FARM_REWARD);
             if let Some(cur_remain) = farm.add_reward(&amount) {
-                self.data_mut().seeds.insert(&seed_id, &farm_seed);
+                self.data_mut().farms.insert(&farm_id, &farm);
                 let old_balance = self.data().reward_info.get(&env::predecessor_account_id()).unwrap_or(0);
                 self.data_mut().reward_info.insert(&env::predecessor_account_id(), &(old_balance + amount));
+                
                 env::log(
                     format!(
                         "{} added {} Reward Token, Now has {} left",
@@ -104,8 +99,21 @@ enum TokenOrPool {
     Pool(u64),
 }
 
+/// a sub token would use a format ":<u64>"
+fn try_identify_sub_token_id(token_id: &String) ->Result<u64, &'static str> {
+    if token_id.starts_with(":") {
+        if let Ok(pool_id) = str::parse::<u64>(&token_id[1..token_id.len()]) {
+            Ok(pool_id)
+        } else {
+            Err("Illegal pool id")
+        }
+    } else {
+        Err("Illegal pool id")
+    }
+}
+
 fn parse_token_id(token_id: String) -> TokenOrPool {
-    if let Ok(pool_id) = str::parse::<u64>(&token_id) {
+    if let Ok(pool_id) = try_identify_sub_token_id(&token_id) {
         TokenOrPool::Pool(pool_id)
     } else {
         TokenOrPool::Token(token_id)
@@ -123,10 +131,6 @@ impl MFTTokenReceiver for Contract {
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
-
-        self.assert_storage_usage(&sender_id);
-
-        self.remove_unused_rps(&sender_id);
  
         let seed_id: String;
         match parse_token_id(token_id.clone()) {
@@ -134,7 +138,8 @@ impl MFTTokenReceiver for Contract {
                 seed_id = format!("{}{}{}", env::predecessor_account_id(), MFT_TAG, pool_id);
             }
             TokenOrPool::Token(_) => {
-                seed_id = env::predecessor_account_id();
+                // for seed deposit, using mft to transfer 'root' token is not supported.
+                env::panic(ERR35_ILLEGAL_TOKEN_ID.as_bytes());
             }
         }
 
@@ -155,6 +160,8 @@ impl MFTTokenReceiver for Contract {
         }
         
         self.internal_seed_deposit(&seed_id, &sender_id, amount, SeedType::MFT);
+
+        self.assert_storage_usage(&sender_id);
 
         env::log(
             format!(

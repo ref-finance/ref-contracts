@@ -7,12 +7,13 @@
 //! token to the farm, after it was created.
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::{U64, U128, ValidAccountId};
+use near_sdk::json_types::{U128, ValidAccountId};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{env, AccountId, Balance, BlockHeight};
+use near_sdk::{env, AccountId, Balance};
 
 use crate::{SeedId, FarmId};
 use crate::errors::*;
+use crate::utils::*;
 use uint::construct_uint;
 
 construct_uint! {
@@ -36,9 +37,9 @@ pub const DENOM: u128 = 1_000_000_000_000_000_000_000_000;
 pub struct SimpleFarmTerms {
     pub seed_id: SeedId,
     pub reward_token: AccountId,
-    pub start_at: BlockHeight,
+    pub start_at: TimestampSec,
     pub reward_per_session: Balance,
-    pub session_interval: BlockHeight,
+    pub session_interval: TimestampSec,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -46,9 +47,9 @@ pub struct SimpleFarmTerms {
 pub struct HRSimpleFarmTerms {
     pub seed_id: SeedId,
     pub reward_token: ValidAccountId,
-    pub start_at: U64,
+    pub start_at: u32,
     pub reward_per_session: U128,
-    pub session_interval: U64, 
+    pub session_interval: u32, 
 }
 
 impl From<&HRSimpleFarmTerms> for SimpleFarmTerms {
@@ -56,9 +57,9 @@ impl From<&HRSimpleFarmTerms> for SimpleFarmTerms {
         SimpleFarmTerms {
             seed_id: terms.seed_id.clone(),
             reward_token: terms.reward_token.clone().into(),
-            start_at: terms.start_at.into(),
+            start_at: terms.start_at,
             reward_per_session: terms.reward_per_session.into(),
-            session_interval: terms.session_interval.into(),
+            session_interval: terms.session_interval,
         }
     }
 }
@@ -90,8 +91,8 @@ pub struct SimpleFarmRewardDistribution {
     /// rps(cur) = rps(prev) + distributing_reward / total_seed_staked
     pub rps: RPS,
     /// Reward_Round
-    /// rr = (cur_block_height - start_at) / session_interval
-    pub rr: u64,
+    /// rr = (cur_block_timestamp in sec - start_at) / session_interval
+    pub rr: u32,
 }
 
 ///   Implementation of simple farm, Similar to the design of "berry farm".
@@ -140,15 +141,26 @@ impl SimpleFarm {
 
         match self.status {
             SimpleFarmStatus::Created => {
+                // When a farm gots first deposit of reward, it turns to Running state,
+                // but farming or not depends on `start_at` 
                 self.status = SimpleFarmStatus::Running;
                 if self.terms.start_at == 0 {
-                    self.terms.start_at = env::block_index();
+                    // for a farm without start time, the first deposit of reward 
+                    // would trigger the farming
+                    self.terms.start_at = to_sec(env::block_timestamp());
                 }
                 self.amount_of_reward += amount;
                 self.last_distribution.undistributed += amount;
                 Some(self.last_distribution.undistributed)
             },
             SimpleFarmStatus::Running => {
+                if let Some(dis) = self.try_distribute(&DENOM) {
+                    if dis.undistributed == 0 {
+                        // farm has ended actually
+                        return None;
+                    }
+                }
+                // For a running farm, can add reward to extend duration
                 self.amount_of_reward += amount;
                 self.last_distribution.undistributed += amount;
                 Some(self.last_distribution.undistributed)
@@ -159,23 +171,34 @@ impl SimpleFarm {
     }
 
 
+    /// Try to distribute reward according to current timestamp
+    /// return None if farm is not in Running state or haven't start farming yet;
+    /// return new dis :SimpleFarmRewardDistribution 
+    /// Note, if total_seed is 0, the rps in new dis would be reset to 0 too.
     pub(crate) fn try_distribute(&self, total_seeds: &Balance) -> Option<SimpleFarmRewardDistribution> {
 
         if let SimpleFarmStatus::Running = self.status {
-            if env::block_index() < self.terms.start_at {
+            if env::block_timestamp() < to_nano(self.terms.start_at) {
+                // a farm haven't start yet
                 return None;
             }
             let mut dis = self.last_distribution.clone();
-            // calculate rr according to cur_height
-            dis.rr = (env::block_index() - self.terms.start_at) / self.terms.session_interval;
+            // calculate rr according to cur_timestamp
+            dis.rr = (to_sec(env::block_timestamp()) - self.terms.start_at) / self.terms.session_interval;
             let mut reward_added = (dis.rr - self.last_distribution.rr) as u128 
                 * self.terms.reward_per_session;
             if self.last_distribution.undistributed < reward_added {
+                // all undistribution would be distributed this time
+                reward_added = self.last_distribution.undistributed;
                 // recalculate rr according to undistributed
-                let increased_rr = (self.last_distribution.undistributed 
-                    / self.terms.reward_per_session) as u64;
+                let increased_rr = (reward_added / self.terms.reward_per_session) as u32;
                 dis.rr = self.last_distribution.rr + increased_rr;
-                reward_added = increased_rr as u128 * self.terms.reward_per_session;
+                let reward_caculated = increased_rr as u128 * self.terms.reward_per_session;
+                if reward_caculated < reward_added {
+                    // add the tail round
+                    dis.rr += 1;
+
+                }
                 // env::log(
                 //     format!(
                 //         "Farm ends at Round #{}, unclaimed reward: {}.",
@@ -230,13 +253,16 @@ impl SimpleFarm {
         }
     }
 
+    /// Distribute reward generated from previous distribution to now,
+    /// only works for farm in Running state and has reward deposited in,
+    /// Note 1, if undistribute equals 0, the farm goes to Ended state;
+    /// Note 2, if total_seed is 0, reward is claimed directly by beneficiary
     pub(crate) fn distribute(&mut self, total_seeds: &Balance, silent: bool) {
         if let Some(dis) = self.try_distribute(total_seeds) {
             if self.last_distribution.rr != dis.rr {
                 self.last_distribution = dis.clone();
                 if total_seeds == &0 {
-                    // if total_seeds == &0, 
-                    // reward goes to beneficiary,
+                    // if total_seeds == &0, reward goes to beneficiary,
                     self.amount_of_claimed += self.last_distribution.unclaimed;
                     self.amount_of_beneficiary += self.last_distribution.unclaimed;
                     self.last_distribution.unclaimed = 0;
@@ -252,14 +278,15 @@ impl SimpleFarm {
                 }
                 
             }
-            if self.last_distribution.undistributed < self.terms.reward_per_session {
+            if self.last_distribution.undistributed == 0 {
                 self.status = SimpleFarmStatus::Ended;
             }
         } 
     }
 
-    /// return the new user reward per seed 
-    /// and amount of reward as (user_rps, reward_amount) 
+    /// Claim user's unclaimed reward in this farm,
+    /// return the new user RPS (reward per seed),  
+    /// and amount of reward 
     pub(crate) fn claim_user_reward(
         &mut self, 
         user_rps: &RPS,
@@ -269,9 +296,9 @@ impl SimpleFarm {
     ) -> (RPS, Balance) {
 
         self.distribute(total_seeds, silent);
-        if user_seeds == &0 {
-            return (self.last_distribution.rps, 0);
-        }
+        // if user_seeds == &0 {
+        //     return (self.last_distribution.rps, 0);
+        // }
 
         let claimed = (
             U256::from(*user_seeds) 
@@ -292,15 +319,39 @@ impl SimpleFarm {
         (self.last_distribution.rps, claimed)
     }
 
-    pub fn can_be_removed(&self) -> bool {
+    /// Move an Ended farm to Cleared, if any unclaimed reward exists, go to beneficiary
+    pub(crate) fn move_to_clear(&mut self, total_seeds: &Balance) -> bool {
+        if let SimpleFarmStatus::Running = self.status {
+            self.distribute(total_seeds, true);
+        }
         if let SimpleFarmStatus::Ended = self.status {
-            if self.amount_of_claimed == self.amount_of_reward {
-                true
-            } else {
-                false
+            if self.last_distribution.unclaimed > 0 {
+                self.amount_of_claimed += self.last_distribution.unclaimed;
+                self.amount_of_beneficiary += self.last_distribution.unclaimed;
+                self.last_distribution.unclaimed = 0;
             }
+            self.status = SimpleFarmStatus::Cleared;
+            true
         } else {
             false
+        }
+    }
+
+    pub fn can_be_removed(&self, total_seeds: &Balance) -> bool {
+        match self.status {
+            SimpleFarmStatus::Ended => true,
+            SimpleFarmStatus::Running => {
+                if let Some(dis) = self.try_distribute(total_seeds) {
+                    if dis.undistributed == 0 {
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            },
+            _ => false,
         }
     }
 

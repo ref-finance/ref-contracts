@@ -1,18 +1,16 @@
 
 use near_sdk::json_types::{U128};
-use near_sdk::{env, ext_contract, Gas};
+use near_sdk::{env, ext_contract, Gas, Timestamp};
 use uint::construct_uint;
 use crate::{SeedId, FarmId};
 use crate::errors::*;
+
+pub type TimestampSec = u32;
 
 pub const MIN_SEED_DEPOSIT: u128 = 1_000_000_000_000_000_000;
 pub const MAX_ACCOUNT_LENGTH: u128 = 64;
 /// Amount of gas for fungible token transfers.
 pub const GAS_FOR_FT_TRANSFER: Gas = 10_000_000_000_000;
-/// Amount of gas used for upgrade function itself.
-pub const GAS_FOR_UPGRADE_CALL: Gas = 50_000_000_000_000;
-/// Amount of gas for deploy action.
-pub const GAS_FOR_DEPLOY_CALL: Gas = 20_000_000_000_000;
 pub const MFT_TAG: &str = "@";
 
 
@@ -62,6 +60,11 @@ pub fn assert_one_yocto() {
     assert_eq!(env::attached_deposit(), 1, "Requires attached deposit of exactly 1 yoctoNEAR")
 }
 
+/// wrap token_id into correct format in MFT standard
+pub fn wrap_mft_token_id(token_id: &str) -> String {
+    format!(":{}", token_id)
+}
+
 // return receiver_id, token_id
 pub fn parse_seed_id(lpt_id: &str) -> (String, String) {
     let v: Vec<&str> = lpt_id.split(MFT_TAG).collect();
@@ -85,5 +88,13 @@ pub fn parse_farm_id(farm_id: &FarmId) -> (String, usize) {
 
 pub fn gen_farm_id(seed_id: &SeedId, index: usize) -> FarmId {
     format!("{}#{}", seed_id, index)
+}
+
+pub(crate) fn to_nano(timestamp: TimestampSec) -> Timestamp {
+    Timestamp::from(timestamp) * 10u64.pow(9)
+}
+
+pub(crate) fn to_sec(timestamp: Timestamp) -> TimestampSec {
+    (timestamp / 10u64.pow(9)) as u32
 }
 

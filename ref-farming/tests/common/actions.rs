@@ -1,5 +1,5 @@
 
-use near_sdk::json_types::{U128, U64};
+use near_sdk::json_types::{U128};
 use near_sdk::{Balance};
 use near_sdk_sim::{call, to_yocto, ContractAccount, UserAccount};
 
@@ -13,6 +13,31 @@ use near_sdk::serde_json::Value;
 use super::init::*;
 use super::utils::*;
 
+#[allow(dead_code)]
+pub(crate) fn prepair_pool_and_liquidity(
+    root: &UserAccount, 
+    owner: &UserAccount,
+    farming_id: String,
+    lps: Vec<&UserAccount>,
+) -> (ContractAccount<TestRef>, ContractAccount<TestToken>, ContractAccount<TestToken>) {
+    let pool = deploy_pool(&root, swap(), owner.account_id());
+    let token1 = deploy_token(&root, dai(), vec![swap()]);
+    let token2 = deploy_token(&root, eth(), vec![swap()]);
+    call!(owner, pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth())]))
+    .assert_success();
+    call!(root,
+        pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 25),
+        deposit = to_yocto("1")
+    ).assert_success();
+    call!(root, pool.mft_register(":0".to_string(), to_va(farming_id)), deposit = to_yocto("1"))
+    .assert_success();
+    for lp in lps {
+        add_liqudity(lp, &pool, &token1, &token2, 0);
+    }
+    (pool,token1, token2)
+}
+
+#[allow(dead_code)]
 pub(crate) fn prepair_pool(
     root: &UserAccount, 
     owner: &UserAccount, 
@@ -33,6 +58,7 @@ pub(crate) fn prepair_pool(
     (pool, token1, token2)
 }
 
+#[allow(dead_code)]
 pub(crate) fn prepair_farm(
     root: &UserAccount, 
     owner: &UserAccount,
@@ -47,9 +73,9 @@ pub(crate) fn prepair_farm(
         farming.create_simple_farm(HRSimpleFarmTerms{
             seed_id: format!("{}@0", swap()),
             reward_token: to_va(token.account_id()),
-            start_at: U64(0),
+            start_at: 0,
             reward_per_session: to_yocto("1").into(),
-            session_interval: U64(60),
+            session_interval: 60,
         }, Some(U128(1000000000000000000))),
         deposit = to_yocto("1")
     );
@@ -60,7 +86,7 @@ pub(crate) fn prepair_farm(
     } else {
         farm_id = String::from("N/A");
     }
-    println!("    Farm {} created at Height#{}", farm_id.clone(), root.borrow_runtime().current_block().block_height);
+    // println!("    Farm {} created at Height#{}", farm_id.clone(), root.borrow_runtime().current_block().block_height);
     
     // deposit reward token
     call!(
@@ -69,17 +95,19 @@ pub(crate) fn prepair_farm(
         deposit = to_yocto("1")
     )
     .assert_success();
+    mint_token(&token, &root, total_reward.into());
     call!(
         root,
         token.ft_transfer_call(to_va(farming_id()), total_reward.into(), None, farm_id.clone()),
         deposit = 1
     )
     .assert_success();
-    println!("    Farm running at Height#{}", root.borrow_runtime().current_block().block_height);
+    // println!("    Farm running at Height#{}", root.borrow_runtime().current_block().block_height);
 
     (farming, farm_id)
 }
 
+#[allow(dead_code)]
 pub(crate) fn prepair_multi_farms(
     root: &UserAccount, 
     owner: &UserAccount,
@@ -100,15 +128,17 @@ pub(crate) fn prepair_multi_farms(
     )
     .assert_success();
 
+    mint_token(&token, &root, to_yocto("100000"));
+
     for _ in 0..farm_count {
         let out_come = call!(
             owner,
             farming.create_simple_farm(HRSimpleFarmTerms{
                 seed_id: format!("{}@0", swap()),
                 reward_token: to_va(token.account_id()),
-                start_at: U64(0),
+                start_at: 0,
                 reward_per_session: to_yocto("1").into(),
-                session_interval: U64(60),
+                session_interval: 60,
             }, Some(U128(1000000000000000000))),
             deposit = to_yocto("1")
         );
@@ -119,7 +149,6 @@ pub(crate) fn prepair_multi_farms(
         } else {
             farm_id = String::from("N/A");
         }
-
         call!(
             root,
             token.ft_transfer_call(to_va(farming_id()), total_reward.into(), None, farm_id.clone()),
