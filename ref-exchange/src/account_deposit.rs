@@ -10,7 +10,7 @@ use near_sdk::{
     AccountId, Balance, PromiseResult, StorageUsage,
 };
 
-use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER};
+use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER};
 use crate::*;
 
 // [AUDIT_01]
@@ -313,7 +313,7 @@ impl Contract {
             U128(amount),
             &env::current_account_id(),
             0,
-            GAS_FOR_FT_TRANSFER,
+            GAS_FOR_RESOLVE_TRANSFER,
         ))
     }
 }
