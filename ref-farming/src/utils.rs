@@ -11,6 +11,8 @@ pub const MIN_SEED_DEPOSIT: u128 = 1_000_000_000_000_000_000;
 pub const MAX_ACCOUNT_LENGTH: u128 = 64;
 /// Amount of gas for fungible token transfers.
 pub const GAS_FOR_FT_TRANSFER: Gas = 10_000_000_000_000;
+/// hotfix_insuffient_gas_for_mft_resolve_transfer, increase from 5T to 20T
+pub const GAS_FOR_RESOLVE_TRANSFER: Gas = 20_000_000_000_000;
 pub const MFT_TAG: &str = "@";
 
 

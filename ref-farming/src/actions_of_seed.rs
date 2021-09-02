@@ -5,7 +5,7 @@ use near_sdk::{AccountId, Balance, PromiseResult};
 
 use crate::utils::{
     assert_one_yocto, ext_multi_fungible_token, ext_fungible_token, 
-    ext_self, wrap_mft_token_id, parse_seed_id, GAS_FOR_FT_TRANSFER
+    ext_self, wrap_mft_token_id, parse_seed_id, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER
 };
 use crate::errors::*;
 use crate::farm_seed::SeedType;
@@ -41,7 +41,7 @@ impl Contract {
                     amount.into(),
                     &env::current_account_id(),
                     0,
-                    GAS_FOR_FT_TRANSFER,
+                    GAS_FOR_RESOLVE_TRANSFER,
                 ));
             }
             SeedType::MFT => {
@@ -61,7 +61,7 @@ impl Contract {
                     amount.into(),
                     &env::current_account_id(),
                     0,
-                    GAS_FOR_FT_TRANSFER,
+                    GAS_FOR_RESOLVE_TRANSFER,
                 ));
             }
         }
