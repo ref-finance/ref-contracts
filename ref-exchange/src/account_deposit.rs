@@ -116,6 +116,11 @@ impl Account {
         );
     }
 
+    /// like assert_storage_usage but return true or false instead panic directly
+    pub fn is_storage_covered(&self) -> bool {
+            self.storage_usage() <= self.near_amount
+    }
+
     /// Returns minimal account deposit storage usage possible.
     pub fn min_storage_usage() -> Balance {
         INIT_ACCOUNT_STORAGE as Balance * env::storage_byte_cost()
@@ -207,22 +212,36 @@ impl Contract {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {}
             PromiseResult::Failed => {
-                // This reverts the changes from withdraw function. If account doesn't exit, deposits to the owner's account.
+                // This reverts the changes from withdraw function. 
+                // If account doesn't exit, deposits to the owner's account as lostfund.
+                let mut failed = false;
                 if let Some(va) = self.accounts.get(&sender_id) {
                     let mut account: Account = va.into();
                     account.deposit(&token_id, amount.0);
-                    self.internal_save_account(&sender_id, account);
+                    if account.is_storage_covered() {
+                        self.internal_save_account(&sender_id, account);
+                    } else {
+                        env::log(
+                            format!(
+                                "Account {} has not enough storage. Depositing to owner.",
+                                sender_id
+                            )
+                            .as_bytes(),
+                        );
+                        failed = true;
+                    }                    
                 } else {
                     env::log(
                         format!(
-                            "Account {} is not registered or not enough storage. Depositing to owner.",
+                            "Account {} is not registered. Depositing to owner.",
                             sender_id
                         )
                         .as_bytes(),
                     );
-                    let mut owner_account = self.internal_unwrap_account(&self.owner_id);
-                    owner_account.deposit(&token_id, amount.0);
-                    self.internal_save_account(&self.owner_id.clone(), owner_account);
+                    failed = true;
+                }
+                if failed {
+                    self.internal_lostfund(&token_id, amount.0);
                 }
             }
         };
@@ -236,6 +255,13 @@ impl Contract {
     pub(crate) fn internal_save_account(&mut self, account_id: &AccountId, account: Account) {
         account.assert_storage_usage();
         self.accounts.insert(&account_id, &account.into());
+    }
+
+    /// save token to owner account as lostfund
+    pub(crate) fn internal_lostfund(&mut self, token_id: &AccountId, amount: u128) {
+        let mut lostfund = self.internal_unwrap_or_default_account(&self.owner_id.clone());
+        lostfund.deposit(token_id, amount);
+        self.accounts.insert(&self.owner_id, &lostfund.into());
     }
 
     /// Registers account in deposited amounts with given amount of $NEAR.

@@ -92,7 +92,7 @@ impl FungibleTokenReceiver for Contract {
         } else {
             // instant swap
             let message =
-                serde_json::from_str::<TokenReceiverMessage>(&msg).expect("ERR_MSG_WRONG_FORMAT");
+                serde_json::from_str::<TokenReceiverMessage>(&msg).expect(ERR28_WRONG_MSG_FORMAT);
             match message {
                 TokenReceiverMessage::Execute {
                     referral_id,
