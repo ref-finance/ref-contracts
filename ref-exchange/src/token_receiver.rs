@@ -34,7 +34,7 @@ impl Contract {
     ) -> Vec<(AccountId, Balance)> {
         // [AUDIT_12] always save back account for a resident user
         let mut is_resident_user: bool = true;
-        let mut initial_account: Account = self.accounts.get(sender_id).unwrap_or_else(|| {
+        let initial_account: Account = self.accounts.get(sender_id).unwrap_or_else(|| {
             is_resident_user = false;
             if !force {
                 env::panic(ERR10_ACC_NOT_REGISTERED.as_bytes());
@@ -42,8 +42,9 @@ impl Contract {
                 Account::default().into()
             }
         }).into();
-        initial_account.deposit(&token_in, amount_in);
         let mut account = initial_account.clone();
+        // initial_account.deposit(&token_in, amount_in);
+        account.deposit(&token_in, amount_in);
         let _ = self.internal_execute_actions(
             &mut account,
             &referral_id,
@@ -53,16 +54,17 @@ impl Contract {
         );
         let mut result = vec![];
         for (token, amount) in account.tokens.clone().into_iter() {
-            let value = initial_account.tokens.get(&token);
-            // Remove tokens that were transient from the account.
-            if amount == 0 && value.is_none() {
-                account.tokens.remove(&token);
-            } else {
-                let initial_amount = *value.unwrap_or(&0);
-                if amount > initial_amount {
-                    result.push((token.clone(), amount - initial_amount));
-                    account.tokens.insert(token, initial_amount);
+            if let Some(initial_amount) = initial_account.tokens.get(&token) {
+                if amount > *initial_amount {
+                    result.push((token.clone(), amount - *initial_amount));
+                    account.tokens.insert(token, *initial_amount);
                 }
+            } else {  // initial_account has not registered this token
+                if amount > 0 {
+                    result.push((token.clone(), amount));
+                }
+                // should keep it unregistered
+                account.tokens.remove(&token);
             }
         }
         // [AUDIT_12] always save back account for a resident user
