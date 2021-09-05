@@ -106,6 +106,18 @@ pub fn get_storage_balance(
     }
 }
 
+pub fn is_register_to_token(
+    token: &ContractAccount<TestToken>, 
+    account_id: ValidAccountId
+) -> bool {
+    let sb = view!(token.storage_balance_of(account_id)).unwrap_json_value();
+    if let Value::Null = sb {
+        false
+    } else {
+        true
+    }
+}
+
 pub fn get_deposits(
     pool: &ContractAccount<Exchange>, 
     account_id: ValidAccountId
