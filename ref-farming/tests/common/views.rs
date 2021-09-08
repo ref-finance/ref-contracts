@@ -4,6 +4,7 @@ use near_sdk_sim::{view, ContractAccount};
 
 use super::utils::to_va;
 use ref_farming::{ContractContract as Farming, FarmInfo};
+use test_token::ContractContract as TestToken;
 use std::collections::HashMap;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -182,6 +183,12 @@ pub(crate) fn show_storage_balance(farming: &ContractAccount<Farming>, farmer: S
         println!("total {}, available {}", ret.total.0, ret.available.0);
     }
     ret
+}
+
+pub(crate) fn balance_of(token: &ContractAccount<TestToken>, account_id: String) -> u128 {
+    view!(token.ft_balance_of(to_va(account_id.clone())))
+        .unwrap_json::<U128>()
+        .0
 }
 
 // =============  Assertions  ===============

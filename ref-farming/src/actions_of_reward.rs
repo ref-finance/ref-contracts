@@ -183,7 +183,9 @@ impl Contract {
         self.data_mut().farmers.insert(farmer_id, &farmer);
 
         for (token_id, amount) in withdraw_tasks {
-            self.internal_send_tokens(farmer_id, &token_id, amount);
+            if amount > 0 {
+                self.internal_send_tokens(farmer_id, &token_id, amount);
+            }
         }
     }
     
