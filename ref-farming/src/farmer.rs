@@ -53,7 +53,7 @@ impl Farmer {
         let value = *self.rewards.get(token).expect(ERR21_TOKEN_NOT_REG);
         assert!(value >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
         if amount == 0 || amount == value {
-            self.rewards.remove(&token.clone());
+            self.rewards.remove(&token);
             value
         } else {
             self.rewards.insert(token.clone(), value - amount);

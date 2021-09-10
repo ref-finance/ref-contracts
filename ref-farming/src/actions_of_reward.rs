@@ -175,14 +175,10 @@ impl Contract {
         };
         
         let mut farmer = self.get_farmer(&farmer_id);
-        let mut withdraw_tasks = HashMap::<AccountId, u128>::new();
-        for token_id in tokens {
-            let amount = farmer.get_ref_mut().sub_reward(&token_id, 0);
-            withdraw_tasks.insert(token_id.clone(), amount);
-        }
+        let withdraw_amounts: Vec<_> = tokens.iter().map(|token_id| farmer.get_ref_mut().sub_reward(&token_id, 0)).collect();
         self.data_mut().farmers.insert(farmer_id, &farmer);
-
-        for (token_id, amount) in withdraw_tasks {
+        
+        for (token_id, amount) in tokens.into_iter().zip(withdraw_amounts) {
             if amount > 0 {
                 self.internal_send_tokens(farmer_id, &token_id, amount);
             }
