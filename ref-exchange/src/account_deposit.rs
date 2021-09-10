@@ -1,17 +1,15 @@
 //! Account deposit is information per user about their balances in the exchange.
-use near_sdk::collections::UnorderedMap;
 use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::collections::UnorderedMap;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
-    assert_one_yocto, env, near_bindgen, 
-    AccountId, Balance, PromiseResult, StorageUsage,
+    assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult, StorageUsage,
 };
 
 use crate::legacy::AccountV1;
 use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER};
 use crate::*;
-
 
 // [AUDIT_01]
 // const MAX_ACCOUNT_LENGTH: u128 = 64;
@@ -44,20 +42,11 @@ pub enum VAccount {
 }
 
 impl VAccount {
-
     /// Upgrades from other versions to the currently used version.
-    pub fn upgrade(self, account_id: AccountId) -> Self {
+    pub fn into_current(self, account_id: &AccountId) -> Account {
         match self {
-            VAccount::Current(account) => VAccount::Current(account),
-            VAccount::V1(account) => VAccount::Current(account.into_current(&account_id)),
-        }
-    }
-
-    #[inline]
-    pub fn need_upgrade(&self) -> bool {
-        match self {
-            VAccount::Current(_) => false,
-            _ => true,
+            VAccount::Current(account) => account,
+            VAccount::V1(account) => account.into_current(account_id),
         }
     }
 }
@@ -67,16 +56,6 @@ impl From<Account> for VAccount {
         VAccount::Current(account)
     }
 }
-
-impl From<VAccount> for Account {
-    fn from(v_account: VAccount) -> Self {
-        match v_account {
-            VAccount::Current(account) => {account},
-            _ => unimplemented!(),
-        }
-    }
-}
-
 
 /// Account deposits information and storage cost.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -89,9 +68,7 @@ pub struct Account {
     pub storage_used: StorageUsage,
 }
 
-
 impl Account {
-
     pub fn new(account_id: &AccountId) -> Self {
         Account {
             near_amount: 0,
@@ -112,13 +89,32 @@ impl Account {
             .as_bytes(),
         );
         let balance = self.tokens.get(&token).unwrap_or(0);
-        let new_balance = balance.checked_add(amount).expect("errors::BALANCE_OVERFLOW");
+        let new_balance = balance
+            .checked_add(amount)
+            .expect("errors::BALANCE_OVERFLOW");
         self.tokens.insert(token, &new_balance);
+        env::log(format!("[in Account::deposit], len of tokens {}", self.tokens.len()).as_bytes());
+        env::log(
+            format!(
+                "[in Account::deposit], balance of dai001 {}",
+                self.tokens.get(&String::from("dai001")).unwrap_or(0)
+            )
+            .as_bytes(),
+        );
+        env::log(
+            format!(
+                "[in Account::deposit], balance of eth002 {}",
+                self.tokens.get(&String::from("eth002")).unwrap_or(0)
+            )
+            .as_bytes(),
+        );
 
         env::log(
             format!(
                 "[in Account::deposit], after deposited {} to token {}, tokens {:?}",
-                amount, token, self.tokens.to_vec()
+                amount,
+                token,
+                self.tokens.to_vec()
             )
             .as_bytes(),
         );
@@ -128,8 +124,25 @@ impl Account {
     /// Panics if `amount` is bigger than the current balance.
     pub(crate) fn withdraw(&mut self, token: &AccountId, amount: Balance) {
         if let Some(x) = self.tokens.get(token) {
+            env::log(
+                format!(
+                    "[in Account::withdraw], before withdraw, tokens {:?}",
+                    self.tokens.to_vec()
+                )
+                .as_bytes(),
+            );
             assert!(x >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
             self.tokens.insert(token, &(x - amount));
+
+            env::log(
+                format!(
+                    "[in Account::withdraw], after withdrawn {} to token {}, tokens {:?}",
+                    amount,
+                    token,
+                    self.tokens.to_vec()
+                )
+                .as_bytes(),
+            );
         } else {
             env::panic(ERR21_TOKEN_NOT_REG.as_bytes());
         }
@@ -138,8 +151,9 @@ impl Account {
     // [AUDIT_01]
     /// Returns amount of $NEAR necessary to cover storage used by this data structure.
     pub fn storage_usage(&self) -> Balance {
-        (INIT_ACCOUNT_STORAGE + 
-            self.tokens.len() as u64 * (KEY_PREFIX_ACC + ACC_ID_AS_KEY_STORAGE + U128_STORAGE)) as u128
+        (INIT_ACCOUNT_STORAGE
+            + self.tokens.len() as u64 * (KEY_PREFIX_ACC + ACC_ID_AS_KEY_STORAGE + U128_STORAGE))
+            as u128
             * env::storage_byte_cost()
     }
 
@@ -165,7 +179,7 @@ impl Account {
 
     /// like assert_storage_usage but return true or false instead panic directly
     pub fn is_storage_covered(&self) -> bool {
-            self.storage_usage() <= self.near_amount
+        self.storage_usage() <= self.near_amount
     }
 
     /// Returns minimal account deposit storage usage possible.
@@ -259,11 +273,10 @@ impl Contract {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => {}
             PromiseResult::Failed => {
-                // This reverts the changes from withdraw function. 
+                // This reverts the changes from withdraw function.
                 // If account doesn't exit, deposits to the owner's account as lostfound.
                 let mut failed = false;
-                if let Some(va) = self.accounts.get(&sender_id) {
-                    let mut account: Account = va.into();
+                if let Some(mut account) = self.internal_get_account(&sender_id) {
                     account.deposit(&token_id, amount.0);
                     if account.is_storage_covered() {
                         self.internal_save_account(&sender_id, account);
@@ -276,7 +289,7 @@ impl Contract {
                             .as_bytes(),
                         );
                         failed = true;
-                    }                    
+                    }
                 } else {
                     env::log(
                         format!(
@@ -296,7 +309,6 @@ impl Contract {
 }
 
 impl Contract {
-
     /// Checks that account has enough storage to be stored and saves it into collection.
     /// This should be only place to directly use `self.accounts`.
     pub(crate) fn internal_save_account(&mut self, account_id: &AccountId, account: Account) {
@@ -306,7 +318,7 @@ impl Contract {
 
     /// save token to owner account as lostfound
     pub(crate) fn internal_lostfound(&mut self, token_id: &AccountId, amount: u128) {
-        let mut lostfound = self.internal_unwrap_or_default_account(&self.owner_id.clone());
+        let mut lostfound = self.internal_unwrap_or_default_account(&self.owner_id);
         lostfound.deposit(token_id, amount);
         self.accounts.insert(&self.owner_id, &lostfound.into());
     }
@@ -330,7 +342,7 @@ impl Contract {
     ) {
         let mut account = self.internal_unwrap_account(sender_id);
         assert!(
-            self.whitelisted_tokens.contains(token_id) || !account.tokens.get(token_id).is_none(),
+            self.whitelisted_tokens.contains(token_id) || account.tokens.get(token_id).is_some(),
             "{}",
             ERR12_TOKEN_NOT_WHITELISTED
         );
@@ -338,22 +350,20 @@ impl Contract {
         self.internal_save_account(&sender_id, account);
     }
 
+    pub fn internal_get_account(&self, account_id: &AccountId) -> Option<Account> {
+        self.accounts
+            .get(account_id)
+            .map(|va| va.into_current(account_id))
+    }
+
     pub fn internal_unwrap_account(&self, account_id: &AccountId) -> Account {
-        let va = self.accounts.get(account_id).expect(errors::ERR10_ACC_NOT_REGISTERED);
-        if va.need_upgrade() {
-            va.upgrade(account_id.clone()).into()
-        } else {
-            va.into()
-        }
+        self.internal_get_account(account_id)
+            .expect(errors::ERR10_ACC_NOT_REGISTERED)
     }
 
     pub fn internal_unwrap_or_default_account(&self, account_id: &AccountId) -> Account {
-        let va = self.accounts.get(account_id).unwrap_or(Account::new(account_id).into());
-        if va.need_upgrade() {
-            va.upgrade(account_id.clone()).into()
-        } else {
-            va.into()
-        }
+        self.internal_get_account(account_id)
+            .unwrap_or_else(|| Account::new(account_id))
     }
 
     /// Returns current balance of given token for given user. If there is nothing recorded, returns 0.
@@ -362,18 +372,9 @@ impl Contract {
         sender_id: &AccountId,
         token_id: &AccountId,
     ) -> Balance {
-        if let Some(va) = self.accounts.get(sender_id) {
-            let a: Account = {
-                if va.need_upgrade() {
-                    va.upgrade(sender_id.clone()).into()
-                } else {
-                    va.into()
-                }
-            };
-            a.tokens.get(token_id).unwrap_or(0)
-        } else {
-            0
-        }
+        self.internal_get_account(sender_id)
+            .and_then(|a| a.tokens.get(token_id))
+            .unwrap_or(0)
     }
 
     /// Sends given amount to given user and if it fails, returns it back to user's balance.
