@@ -28,6 +28,7 @@ mod multi_fungible_token;
 mod owner;
 mod pool;
 mod simple_pool;
+mod stable_swap;
 mod storage_impl;
 mod token_receiver;
 mod utils;

@@ -170,6 +170,11 @@ impl SimplePool {
         shares: Balance,
         min_amounts: Vec<Balance>,
     ) -> Vec<Balance> {
+        assert_eq!(
+            min_amounts.len(),
+            self.token_account_ids.len(),
+            "ERR_WRONG_TOKEN_COUNT"
+        );
         let prev_shares_amount = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
         assert!(prev_shares_amount >= shares, "ERR_NOT_ENOUGH_SHARES");
         let mut result = vec![];
