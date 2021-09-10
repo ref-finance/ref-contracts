@@ -167,6 +167,7 @@ fn instant_swap_scenario_02() {
     let action = pack_action(0, &token1.account_id(), &token2.account_id(), None, 1);
     let out_come = direct_swap(&new_user, &token1, vec![action], 0);
     out_come.assert_success();
+    println!("swap one logs: {:#?}", get_logs(&out_come));
     // println!("{:#?}", out_come.promise_results());
     assert_eq!(get_error_count(&out_come), 1);
     assert!(get_error_status(&out_come)

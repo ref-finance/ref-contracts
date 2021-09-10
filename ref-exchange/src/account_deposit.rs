@@ -281,6 +281,8 @@ impl Contract {
                     if account.is_storage_covered() {
                         self.internal_save_account(&sender_id, account);
                     } else {
+                        // The deposit added this token to the state.
+                        account.tokens.remove(&token_id);
                         env::log(
                             format!(
                                 "Account {} has not enough storage. Depositing to owner.",
