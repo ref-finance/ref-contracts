@@ -1,7 +1,5 @@
 //! Account deposit is information per user about their balances in the exchange.
-
-use std::collections::HashMap;
-
+use near_sdk::collections::UnorderedMap;
 use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId, U128};
@@ -10,8 +8,10 @@ use near_sdk::{
     AccountId, Balance, PromiseResult, StorageUsage,
 };
 
+use crate::legacy::AccountV1;
 use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER};
 use crate::*;
+
 
 // [AUDIT_01]
 // const MAX_ACCOUNT_LENGTH: u128 = 64;
@@ -25,13 +25,14 @@ const U32_STORAGE: StorageUsage = 4;
 const ACC_ID_STORAGE: StorageUsage = 64;
 /// As a key, 4 bytes length would be added to the head
 const ACC_ID_AS_KEY_STORAGE: StorageUsage = ACC_ID_STORAGE + 4;
+const KEY_PREFIX_ACC: StorageUsage = 64;
 /// As a near_sdk::collection key, 1 byte for prefiex
 const ACC_ID_AS_CLT_KEY_STORAGE: StorageUsage = ACC_ID_AS_KEY_STORAGE + 1;
 
 // ACC_ID: the Contract accounts map key length
 // + VAccount enum: 1 byte
 // + U128_STORAGE: near_amount storage
-// + U32_STORAGE: tokens HashMap length
+// + U32_STORAGE: tokens UnorderedMap length
 // + U64_STORAGE: storage_used
 pub const INIT_ACCOUNT_STORAGE: StorageUsage =
     ACC_ID_AS_CLT_KEY_STORAGE + 1 + U128_STORAGE + U32_STORAGE + U64_STORAGE;
@@ -39,6 +40,26 @@ pub const INIT_ACCOUNT_STORAGE: StorageUsage =
 #[derive(BorshDeserialize, BorshSerialize)]
 pub enum VAccount {
     Current(Account),
+    V1(AccountV1),
+}
+
+impl VAccount {
+
+    /// Upgrades from other versions to the currently used version.
+    pub fn upgrade(self, account_id: AccountId) -> Self {
+        match self {
+            VAccount::Current(account) => VAccount::Current(account),
+            VAccount::V1(account) => VAccount::Current(account.into_current(&account_id)),
+        }
+    }
+
+    #[inline]
+    pub fn need_upgrade(&self) -> bool {
+        match self {
+            VAccount::Current(_) => false,
+            _ => true,
+        }
+    }
 }
 
 impl From<Account> for VAccount {
@@ -51,48 +72,74 @@ impl From<VAccount> for Account {
     fn from(v_account: VAccount) -> Self {
         match v_account {
             VAccount::Current(account) => {account},
+            _ => unimplemented!(),
         }
     }
 }
 
 
 /// Account deposits information and storage cost.
-#[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct Account {
     /// Native NEAR amount sent to the exchange.
     /// Used for storage right now, but in future can be used for trading as well.
     pub near_amount: Balance,
     /// Amounts of various tokens deposited to this account.
-    pub tokens: HashMap<AccountId, Balance>,
+    pub tokens: UnorderedMap<AccountId, Balance>,
     pub storage_used: StorageUsage,
 }
 
 
-
-
 impl Account {
+
+    pub fn new(account_id: &AccountId) -> Self {
+        Account {
+            near_amount: 0,
+            tokens: UnorderedMap::new(StorageKey::AccountTokens {
+                account_id: account_id.clone(),
+            }),
+            storage_used: 0,
+        }
+    }
+
     /// Deposit amount to the balance of given token.
     pub(crate) fn deposit(&mut self, token: &AccountId, amount: Balance) {
-        if let Some(x) = self.tokens.get_mut(token) {
-            *x = *x + amount;
-        } else {
-            self.tokens.insert(token.clone(), amount);
-        }
+        env::log(
+            format!(
+                "[in Account::deposit], before deposit, tokens {:?}",
+                self.tokens.to_vec()
+            )
+            .as_bytes(),
+        );
+        let balance = self.tokens.get(&token).unwrap_or(0);
+        let new_balance = balance.checked_add(amount).expect("errors::BALANCE_OVERFLOW");
+        self.tokens.insert(token, &new_balance);
+
+        env::log(
+            format!(
+                "[in Account::deposit], after deposited {} to token {}, tokens {:?}",
+                amount, token, self.tokens.to_vec()
+            )
+            .as_bytes(),
+        );
     }
 
     /// Withdraw amount of `token` from the internal balance.
     /// Panics if `amount` is bigger than the current balance.
     pub(crate) fn withdraw(&mut self, token: &AccountId, amount: Balance) {
-        let value = *self.tokens.get(token).expect(ERR21_TOKEN_NOT_REG);
-        assert!(value >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
-        self.tokens.insert(token.clone(), value - amount);
+        if let Some(x) = self.tokens.get(token) {
+            assert!(x >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
+            self.tokens.insert(token, &(x - amount));
+        } else {
+            env::panic(ERR21_TOKEN_NOT_REG.as_bytes());
+        }
     }
 
     // [AUDIT_01]
     /// Returns amount of $NEAR necessary to cover storage used by this data structure.
     pub fn storage_usage(&self) -> Balance {
         (INIT_ACCOUNT_STORAGE + 
-            self.tokens.len() as u64 * (ACC_ID_AS_KEY_STORAGE + U128_STORAGE)) as u128
+            self.tokens.len() as u64 * (KEY_PREFIX_ACC + ACC_ID_AS_KEY_STORAGE + U128_STORAGE)) as u128
             * env::storage_byte_cost()
     }
 
@@ -131,8 +178,8 @@ impl Account {
     pub(crate) fn register(&mut self, token_ids: &Vec<ValidAccountId>) {
         for token_id in token_ids {
             let t = token_id.as_ref();
-            if !self.tokens.contains_key(t) {
-                self.tokens.insert(t.clone(), 0);
+            if self.tokens.get(t).is_none() {
+                self.tokens.insert(t, &0);
             }
         }
     }
@@ -140,7 +187,7 @@ impl Account {
     /// Unregisters `token_id` from this account balance.
     /// Panics if the `token_id` balance is not 0.
     pub(crate) fn unregister(&mut self, token_id: &AccountId) {
-        let amount = self.tokens.remove(token_id).unwrap_or_default();
+        let amount = self.tokens.remove(token_id).unwrap_or(0);
         assert_eq!(amount, 0, "{}", ERR24_NON_ZERO_TOKEN_BALANCE);
     }
 }
@@ -213,7 +260,7 @@ impl Contract {
             PromiseResult::Successful(_) => {}
             PromiseResult::Failed => {
                 // This reverts the changes from withdraw function. 
-                // If account doesn't exit, deposits to the owner's account as lostfund.
+                // If account doesn't exit, deposits to the owner's account as lostfound.
                 let mut failed = false;
                 if let Some(va) = self.accounts.get(&sender_id) {
                     let mut account: Account = va.into();
@@ -241,7 +288,7 @@ impl Contract {
                     failed = true;
                 }
                 if failed {
-                    self.internal_lostfund(&token_id, amount.0);
+                    self.internal_lostfound(&token_id, amount.0);
                 }
             }
         };
@@ -257,11 +304,11 @@ impl Contract {
         self.accounts.insert(&account_id, &account.into());
     }
 
-    /// save token to owner account as lostfund
-    pub(crate) fn internal_lostfund(&mut self, token_id: &AccountId, amount: u128) {
-        let mut lostfund = self.internal_unwrap_or_default_account(&self.owner_id.clone());
-        lostfund.deposit(token_id, amount);
-        self.accounts.insert(&self.owner_id, &lostfund.into());
+    /// save token to owner account as lostfound
+    pub(crate) fn internal_lostfound(&mut self, token_id: &AccountId, amount: u128) {
+        let mut lostfound = self.internal_unwrap_or_default_account(&self.owner_id.clone());
+        lostfound.deposit(token_id, amount);
+        self.accounts.insert(&self.owner_id, &lostfound.into());
     }
 
     /// Registers account in deposited amounts with given amount of $NEAR.
@@ -283,7 +330,7 @@ impl Contract {
     ) {
         let mut account = self.internal_unwrap_account(sender_id);
         assert!(
-            self.whitelisted_tokens.contains(token_id) || account.tokens.contains_key(token_id),
+            self.whitelisted_tokens.contains(token_id) || !account.tokens.get(token_id).is_none(),
             "{}",
             ERR12_TOKEN_NOT_WHITELISTED
         );
@@ -292,17 +339,21 @@ impl Contract {
     }
 
     pub fn internal_unwrap_account(&self, account_id: &AccountId) -> Account {
-        self.accounts
-            .get(account_id)
-            .expect(errors::ERR10_ACC_NOT_REGISTERED)
-            .into()
+        let va = self.accounts.get(account_id).expect(errors::ERR10_ACC_NOT_REGISTERED);
+        if va.need_upgrade() {
+            va.upgrade(account_id.clone()).into()
+        } else {
+            va.into()
+        }
     }
 
     pub fn internal_unwrap_or_default_account(&self, account_id: &AccountId) -> Account {
-        self.accounts
-            .get(account_id)
-            .unwrap_or(Account::default().into())
-            .into()
+        let va = self.accounts.get(account_id).unwrap_or(Account::new(account_id).into());
+        if va.need_upgrade() {
+            va.upgrade(account_id.clone()).into()
+        } else {
+            va.into()
+        }
     }
 
     /// Returns current balance of given token for given user. If there is nothing recorded, returns 0.
@@ -311,10 +362,18 @@ impl Contract {
         sender_id: &AccountId,
         token_id: &AccountId,
     ) -> Balance {
-        self.accounts
-            .get(sender_id)
-            .and_then(|va| {let a: Account = va.into(); a.tokens.get(token_id).cloned()})
-            .unwrap_or_default()
+        if let Some(va) = self.accounts.get(sender_id) {
+            let a: Account = {
+                if va.need_upgrade() {
+                    va.upgrade(sender_id.clone()).into()
+                } else {
+                    va.into()
+                }
+            };
+            a.tokens.get(token_id).unwrap_or(0)
+        } else {
+            0
+        }
     }
 
     /// Sends given amount to given user and if it fails, returns it back to user's balance.

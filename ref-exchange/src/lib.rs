@@ -41,6 +41,7 @@ pub(crate) enum StorageKey {
     Accounts,
     Shares { pool_id: u32 },
     Whitelist,
+    AccountTokens {account_id: AccountId},
 }
 
 #[near_bindgen]
@@ -106,7 +107,7 @@ impl Contract {
             for action in &actions {
                 for token in action.tokens() {
                     assert!(
-                        account.tokens.contains_key(&token)
+                        !account.tokens.get(&token).is_none()
                             || self.whitelisted_tokens.contains(&token),
                         "{}",
                         // [AUDIT_05]

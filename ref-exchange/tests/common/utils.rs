@@ -136,11 +136,11 @@ fn mft_balance_of(
 }
 
 pub fn dai() -> AccountId {
-    "dai".to_string()
+    "dai001".to_string()
 }
 
 pub fn eth() -> AccountId {
-    "eth".to_string()
+    "eth002".to_string()
 }
 
 pub fn usdt() -> AccountId {

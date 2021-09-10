@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{serde_json, PromiseOrValue};
@@ -34,16 +35,28 @@ impl Contract {
     ) -> Vec<(AccountId, Balance)> {
         // [AUDIT_12] always save back account for a resident user
         let mut is_resident_user: bool = true;
-        let initial_account: Account = self.accounts.get(sender_id).unwrap_or_else(|| {
+
+        let va = self.accounts.get(sender_id).unwrap_or_else(|| { 
             is_resident_user = false;
             if !force {
                 env::panic(ERR10_ACC_NOT_REGISTERED.as_bytes());
             } else {
-                Account::default().into()
+                Account::new(sender_id).into()
             }
-        }).into();
-        let mut account = initial_account.clone();
-        // initial_account.deposit(&token_in, amount_in);
+        });
+        let mut account: Account = {
+            if va.need_upgrade() {
+                va.upgrade(sender_id.clone()).into()
+            } else {
+                va.into()
+            }
+        };
+
+        let tokens_snapshot: HashMap<String, u128> = account
+        .tokens.to_vec().iter()
+        .map(|(token, balance)| (token.clone(), *balance))
+        .collect();
+
         account.deposit(&token_in, amount_in);
         let _ = self.internal_execute_actions(
             &mut account,
@@ -52,14 +65,17 @@ impl Contract {
             // [AUDIT_02]
             ActionResult::Amount(U128(amount_in)),
         );
+
         let mut result = vec![];
-        for (token, amount) in account.tokens.clone().into_iter() {
-            if let Some(initial_amount) = initial_account.tokens.get(&token) {
+        for (token, amount) in account.tokens.to_vec() {
+            if let Some(initial_amount) = tokens_snapshot.get(&token) {
+                // restore token balance to original state if have more
+                // but keep cur state if have less
                 if amount > *initial_amount {
                     result.push((token.clone(), amount - *initial_amount));
-                    account.tokens.insert(token, *initial_amount);
+                    account.tokens.insert(&token, initial_amount);
                 }
-            } else {  // initial_account has not registered this token
+            } else {  // this token not in original state
                 if amount > 0 {
                     result.push((token.clone(), amount));
                 }

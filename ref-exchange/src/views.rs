@@ -94,16 +94,13 @@ impl Contract {
     /// Returns balances of the deposits for given user outside of any pools.
     /// Returns empty list if no tokens deposited.
     pub fn get_deposits(&self, account_id: ValidAccountId) -> HashMap<AccountId, U128> {
-        self.accounts
-            .get(account_id.as_ref())
-            .map(|va| {
-                let a: Account = va.into(); 
-                a.tokens
-                    .into_iter()
-                    .map(|(acc, bal)| (acc, U128(bal)))
-                    .collect()
-            })
-            .unwrap_or_default()
+        let acc: Account = self.internal_unwrap_or_default_account(account_id.as_ref());
+        acc.tokens
+        .to_vec()
+        .iter()
+        .map(|(token, balance)| (token.clone(), U128(*balance)))
+        .collect()
+
     }
 
     /// Returns balance of the deposit for given user outside of any pools.
@@ -132,12 +129,7 @@ impl Contract {
 
     /// Get specific user whitelisted tokens.
     pub fn get_user_whitelisted_tokens(&self, account_id: &AccountId) -> Vec<AccountId> {
-        self.accounts
-            .get(&account_id)
-            .map(|va| {
-                let a: Account = va.into();
-                a.tokens.keys().cloned().collect()
-            })
-            .unwrap_or_default()
+        let acc: Account = self.internal_unwrap_or_default_account(account_id);
+        acc.tokens.keys().collect()
     }
 }
