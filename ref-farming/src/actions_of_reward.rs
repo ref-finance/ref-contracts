@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{assert_one_yocto, env, near_bindgen, 
     AccountId, Balance, Promise, PromiseResult};
@@ -168,13 +167,13 @@ impl Contract {
         let view_farmer = self.get_farmer(&farmer_id);
         let tokens = {
             if let Some(token) = token {
-                vec![token]
+                vec![token.clone()]
             } else {
-                view_farmer.get_ref().rewards.keys().collect::<Vec<_>>()
+                view_farmer.get_ref().rewards.keys().map(|x| x.clone()).collect::<Vec<_>>()
             }
         };
-        
-        let mut farmer = self.get_farmer(&farmer_id);
+
+        let mut farmer = view_farmer;
         let withdraw_amounts: Vec<_> = tokens.iter().map(|token_id| farmer.get_ref_mut().sub_reward(&token_id, 0)).collect();
         self.data_mut().farmers.insert(farmer_id, &farmer);
         
