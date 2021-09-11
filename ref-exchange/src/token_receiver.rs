@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{serde_json, PromiseOrValue};
+use std::collections::HashMap;
 
 use crate::*;
 
@@ -36,26 +36,20 @@ impl Contract {
         // [AUDIT_12] always save back account for a resident user
         let mut is_resident_user: bool = true;
 
-        let va = self.accounts.get(sender_id).unwrap_or_else(|| { 
+        let mut account: Account = self.internal_get_account(sender_id).unwrap_or_else(|| {
             is_resident_user = false;
             if !force {
                 env::panic(ERR10_ACC_NOT_REGISTERED.as_bytes());
             } else {
-                Account::new(sender_id).into()
+                Account::new(sender_id)
             }
         });
-        let mut account: Account = {
-            if va.need_upgrade() {
-                va.upgrade(sender_id.clone()).into()
-            } else {
-                va.into()
-            }
-        };
 
         let tokens_snapshot: HashMap<String, u128> = account
-        .tokens.to_vec().iter()
-        .map(|(token, balance)| (token.clone(), *balance))
-        .collect();
+            .tokens
+            .iter()
+            .map(|(token, balance)| (token, balance))
+            .collect();
 
         account.deposit(&token_in, amount_in);
         let _ = self.internal_execute_actions(
@@ -75,7 +69,8 @@ impl Contract {
                     result.push((token.clone(), amount - *initial_amount));
                     account.tokens.insert(&token, initial_amount);
                 }
-            } else {  // this token not in original state
+            } else {
+                // this token not in original state
                 if amount > 0 {
                     result.push((token.clone(), amount));
                 }
