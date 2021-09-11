@@ -79,70 +79,43 @@ impl Account {
         }
     }
 
+    /// Deposit amount to the balance of given token,
+    /// if given token not register and not enough storage, deposit fails 
+    pub(crate) fn deposit_with_storage_check(&mut self, token: &AccountId, amount: Balance) -> bool {
+        if let Some(balance) = self.tokens.get(token) {
+            // token has been registered, just add without storage check, 
+            let new_balance = balance
+                .checked_add(amount)
+                .expect("errors::BALANCE_OVERFLOW");
+            self.tokens.insert(token, &new_balance);
+            true
+        } else {
+            // check storage after insert, if fail should unregister the token
+            self.tokens.insert(token, &(amount));
+            if self.storage_usage() <= self.near_amount {
+                true
+            } else {
+                self.tokens.remove(token);
+                false
+            }
+        }
+    }
+
     /// Deposit amount to the balance of given token.
     pub(crate) fn deposit(&mut self, token: &AccountId, amount: Balance) {
-        env::log(
-            format!(
-                "[in Account::deposit], before deposit, tokens {:?}",
-                self.tokens.to_vec()
-            )
-            .as_bytes(),
-        );
         let balance = self.tokens.get(&token).unwrap_or(0);
         let new_balance = balance
             .checked_add(amount)
             .expect("errors::BALANCE_OVERFLOW");
         self.tokens.insert(token, &new_balance);
-        env::log(format!("[in Account::deposit], len of tokens {}", self.tokens.len()).as_bytes());
-        env::log(
-            format!(
-                "[in Account::deposit], balance of dai001 {}",
-                self.tokens.get(&String::from("dai001")).unwrap_or(0)
-            )
-            .as_bytes(),
-        );
-        env::log(
-            format!(
-                "[in Account::deposit], balance of eth002 {}",
-                self.tokens.get(&String::from("eth002")).unwrap_or(0)
-            )
-            .as_bytes(),
-        );
-
-        env::log(
-            format!(
-                "[in Account::deposit], after deposited {} to token {}, tokens {:?}",
-                amount,
-                token,
-                self.tokens.to_vec()
-            )
-            .as_bytes(),
-        );
     }
 
     /// Withdraw amount of `token` from the internal balance.
     /// Panics if `amount` is bigger than the current balance.
     pub(crate) fn withdraw(&mut self, token: &AccountId, amount: Balance) {
         if let Some(x) = self.tokens.get(token) {
-            env::log(
-                format!(
-                    "[in Account::withdraw], before withdraw, tokens {:?}",
-                    self.tokens.to_vec()
-                )
-                .as_bytes(),
-            );
             assert!(x >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
             self.tokens.insert(token, &(x - amount));
-
-            env::log(
-                format!(
-                    "[in Account::withdraw], after withdrawn {} to token {}, tokens {:?}",
-                    amount,
-                    token,
-                    self.tokens.to_vec()
-                )
-                .as_bytes(),
-            );
         } else {
             env::panic(ERR21_TOKEN_NOT_REG.as_bytes());
         }
@@ -175,11 +148,6 @@ impl Account {
             "{}",
             ERR11_INSUFFICIENT_STORAGE
         );
-    }
-
-    /// like assert_storage_usage but return true or false instead panic directly
-    pub fn is_storage_covered(&self) -> bool {
-        self.storage_usage() <= self.near_amount
     }
 
     /// Returns minimal account deposit storage usage possible.
@@ -277,12 +245,13 @@ impl Contract {
                 // If account doesn't exit, deposits to the owner's account as lostfound.
                 let mut failed = false;
                 if let Some(mut account) = self.internal_get_account(&sender_id) {
-                    account.deposit(&token_id, amount.0);
-                    if account.is_storage_covered() {
-                        self.internal_save_account(&sender_id, account);
+                    if account.deposit_with_storage_check(&token_id, amount.0) {
+                        // cause storage already checked, here can directly save
+                        self.accounts.insert(&sender_id, &account.into());
                     } else {
-                        // The deposit added this token to the state.
-                        account.tokens.remove(&token_id);
+                        // we can ensure that internal_get_account here would NOT cause a version upgrade, 
+                        // cause it is callback, the account must be the current version or non-exist,
+                        // so, here we can just leave it without insert, won't cause storage collection inconsistency.
                         env::log(
                             format!(
                                 "Account {} has not enough storage. Depositing to owner.",

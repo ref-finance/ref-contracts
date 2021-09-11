@@ -20,21 +20,6 @@ pub struct AccountV1 {
     pub storage_used: StorageUsage,
 }
 
-// impl From<AccountV1> for VAccount {
-//     fn from(account: AccountV1) -> Self {
-//         VAccount::V1(account)
-//     }
-// }
-
-// impl From<VAccount> for AccountV1 {
-//     fn from(v_account: VAccount) -> Self {
-//         match v_account {
-//             VAccount::V1(account) => {account},
-//             _ => unimplemented!(),
-//         }
-//     }
-// }
-
 impl AccountV1 {
     pub fn into_current(&self, account_id: &AccountId) -> Account {
         let mut acc = Account {

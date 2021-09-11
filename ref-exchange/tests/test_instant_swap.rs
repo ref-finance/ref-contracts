@@ -1,10 +1,10 @@
 use near_sdk::json_types::U128;
-use near_sdk::serde_json::Value;
+// use near_sdk::serde_json::Value;
 use near_sdk_sim::{
-    call, init_simulator, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
+    call, to_yocto, ContractAccount, ExecutionResult, UserAccount,
 };
 
-use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
+// use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
 use test_token::ContractContract as TestToken;
 
 use crate::common::utils::*;
@@ -49,7 +49,7 @@ fn direct_swap(
 
 #[test]
 fn instant_swap_scenario_01() {
-    let (root, owner, pool, token1, token2, token3) = setup_pool_with_liquidity();
+    let (root, owner, pool, token1, token2, _) = setup_pool_with_liquidity();
     let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
     call!(
         new_user,
@@ -167,13 +167,13 @@ fn instant_swap_scenario_02() {
     let action = pack_action(0, &token1.account_id(), &token2.account_id(), None, 1);
     let out_come = direct_swap(&new_user, &token1, vec![action], 0);
     out_come.assert_success();
-    println!("swap one logs: {:#?}", get_logs(&out_come));
+    // println!("swap one logs: {:#?}", get_logs(&out_come));
     // println!("{:#?}", out_come.promise_results());
     assert_eq!(get_error_count(&out_come), 1);
     assert!(get_error_status(&out_come)
         .contains("Smart contract panicked: The account new_user is not registered"));
     // println!("total logs: {:#?}", get_logs(&out_come));
-    // assert!(get_logs(&out_come)[2].contains("Account new_user has not enough storage. Depositing to owner."));
+    assert!(get_logs(&out_come)[2].contains("Account new_user has not enough storage. Depositing to owner."));
     assert_eq!(
         get_storage_balance(&pool, new_user.valid_account_id())
             .unwrap()
@@ -215,7 +215,7 @@ fn instant_swap_scenario_02() {
     let out_come = direct_swap(&new_user, &token1, vec![action], 0);
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
-    println!("total logs: {:#?}", get_logs(&out_come));
+    // println!("total logs: {:#?}", get_logs(&out_come));
     assert_eq!(get_error_count(&out_come), 0);
     assert_eq!(
         get_storage_balance(&pool, new_user.valid_account_id())
@@ -319,7 +319,7 @@ fn instant_swap_scenario_02() {
 
 #[test]
 fn instant_swap_scenario_03() {
-    let (root, owner, pool, token1, token2, token3) = setup_pool_with_liquidity();
+    let (root, _, pool, token1, token2, token3) = setup_pool_with_liquidity();
     let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
     call!(
         new_user,
