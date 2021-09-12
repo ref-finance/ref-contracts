@@ -51,11 +51,11 @@ pub fn deploy_token(
         signer_account: root
     );
     call!(root, t.new()).assert_success();
-    call!(
-        root,
-        t.mint(to_va(root.account_id.clone()), to_yocto("10000").into())
-    )
-    .assert_success();
+    // call!(
+    //     root,
+    //     t.mint(to_va(root.account_id.clone()), to_yocto("10000").into())
+    // )
+    // .assert_success();
     for account_id in accounts_to_register {
         call!(
             root,

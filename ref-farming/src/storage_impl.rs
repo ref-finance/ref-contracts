@@ -54,8 +54,7 @@ impl StorageManagement for Contract {
                 self.internal_register_account(&account_id, amount);
             }
         }
-        self.storage_balance_of(account_id.try_into().unwrap())
-            .unwrap()
+        self.storage_balance_of(account_id.try_into().unwrap()).unwrap()
     }
 
     #[payable]
@@ -65,14 +64,17 @@ impl StorageManagement for Contract {
         let account_id = env::predecessor_account_id();        
         let (locked, deposited) = self.internal_farmer_storage(&account_id);
         if deposited > 0 {
-            let amount = amount.map(|a| a.0).unwrap_or(deposited);
+            if deposited < locked {
+                env::panic(format!("{}", ERR11_INSUFFICIENT_STORAGE).as_bytes());
+            }
+            let amount = amount.map(|a| a.0).unwrap_or(deposited - locked);
             assert!(deposited >= locked + amount, "{}", ERR11_INSUFFICIENT_STORAGE);
             // TODO: should make sure tranfer is OK with a callback
+            let mut farmer = self.get_farmer(&account_id);
+            farmer.get_ref_mut().amount -= amount;
+            self.data_mut().farmers.insert(&account_id, &farmer);
             Promise::new(account_id.clone()).transfer(amount);
-            StorageBalance {
-                total: locked.into(),
-                available: (deposited - amount).into(),
-            }
+            self.storage_balance_of(account_id.try_into().unwrap()).unwrap()
         } else {
             env::panic(format!("{}", ERR10_ACC_NOT_REGISTERED).as_bytes());
         }
@@ -118,8 +120,8 @@ impl StorageManagement for Contract {
         let (locked, deposited) = self.internal_farmer_storage(account_id.as_ref()); 
         if locked > 0 {
             Some(StorageBalance {
-                total: U128(locked),
-                available: U128(deposited),
+                total: U128(deposited),
+                available: U128(deposited.saturating_sub(locked)),
             })
         } else {
            None
@@ -174,7 +176,7 @@ impl Contract {
             farmer.get_ref_mut().amount += amount;
             self.data_mut().farmers.insert(&account_id, &farmer);
         } else {
-            self.data_mut().farmers.insert(&account_id, &VersionedFarmer::new(amount));
+            self.data_mut().farmers.insert(&account_id, &VersionedFarmer::new(account_id.clone(), amount));
             self.data_mut().farmer_count += 1;
         }
     }

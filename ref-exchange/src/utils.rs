@@ -9,8 +9,8 @@ use uint::construct_uint;
 
 /// Attach no deposit.
 pub const NO_DEPOSIT: u128 = 0;
-
-pub const GAS_FOR_RESOLVE_TRANSFER: Gas = 5_000_000_000_000;
+/// hotfix_insuffient_gas_for_mft_resolve_transfer, increase from 5T to 20T
+pub const GAS_FOR_RESOLVE_TRANSFER: Gas = 20_000_000_000_000;
 
 pub const GAS_FOR_FT_TRANSFER_CALL: Gas = 25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER;
 

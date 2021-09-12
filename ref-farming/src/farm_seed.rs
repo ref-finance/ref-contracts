@@ -1,13 +1,13 @@
 //! FarmSeed stores information per seed about 
 //! staked seed amount and farms under it.
 
-use std::collections::HashMap;
+use std::collections::HashSet;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{Balance};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::json_types::{U128};
 use crate::errors::*;
-use crate::farm::{Farm, FarmId};
+use crate::farm::FarmId;
 use crate::utils::parse_seed_id;
 
 
@@ -32,7 +32,7 @@ pub struct FarmSeed {
     pub seed_type: SeedType,
     /// all farms that accepted this seed
     /// FarmId = {seed_id}#{next_index}
-    pub farms: HashMap<FarmId, Farm>,
+    pub farms: HashSet<FarmId>,
     pub next_index: u32,
     /// total (staked) balance of this seed (Farming Token)
     pub amount: Balance,
@@ -51,7 +51,7 @@ impl FarmSeed {
         Self {
             seed_id: seed_id.clone(),
             seed_type,
-            farms: HashMap::new(),
+            farms: HashSet::new(),
             next_index: 0,
             amount: 0,
             min_deposit,
@@ -146,7 +146,7 @@ impl From<&FarmSeed> for SeedInfo {
             next_index: fs.next_index,
             amount: fs.amount.into(),
             min_deposit: fs.min_deposit.into(),
-            farms: fs.farms.keys().map(|key| key.clone()).collect(),
+            farms: fs.farms.iter().map(|key| key.clone()).collect(),
         }
     }
 }

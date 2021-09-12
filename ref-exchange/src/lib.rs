@@ -8,10 +8,10 @@ use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
-    PromiseResult, StorageUsage,
+    PromiseResult, StorageUsage, BorshStorageKey
 };
 
-use crate::account_deposit::Account;
+use crate::account_deposit::{VAccount, Account};
 pub use crate::action::SwapAction;
 use crate::action::{Action, ActionResult};
 use crate::errors::*;
@@ -36,6 +36,14 @@ mod views;
 
 near_sdk::setup_alloc!();
 
+#[derive(BorshStorageKey, BorshSerialize)]
+pub(crate) enum StorageKey {
+    Pools,
+    Accounts,
+    Shares { pool_id: u32 },
+    Whitelist,
+}
+
 #[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 pub struct Contract {
@@ -48,7 +56,7 @@ pub struct Contract {
     /// List of all the pools.
     pools: Vector<Pool>,
     /// Accounts registered, keeping track all the amounts deposited, storage and more.
-    accounts: LookupMap<AccountId, Account>,
+    accounts: LookupMap<AccountId, VAccount>,
     /// Set of whitelisted tokens by "owner".
     whitelisted_tokens: UnorderedSet<AccountId>,
 }
@@ -61,9 +69,9 @@ impl Contract {
             owner_id: owner_id.as_ref().clone(),
             exchange_fee,
             referral_fee,
-            pools: Vector::new(b"p".to_vec()),
-            accounts: LookupMap::new(b"d".to_vec()),
-            whitelisted_tokens: UnorderedSet::new(b"w".to_vec()),
+            pools: Vector::new(StorageKey::Pools),
+            accounts: LookupMap::new(StorageKey::Accounts),
+            whitelisted_tokens: UnorderedSet::new(StorageKey::Whitelist),
         }
     }
 
@@ -81,16 +89,19 @@ impl Contract {
         )))
     }
 
+    /// [AUDIT_03_reject(NOPE action is allowed by design)] 
+    /// [AUDIT_04]
     /// Executes generic set of actions.
     /// If referrer provided, pays referral_fee to it.
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
+    #[payable]
     pub fn execute_actions(
         &mut self,
         actions: Vec<Action>,
         referral_id: Option<ValidAccountId>,
     ) -> ActionResult {
         let sender_id = env::predecessor_account_id();
-        let mut account = self.get_account_deposits(&sender_id);
+        let mut account = self.internal_unwrap_account(&sender_id);
         // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
         if env::attached_deposit() == 0 {
             for action in &actions {
@@ -99,7 +110,8 @@ impl Contract {
                         account.tokens.contains_key(&token)
                             || self.whitelisted_tokens.contains(&token),
                         "{}",
-                        ERR26_ACCESS_KEY_NOT_ALLOWED
+                        // [AUDIT_05]
+                        ERR27_DEPOSIT_NEEDED
                     );
                 }
             }
@@ -153,7 +165,7 @@ impl Contract {
                 assert!(amount >= &min_amount.0, "ERR_MIN_AMOUNT");
             }
         }
-        let mut deposits = self.accounts.get(&sender_id).unwrap_or_default();
+        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
         let tokens = pool.tokens();
         // Subtract updated amounts from deposits. This will fail if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
@@ -181,7 +193,7 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        let mut deposits = self.accounts.get(&sender_id).unwrap_or_default();
+        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
         for i in 0..tokens.len() {
             deposits.deposit(&tokens[i], amounts[i]);
         }
@@ -196,12 +208,14 @@ impl Contract {
 
 /// Internal methods implementation.
 impl Contract {
+
     /// Check how much storage taken costs and refund the left over back.
     fn internal_check_storage(&self, prev_storage: StorageUsage) {
         let storage_cost = env::storage_usage()
             .checked_sub(prev_storage)
             .unwrap_or_default() as Balance
             * env::storage_byte_cost();
+        // println!("need: {}, attached: {}", storage_cost, env::attached_deposit());
         let refund = env::attached_deposit()
             .checked_sub(storage_cost)
             .expect("ERR_STORAGE_DEPOSIT");
@@ -261,7 +275,8 @@ impl Contract {
                     referral_id,
                 );
                 account.deposit(&swap_action.token_out, amount_out);
-                ActionResult::Amount(amount_out)
+                // [AUDIT_02]
+                ActionResult::Amount(U128(amount_out))
             }
         }
     }
@@ -367,7 +382,7 @@ mod tests {
         deposit_tokens(context, contract, accounts(3), token_amounts.clone());
         testing_env!(context
             .predecessor_account_id(account_id.clone())
-            .attached_deposit(to_yocto("0.00067"))
+            .attached_deposit(to_yocto("0.0007"))
             .build());
         contract.add_liquidity(
             pool_id,
@@ -433,7 +448,7 @@ mod tests {
             crate::utils::INIT_SHARES_SUPPLY
         );
 
-        // Get price from pool #0 1 -> 2 tokens.
+        // Get price from pool :0 1 -> 2 tokens.
         let expected_out = contract.get_return(0, accounts(1), one_near.into(), accounts(2));
         assert_eq!(expected_out.0, 1662497915624478906119726);
 
@@ -460,13 +475,13 @@ mod tests {
             .predecessor_account_id(accounts(3))
             .attached_deposit(to_yocto("0.0067"))
             .build());
-        contract.mft_register("0".to_string(), accounts(1));
+        contract.mft_register(":0".to_string(), accounts(1));
         testing_env!(context
             .predecessor_account_id(accounts(3))
             .attached_deposit(1)
             .build());
         // transfer 1m shares in pool 0 to acc 1.
-        contract.mft_transfer("0".to_string(), accounts(1), U128(1_000_000), None);
+        contract.mft_transfer(":0".to_string(), accounts(1), U128(1_000_000), None);
 
         testing_env!(context.predecessor_account_id(accounts(3)).build());
         contract.remove_liquidity(
@@ -506,7 +521,7 @@ mod tests {
             .attached_deposit(to_yocto("1"))
             .build());
         let id = contract.add_simple_pool(vec![accounts(1), accounts(2)], 25);
-        testing_env!(context.attached_deposit(to_yocto("0.00067")).build());
+        testing_env!(context.attached_deposit(to_yocto("0.0007")).build());
         contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("10"))], None);
         contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("50"))], None);
         testing_env!(context.attached_deposit(1).build());
@@ -535,7 +550,7 @@ mod tests {
 
     /// Deny pool with a single token
     #[test]
-    #[should_panic(expected = "ERR_NOT_ENOUGH_TOKENS")]
+    #[should_panic(expected = "ERR_SHOULD_HAVE_2_TOKENS")]
     fn test_deny_single_token_pool() {
         let (mut context, mut contract) = setup_contract();
         create_pool_with_liquidity(
@@ -548,7 +563,7 @@ mod tests {
 
     /// Deny pool with a single token
     #[test]
-    #[should_panic(expected = "ERR_TOO_MANY_TOKENS")]
+    #[should_panic(expected = "ERR_SHOULD_HAVE_2_TOKENS")]
     fn test_deny_too_many_tokens_pool() {
         let (mut context, mut contract) = setup_contract();
         create_pool_with_liquidity(
@@ -615,12 +630,14 @@ mod tests {
             vec![(accounts(1), to_yocto("1")), (accounts(2), to_yocto("1"))],
         );
         let acc = ValidAccountId::try_from("test_user").unwrap();
+
         deposit_tokens(
             &mut context,
             &mut contract,
             acc.clone(),
             vec![(accounts(1), 1_000_000)],
         );
+
         testing_env!(context
             .predecessor_account_id(acc.clone())
             .attached_deposit(1)
@@ -658,7 +675,7 @@ mod tests {
 
     /// Check that can not swap non whitelisted tokens when attaching 0 deposit (access key).
     #[test]
-    #[should_panic(expected = "E26: access key not allowed")]
+    #[should_panic(expected = "E27: attach 1yN to swap tokens not in whitelist")]
     fn test_fail_swap_not_whitelisted() {
         let (mut context, mut contract) = setup_contract();
         deposit_tokens(
@@ -721,5 +738,162 @@ mod tests {
         );
         // Roundtrip returns almost everything except 0.3% fee.
         assert_eq!(contract.get_deposit(acc, accounts(1)).0, 1_000_000 - 7);
+    }
+
+    #[test]
+    #[should_panic(expected = "E14: LP already registered")]
+    fn test_lpt_transfer() {
+        // account(0) -- swap contract
+        // account(1) -- token0 contract
+        // account(2) -- token1 contract
+        // account(3) -- user account 
+        // account(4) -- another user account
+        let (mut context, mut contract) = setup_contract();
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![
+                (accounts(1), to_yocto("100")),
+                (accounts(2), to_yocto("100")),
+            ],
+        );
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(to_yocto("1"))
+            .build());
+        let id = contract.add_simple_pool(vec![accounts(1), accounts(2)], 25);
+        testing_env!(context.attached_deposit(to_yocto("0.0007")).build());
+        contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("10"))], None);
+        assert_eq!(
+            contract.mft_balance_of(":0".to_string(), accounts(3)).0,
+            to_yocto("1")
+        );
+        assert_eq!(
+            contract.mft_total_supply(":0".to_string()).0,
+            to_yocto("1")
+        );
+        testing_env!(context.attached_deposit(1).build());
+        contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("50"))], None);
+        assert_eq!(
+            contract.mft_balance_of(":0".to_string(), accounts(3)).0,
+            to_yocto("2")
+        );
+        assert_eq!(
+            contract.mft_total_supply(":0".to_string()).0,
+            to_yocto("2")
+        );
+
+        // register another user
+        testing_env!(context
+            .predecessor_account_id(accounts(4))
+            .attached_deposit(to_yocto("0.00071"))
+            .build());
+        contract.mft_register(":0".to_string(), accounts(4));
+        // make transfer to him
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(1)
+            .build());
+        contract.mft_transfer(":0".to_string(), accounts(4), U128(to_yocto("1")), None);
+        assert_eq!(
+            contract.mft_balance_of(":0".to_string(), accounts(3)).0,
+            to_yocto("1")
+        );
+        assert_eq!(
+            contract.mft_balance_of(":0".to_string(), accounts(4)).0,
+            to_yocto("1")
+        );
+        assert_eq!(
+            contract.mft_total_supply(":0".to_string()).0,
+            to_yocto("2")
+        );
+        // remove lpt for account 3
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(1)
+            .build());
+        contract.remove_liquidity(id, U128(to_yocto("0.6")), vec![U128(1), U128(1)]);
+        assert_eq!(
+            contract.mft_balance_of(":0".to_string(), accounts(3)).0,
+            to_yocto("0.4")
+        );
+        assert_eq!(
+            contract.mft_total_supply(":0".to_string()).0,
+            to_yocto("1.4")
+        );
+        // remove lpt for account 4 who got lpt from others
+        if contract.storage_balance_of(accounts(4)).is_none() {
+            testing_env!(context
+                .predecessor_account_id(accounts(4))
+                .attached_deposit(to_yocto("1"))
+                .build());
+            contract.storage_deposit(None, None);
+        }
+        testing_env!(context
+            .predecessor_account_id(accounts(4))
+            .attached_deposit(1)
+            .build());
+        contract.remove_liquidity(id, U128(to_yocto("1")), vec![U128(1), U128(1)]);
+        assert_eq!(
+            contract.mft_balance_of(":0".to_string(), accounts(4)).0,
+            to_yocto("0")
+        );
+        assert_eq!(
+            contract.mft_total_supply(":0".to_string()).0,
+            to_yocto("0.4")
+        );
+
+        // [AUDIT_13]
+        // should panic cause accounts(4) not removed by a full remove liqudity
+        testing_env!(context
+            .predecessor_account_id(accounts(4))
+            .attached_deposit(to_yocto("0.00071"))
+            .build());
+        contract.mft_register(":0".to_string(), accounts(4));
+    }
+
+    #[test]
+    #[should_panic(expected = "E33: transfer to self")]
+    fn test_lpt_transfer_self() {
+        // [AUDIT_07]
+        // account(0) -- swap contract
+        // account(1) -- token0 contract
+        // account(2) -- token1 contract
+        // account(3) -- user account 
+        let (mut context, mut contract) = setup_contract();
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![
+                (accounts(1), to_yocto("100")),
+                (accounts(2), to_yocto("100")),
+            ],
+        );
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(to_yocto("1"))
+            .build());
+        let id = contract.add_simple_pool(vec![accounts(1), accounts(2)], 25);
+        testing_env!(context.attached_deposit(to_yocto("0.0007")).build());
+        contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("10"))], None);
+        assert_eq!(
+            contract.mft_balance_of(":0".to_string(), accounts(3)).0,
+            to_yocto("1")
+        );
+        testing_env!(context.attached_deposit(1).build());
+        contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("50"))], None);
+        assert_eq!(
+            contract.mft_balance_of(":0".to_string(), accounts(3)).0,
+            to_yocto("2")
+        );
+
+        // make transfer to self
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(1)
+            .build());
+        contract.mft_transfer(":0".to_string(), accounts(3), U128(to_yocto("1")), None);
     }
 }
