@@ -156,7 +156,14 @@ fn account_upgrade_view_before_modify() {
     )
     .assert_success();
 
-    let vr = view!(pool.storage_balance_of(new_user.valid_account_id()));
+    assert_eq!(get_deposits(&pool, 
+        new_user.valid_account_id())
+        .get(&token1.account_id()).unwrap().0, to_yocto("5"));
+    
+    let sb = get_storage_balance(&pool, new_user.valid_account_id()).unwrap();
+    println!("after upgrade, t:{} a:{}", sb.total.0, sb.available.0);
+
+    // let vr = view!(pool.storage_balance_of(new_user.valid_account_id()));
     // println!("{}", vr.unwrap_err());
-    assert!(format!("{}", vr.unwrap_err()).contains("ProhibitedInView { method_name: \"storage_write\" }"));
+    // assert!(format!("{}", vr.unwrap_err()).contains("ProhibitedInView { method_name: \"storage_write\" }"));
 }

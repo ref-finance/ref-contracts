@@ -80,10 +80,15 @@ impl StorageManagement for Contract {
     }
 
     fn storage_balance_of(&self, account_id: ValidAccountId) -> Option<StorageBalance> {
-        self.internal_get_account(account_id.as_ref())
-            .map(|account| StorageBalance {
-                total: U128(account.near_amount),
-                available: U128(account.storage_available()),
-            })
+        // self.internal_get_account(account_id.as_ref())
+        //     .map(|account| StorageBalance {
+        //         total: U128(account.near_amount),
+        //         available: U128(account.storage_available()),
+        //     })
+        if let Some(va) = self.accounts.get(account_id.as_ref()) {
+            Some(va.storage_balance())
+        } else {
+            None
+        }
     }
 }

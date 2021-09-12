@@ -9,8 +9,17 @@ use near_sdk::{near_bindgen, AccountId};
 use crate::utils::SwapVolume;
 use crate::*;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Serialize)]
 #[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub struct RefStorageState {
+    pub deposit: U128,
+    pub usage: U128,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
 pub struct PoolInfo {
     /// Pool kind.
     pub pool_kind: String,
@@ -94,19 +103,28 @@ impl Contract {
     /// Returns balances of the deposits for given user outside of any pools.
     /// Returns empty list if no tokens deposited.
     pub fn get_deposits(&self, account_id: ValidAccountId) -> HashMap<AccountId, U128> {
-        let acc: Account = self.internal_unwrap_or_default_account(account_id.as_ref());
-        acc.tokens
-        .to_vec()
-        .iter()
-        .map(|(token, balance)| (token.clone(), U128(*balance)))
-        .collect()
-
+        // let acc: Account = self.internal_unwrap_or_default_account(account_id.as_ref());
+        // acc.tokens
+        // .to_vec()
+        // .iter()
+        // .map(|(token, balance)| (token.clone(), U128(*balance)))
+        // .collect()
+        if let Some(va) = self.accounts.get(account_id.as_ref()) {
+            va.tokens_to_hashmap()
+        } else {
+            HashMap::new()
+        }
     }
 
     /// Returns balance of the deposit for given user outside of any pools.
     pub fn get_deposit(&self, account_id: ValidAccountId, token_id: ValidAccountId) -> U128 {
-        self.internal_get_deposit(account_id.as_ref(), token_id.as_ref())
-            .into()
+        // self.internal_get_deposit(account_id.as_ref(), token_id.as_ref())
+        //     .into()
+        if let Some(va) = self.accounts.get(account_id.as_ref()) {
+            *(va.tokens_to_hashmap().get(token_id.as_ref()).unwrap_or(&U128(0)))
+        } else {
+            U128(0)
+        }
     }
 
     /// Given specific pool, returns amount of token_out recevied swapping amount_in of token_in.
@@ -128,8 +146,22 @@ impl Contract {
     }
 
     /// Get specific user whitelisted tokens.
-    pub fn get_user_whitelisted_tokens(&self, account_id: &AccountId) -> Vec<AccountId> {
-        let acc: Account = self.internal_unwrap_or_default_account(account_id);
-        acc.tokens.keys().collect()
+    pub fn get_user_whitelisted_tokens(&self, account_id: ValidAccountId) -> Vec<AccountId> {
+        // let acc: Account = self.internal_unwrap_or_default_account(account_id);
+        // acc.tokens.keys().collect()
+        if let Some(va) = self.accounts.get(account_id.as_ref()) {
+            va.tokens_to_hashmap().keys().map(|x| x.clone()).collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get user's storage deposit and needed in the account of current version
+    pub fn get_user_storage_state(&self, account_id: ValidAccountId) -> Option<RefStorageState> {
+        if let Some(va) = self.accounts.get(account_id.as_ref()) {
+            Some(va.storage_state())
+        } else {
+            None
+        }
     }
 }

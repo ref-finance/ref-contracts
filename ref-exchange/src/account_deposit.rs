@@ -2,6 +2,7 @@
 use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedMap;
+use std::collections::HashMap;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
     assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult, StorageUsage,
@@ -9,6 +10,7 @@ use near_sdk::{
 
 use crate::legacy::AccountV1;
 use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER};
+use crate::views::RefStorageState;
 use crate::*;
 
 // [AUDIT_01]
@@ -47,6 +49,60 @@ impl VAccount {
         match self {
             VAccount::Current(account) => account,
             VAccount::V1(account) => account.into_current(account_id),
+        }
+    }
+
+    pub fn tokens_to_hashmap(&self) -> HashMap<AccountId, U128> {
+        match self {
+            VAccount::Current(account) => {
+                account.tokens
+                    .to_vec()
+                    .iter()
+                    .map(|(token, balance)| (token.clone(), U128(*balance)))
+                    .collect()
+            },
+            VAccount::V1(account) => {
+                account.clone().tokens
+                    .into_iter()
+                    .map(|(acc, bal)| (acc.clone(), U128(bal)))
+                    .collect()
+            },
+        }
+    }
+
+    pub fn storage_state(&self) -> RefStorageState {
+        match self {
+            VAccount::Current(account) => {
+                RefStorageState {
+                    deposit: U128(account.near_amount),
+                    usage: U128(account.storage_usage()),
+                }
+            },
+            VAccount::V1(account) => {
+                let locked = (INIT_ACCOUNT_STORAGE
+                    + account.tokens.len() as u64 * (KEY_PREFIX_ACC + ACC_ID_AS_KEY_STORAGE + U128_STORAGE))
+                    as u128
+                    * env::storage_byte_cost();
+                RefStorageState {
+                    deposit: U128(account.near_amount),
+                    usage: U128(locked),
+                }
+            }
+        }
+    }
+
+    pub fn storage_balance(&self) -> StorageBalance {
+        let ref_storage_state = self.storage_state();
+        let available = {
+            if ref_storage_state.deposit.0 > ref_storage_state.usage.0 {
+                ref_storage_state.deposit.0 - ref_storage_state.usage.0
+            } else {
+                0
+            }
+        };
+        StorageBalance {
+            total: ref_storage_state.deposit,
+            available: U128(available),
         }
     }
 }
