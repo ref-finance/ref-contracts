@@ -8,7 +8,7 @@ use near_sdk_sim::{
 use test_token::ContractContract as TestToken;
 
 use crate::common::utils::*;
-mod common;
+pub mod common;
 
 fn pack_action(
     pool_id: u32,
