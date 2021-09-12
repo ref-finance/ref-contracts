@@ -37,8 +37,8 @@ pub const INIT_ACCOUNT_STORAGE: StorageUsage =
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub enum VAccount {
-    Current(Account),
     V1(AccountV1),
+    Current(Account),
 }
 
 impl VAccount {

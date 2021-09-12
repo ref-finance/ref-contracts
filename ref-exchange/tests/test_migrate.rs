@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 
 use near_sdk::json_types::{U128, ValidAccountId};
-use near_sdk_sim::{call, deploy, init_simulator, to_yocto};
+use near_sdk_sim::{call, view, deploy, init_simulator, to_yocto};
 
 use ref_exchange::ContractContract as Exchange;
 
@@ -58,7 +58,7 @@ fn test_upgrade() {
 
 
 #[test]
-fn test_account_upgrade() {
+fn account_upgrade_enough_storage() {
     let (root, owner, pool, token1, _, _) = setup_old_pool_with_liquidity();
 
     let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
@@ -81,11 +81,10 @@ fn test_account_upgrade() {
     )
     .assert_success();
 
-    println!("before upgrade, version: {}", get_version(&pool));
-    println!("before upgrade, num_of_pools: {}", get_num_of_pools(&pool));
-    println!("before upgrade, pool0 shares: {}", get_pool(&pool, 0).shares_total_supply.0);
-    let sb = get_storage_balance(&pool, new_user.valid_account_id()).unwrap();
-    println!("before upgrade, t:{} a:{}", sb.total.0, sb.available.0);
+    assert_eq!(get_version(&pool), String::from("1.0.1"));
+    assert_eq!(get_deposits(&pool, 
+        new_user.valid_account_id())
+        .get(&token1.account_id()).unwrap().0, to_yocto("5"));
 
     // Upgrade to the new version.
     owner.call(
@@ -97,9 +96,11 @@ fn test_account_upgrade() {
     )
     .assert_success();
 
-    println!("after upgrade, version: {}", get_version(&pool));
-    println!("after upgrade, num_of_pools: {}", get_num_of_pools(&pool));
-    println!("after upgrade, pool0 shares: {}", get_pool(&pool, 0).shares_total_supply.0);
+    assert_eq!(get_version(&pool), String::from("1.1.0"));
+    
+    // println!("after upgrade, version: {}", get_version(&pool));
+    // println!("after upgrade, num_of_pools: {}", get_num_of_pools(&pool));
+    // println!("after upgrade, pool0 shares: {}", get_pool(&pool, 0).shares_total_supply.0);
 
     let out_come = call!(
         new_user,
@@ -107,12 +108,55 @@ fn test_account_upgrade() {
         deposit = 1
     );
     out_come.assert_success();
-    // println!("{:#?}", out_come.promise_results());
+    assert_eq!(get_error_count(&out_come), 0);
 
-    let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
-    println!("{}", ex_status);
+    assert_eq!(get_deposits(&pool, 
+        new_user.valid_account_id())
+        .get(&token1.account_id()).unwrap().0, to_yocto("10"));
+
+    // println!("{:#?}", out_come.promise_results());
+    // assert_eq!(balance_of(&token1, &new_user.account_id()), to_yocto("0"));
 
     // let sb = get_storage_balance(&pool, new_user.valid_account_id()).unwrap();
-    // println!("before upgrade, t:{} a:{}", sb.total.0, sb.available.0);
+    // println!("after upgrade, t:{} a:{}", sb.total.0, sb.available.0);
 
+}
+
+#[test]
+fn account_upgrade_view_before_modify() {
+    let (root, owner, pool, token1, _, _) = setup_old_pool_with_liquidity();
+
+    let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
+    call!(
+        new_user,
+        token1.mint(to_va(new_user.account_id.clone()), U128(to_yocto("10")))
+    )
+    .assert_success();
+
+    call!(
+        new_user,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        new_user,
+        token1.ft_transfer_call(to_va(swap()), to_yocto("5").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+
+    // Upgrade to the new version.
+    owner.call(
+        pool.user_account.account_id.clone(),
+        "upgrade",
+        &EXCHANGE_WASM_BYTES,
+        near_sdk_sim::DEFAULT_GAS,
+        0,
+    )
+    .assert_success();
+
+    let vr = view!(pool.storage_balance_of(new_user.valid_account_id()));
+    // println!("{}", vr.unwrap_err());
+    assert!(format!("{}", vr.unwrap_err()).contains("ProhibitedInView { method_name: \"storage_write\" }"));
 }
