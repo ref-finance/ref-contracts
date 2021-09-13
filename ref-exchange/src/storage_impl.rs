@@ -47,6 +47,7 @@ impl StorageManagement for Contract {
         let account_deposit = self.internal_unwrap_account(&account_id);
         let available = account_deposit.storage_available();
         let amount = amount.map(|a| a.0).unwrap_or(available);
+        log!("[storage_withdraw] available: {}, amount: {}", available, amount);
         assert!(amount <= available, "ERR_STORAGE_WITHDRAW_TOO_MUCH");
         Promise::new(account_id.clone()).transfer(amount);
         self.storage_balance_of(account_id.try_into().unwrap())

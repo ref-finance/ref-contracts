@@ -1,23 +1,28 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::serde_json::{Value, from_value};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::AccountId;
-use near_sdk_sim::transaction::ExecutionStatus;
 use near_sdk_sim::{
     call, deploy, init_simulator, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
 
-use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
+use ref_exchange::{ContractContract as Exchange, PoolInfo};
 use test_token::ContractContract as TestToken;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
     PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_101.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange_release.wasm",
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub struct RefStorageState {
+    pub deposit: U128,
+    pub usage: U128,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -87,25 +92,64 @@ pub fn test_token(
     t
 }
 
+//*****************************
+// View functions
+//*****************************
+
+/// tell a user if he has registered to given ft token
+pub fn is_register_to_token(
+    token: &ContractAccount<TestToken>, 
+    account_id: ValidAccountId
+) -> bool {
+    let sb = view!(token.storage_balance_of(account_id)).unwrap_json_value();
+    if let Value::Null = sb {
+        false
+    } else {
+        true
+    }
+}
+
+/// get user's ft balance of given token
 pub fn balance_of(token: &ContractAccount<TestToken>, account_id: &AccountId) -> u128 {
-    view!(token.ft_balance_of(to_va(account_id.clone())))
-        .unwrap_json::<U128>()
-        .0
+    view!(token.ft_balance_of(to_va(account_id.clone()))).unwrap_json::<U128>().0
 }
 
+/// get ref-exchange's version
 pub fn get_version(pool: &ContractAccount<Exchange>) -> String {
-    view!(pool.version())
-        .unwrap_json::<String>()
+    view!(pool.version()).unwrap_json::<String>()
 }
 
+/// get ref-exchange's pool count
 pub fn get_num_of_pools(pool: &ContractAccount<Exchange>) -> u64 {
-    view!(pool.get_number_of_pools())
-        .unwrap_json::<u64>()
+    view!(pool.get_number_of_pools()).unwrap_json::<u64>()
 }
 
+/// get ref-exchange's all pool info
+pub fn get_pools(pool: &ContractAccount<Exchange>) -> Vec<PoolInfo> {
+    view!(pool.get_pools(0, 100)).unwrap_json::<Vec<PoolInfo>>()
+}
+
+/// get ref-exchange's pool info
 pub fn get_pool(pool: &ContractAccount<Exchange>, pool_id: u64) -> PoolInfo {
     view!(pool.get_pool(pool_id))
         .unwrap_json::<PoolInfo>()
+}
+
+pub fn get_deposits(
+    pool: &ContractAccount<Exchange>, 
+    account_id: ValidAccountId
+) -> HashMap<String, U128> {
+    view!(pool.get_deposits(account_id)).unwrap_json::<HashMap<String, U128>>()
+}
+
+/// get ref-exchange's whitelisted tokens
+pub fn get_whitelist(pool: &ContractAccount<Exchange>) -> Vec<String> {
+    view!(pool.get_whitelisted_tokens()).unwrap_json::<Vec<String>>()
+}
+
+/// get ref-exchange's user whitelisted tokens
+pub fn get_user_tokens(pool: &ContractAccount<Exchange>, account_id: ValidAccountId) -> Vec<String> {
+    view!(pool.get_user_whitelisted_tokens(account_id)).unwrap_json::<Vec<String>>()
 }
 
 pub fn get_storage_balance(
@@ -122,26 +166,20 @@ pub fn get_storage_balance(
     }
 }
 
-pub fn is_register_to_token(
-    token: &ContractAccount<TestToken>, 
+pub fn get_storage_state(
+    pool: &ContractAccount<Exchange>, 
     account_id: ValidAccountId
-) -> bool {
-    let sb = view!(token.storage_balance_of(account_id)).unwrap_json_value();
+) -> Option<RefStorageState> {
+    let sb = view!(pool.get_user_storage_state(account_id)).unwrap_json_value();
     if let Value::Null = sb {
-        false
+        None
     } else {
-        true
+        let ret: RefStorageState = from_value(sb).unwrap();
+        Some(ret)
     }
 }
 
-pub fn get_deposits(
-    pool: &ContractAccount<Exchange>, 
-    account_id: ValidAccountId
-) -> HashMap<String, U128> {
-    view!(pool.get_deposits(account_id)).unwrap_json::<HashMap<String, U128>>()
-}
-
-fn mft_balance_of(
+pub fn mft_balance_of(
     pool: &ContractAccount<Exchange>,
     token_or_pool: &str,
     account_id: &AccountId,
@@ -150,6 +188,8 @@ fn mft_balance_of(
         .unwrap_json::<U128>()
         .0
 }
+
+//************************************
 
 pub fn dai() -> AccountId {
     "dai001".to_string()
