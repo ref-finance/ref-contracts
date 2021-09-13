@@ -191,7 +191,7 @@ impl SimplePool {
             result.push(amount);
         }
         if prev_shares_amount == shares {
-            // [AUDIT_13] never unregister a LP when he remove liqudity.
+            // [AUDIT_13] Never unregister an LP when liquidity is removed.
             self.shares.insert(&sender_id, &0);
         } else {
             self.shares
@@ -277,6 +277,7 @@ impl SimplePool {
         min_amount_out: Balance,
         fees: SwapFees,
     ) -> Balance {
+        assert_ne!(token_in, token_out, "ERR_SAME_TOKEN_SWAP");
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
         let amount_out = self.internal_get_return(in_idx, amount_in, out_idx);

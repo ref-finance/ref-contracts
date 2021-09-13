@@ -95,20 +95,28 @@ impl StableSwapPool {
             self.init_amp_time,
             self.future_amp_time,
         );
-        let new_shares = invariant
-            .compute_lp_amount_for_deposit(
-                self.amounts[0],
-                self.amounts[1],
-                amounts[0],
-                amounts[1],
-                self.shares_total_supply,
-                &Fees {
-                    trade_fee: self.total_fee as u64,
-                    admin_fee: 0,
-                },
-            )
-            // TODO: proper error
-            .expect("ERR_CALC_FAILED");
+        let new_shares = if self.shares_total_supply == 0 {
+            // Bootstrapping the pool.
+            invariant
+                .compute_d(amounts[0], amounts[1])
+                .expect("ERR_CALC_FAILED")
+                .as_u128()
+        } else {
+            invariant
+                .compute_lp_amount_for_deposit(
+                    amounts[0],
+                    amounts[1],
+                    self.amounts[0],
+                    self.amounts[1],
+                    self.shares_total_supply,
+                    &Fees {
+                        trade_fee: self.total_fee as u64,
+                        admin_fee: 0,
+                    },
+                )
+                // TODO: proper error
+                .expect("ERR_CALC_FAILED")
+        };
 
         // TODO: add slippage check on the LP tokens.
         self.amounts[0] += amounts[0];
@@ -142,7 +150,7 @@ impl StableSwapPool {
         );
         let prev_shares_amount = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
         assert!(prev_shares_amount >= shares, "ERR_NOT_ENOUGH_SHARES");
-        let mut result = vec![];
+        let mut result = vec![0u128; N_COINS as usize];
         let invariant = StableSwap::new(
             self.init_amp_factor,
             self.future_amp_factor,
@@ -174,6 +182,22 @@ impl StableSwapPool {
                 .checked_sub(result[i as usize])
                 .expect("ERR_CALC");
         }
+        // Never unregister an LP when liquidity is removed.
+        self.shares
+            .insert(&sender_id, &(prev_shares_amount - shares));
+        env::log(
+            format!(
+                "{} shares of liquidity removed: receive back {:?}",
+                shares,
+                result
+                    .iter()
+                    .zip(self.token_account_ids.iter())
+                    .map(|(amount, token_id)| format!("{} {}", amount, token_id))
+                    .collect::<Vec<String>>(),
+            )
+            .as_bytes(),
+        );
+        self.shares_total_supply -= shares;
         result
     }
     /// Returns number of tokens in outcome, given amount.
@@ -194,8 +218,8 @@ impl StableSwapPool {
         );
         invariant
             .swap_to(
-                self.amounts[token_in],
                 amount_in,
+                self.amounts[token_in],
                 self.amounts[token_out],
                 &Fees {
                     trade_fee: self.total_fee as u64,
@@ -232,9 +256,11 @@ impl StableSwapPool {
         min_amount_out: Balance,
         fees: SwapFees,
     ) -> Balance {
+        assert_ne!(token_in, token_out, "ERR_SAME_TOKEN_SWAP");
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
         let result = self.internal_get_return(in_idx, amount_in, out_idx, fees);
+        println!("{:?}", result);
         assert!(result.amount_swapped >= min_amount_out, "ERR_MIN_AMOUNT");
         env::log(
             format!(
@@ -311,6 +337,26 @@ mod tests {
     use near_sdk::{testing_env, MockedBlockchain};
     use near_sdk_sim::to_yocto;
 
+    fn swap(
+        pool: &mut StableSwapPool,
+        token_in: usize,
+        amount_in: Balance,
+        token_out: usize,
+    ) -> Balance {
+        pool.swap(
+            accounts(token_in).as_ref(),
+            amount_in,
+            accounts(token_out).as_ref(),
+            1,
+            SwapFees {
+                exchange_fee: 0,
+                exchange_id: accounts(1).as_ref().clone(),
+                referral_fee: 0,
+                referral_id: None,
+            },
+        )
+    }
+
     #[test]
     fn test_basics() {
         let mut context = VMContextBuilder::new();
@@ -324,30 +370,20 @@ mod tests {
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
 
+        let out = swap(&mut pool, 1, to_yocto("1"), 2);
+        assert_eq!(out, 1313682630255414606428571);
+        assert_eq!(pool.amounts, vec![to_yocto("6"), 8686317369744585393571429]);
+        let out2 = swap(&mut pool, 2, out, 1);
+        assert_eq!(out2, to_yocto("1") + 2); // due to precision difference.
+        assert_eq!(pool.amounts, vec![to_yocto("5") - 2, to_yocto("10")]);
+
         // Add only one side of the capital.
         let mut amounts2 = vec![to_yocto("5"), to_yocto("0")];
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2);
 
         // Withdraw on another side of the capital.
         let amounts_out = pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![0, 1]);
-
-        // assert?
-
-        let out = pool.swap(
-            accounts(1).as_ref(),
-            to_yocto("1"),
-            accounts(2).as_ref(),
-            1,
-            SwapFees {
-                exchange_fee: 0,
-                exchange_id: accounts(1).as_ref().clone(),
-                referral_fee: 0,
-                referral_id: None,
-            },
-        );
-
-        // assert out to_yocto("2")
-        assert_eq!(pool.amounts, vec![to_yocto("6"), to_yocto("8")]);
+        assert_eq!(amounts_out, vec![0, to_yocto("5")]);
     }
 
     /// Test that adding and then removing all of the liquidity leaves the pool empty and with no shares.
@@ -359,24 +395,29 @@ mod tests {
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
-        assert_eq!(pool.share_balance_of(accounts(0).as_ref()), 1);
-        assert_eq!(pool.share_total_balance(), 1);
+        assert!(num_shares > 1);
+        assert_eq!(num_shares, pool.share_balance_of(accounts(0).as_ref()));
+        assert_eq!(pool.share_total_balance(), num_shares);
 
         // Move shares to another account.
+        pool.share_register(accounts(3).as_ref());
         pool.share_transfer(accounts(0).as_ref(), accounts(3).as_ref(), num_shares);
         assert_eq!(pool.share_balance_of(accounts(0).as_ref()), 0);
         assert_eq!(pool.share_balance_of(accounts(3).as_ref()), num_shares);
-        assert_eq!(pool.share_total_balance(), 1);
+        assert_eq!(pool.share_total_balance(), num_shares);
 
         // Remove all liquidity.
-        testing_env!(context.predecessor_account_id(accounts(1)).build());
-        let out_amounts = pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1]);
+        testing_env!(context.predecessor_account_id(accounts(3)).build());
+        let out_amounts = pool.remove_liquidity(accounts(3).as_ref(), num_shares, vec![1, 1]);
 
-        // Check it's all taken out.
-        assert_eq!(amounts, out_amounts);
+        // Check it's all taken out. Due to precision there is ~1 yN.
+        assert_eq!(
+            vec![amounts[0], amounts[1]],
+            vec![out_amounts[0] + 1, out_amounts[1] + 1]
+        );
         assert_eq!(pool.share_total_balance(), 0);
         assert_eq!(pool.share_balance_of(accounts(0).as_ref()), 0);
         assert_eq!(pool.share_balance_of(accounts(3).as_ref()), 0);
-        assert_eq!(pool.amounts, vec![0, 0]);
+        assert_eq!(pool.amounts, vec![1, 1]);
     }
 }

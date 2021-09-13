@@ -37,6 +37,7 @@ impl Fees {
 }
 
 /// Encodes all results of swapping from a source token to a destination token.
+#[derive(Debug)]
 pub struct SwapResult {
     /// New amount of source token.
     pub new_source_amount: Balance,
