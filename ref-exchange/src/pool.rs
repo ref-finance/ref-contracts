@@ -1,6 +1,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, Balance};
 
+use crate::fees::SwapFees;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
 use crate::utils::SwapVolume;
@@ -61,7 +62,8 @@ impl Pool {
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.get_return(token_in, amount_in, token_out),
-            Pool::StableSwapPool(pool) => pool.get_return(token_in, amount_in, token_out),
+            _ => 0
+            // Pool::StableSwapPool(pool) => pool.get_return(token_in, amount_in, token_out),
         }
     }
 
@@ -88,26 +90,15 @@ impl Pool {
         amount_in: Balance,
         token_out: &AccountId,
         min_amount_out: Balance,
-        exchange_id: &AccountId,
-        referral_id: &Option<AccountId>,
+        fees: SwapFees,
     ) -> Balance {
         match self {
-            Pool::SimplePool(pool) => pool.swap(
-                token_in,
-                amount_in,
-                token_out,
-                min_amount_out,
-                exchange_id,
-                referral_id,
-            ),
-            Pool::StableSwapPool(pool) => pool.swap(
-                token_in,
-                amount_in,
-                token_out,
-                min_amount_out,
-                exchange_id,
-                referral_id,
-            ),
+            Pool::SimplePool(pool) => {
+                pool.swap(token_in, amount_in, token_out, min_amount_out, fees)
+            }
+            Pool::StableSwapPool(pool) => {
+                pool.swap(token_in, amount_in, token_out, min_amount_out, fees)
+            }
         }
     }
 

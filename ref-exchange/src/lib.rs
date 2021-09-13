@@ -7,14 +7,15 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
-    assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
-    PromiseResult, StorageUsage, BorshStorageKey
+    assert_one_yocto, env, log, near_bindgen, AccountId, Balance, BorshStorageKey, PanicOnDefault,
+    Promise, PromiseResult, StorageUsage,
 };
 
-use crate::account_deposit::{VAccount, Account};
+use crate::account_deposit::{Account, VAccount};
 pub use crate::action::SwapAction;
 use crate::action::{Action, ActionResult};
 use crate::errors::*;
+use crate::fees::SwapFees;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
 use crate::utils::check_token_duplicates;
@@ -23,6 +24,7 @@ pub use crate::views::PoolInfo;
 mod account_deposit;
 mod action;
 mod errors;
+mod fees;
 mod legacy;
 mod multi_fungible_token;
 mod owner;
@@ -89,7 +91,7 @@ impl Contract {
         )))
     }
 
-    /// [AUDIT_03_reject(NOPE action is allowed by design)] 
+    /// [AUDIT_03_reject(NOPE action is allowed by design)]
     /// [AUDIT_04]
     /// Executes generic set of actions.
     /// If referrer provided, pays referral_fee to it.
@@ -208,7 +210,6 @@ impl Contract {
 
 /// Internal methods implementation.
 impl Contract {
-
     /// Check how much storage taken costs and refund the left over back.
     fn internal_check_storage(&self, prev_storage: StorageUsage) {
         let storage_cost = env::storage_usage()
@@ -298,8 +299,12 @@ impl Contract {
             amount_in,
             token_out,
             min_amount_out,
-            &self.owner_id,
-            referral_id,
+            SwapFees {
+                exchange_fee: self.exchange_fee,
+                exchange_id: self.owner_id.clone(),
+                referral_fee: self.referral_fee,
+                referral_id: referral_id.clone(),
+            },
         );
         self.pools.replace(pool_id, &pool);
         amount_out
@@ -746,7 +751,7 @@ mod tests {
         // account(0) -- swap contract
         // account(1) -- token0 contract
         // account(2) -- token1 contract
-        // account(3) -- user account 
+        // account(3) -- user account
         // account(4) -- another user account
         let (mut context, mut contract) = setup_contract();
         deposit_tokens(
@@ -769,20 +774,14 @@ mod tests {
             contract.mft_balance_of(":0".to_string(), accounts(3)).0,
             to_yocto("1")
         );
-        assert_eq!(
-            contract.mft_total_supply(":0".to_string()).0,
-            to_yocto("1")
-        );
+        assert_eq!(contract.mft_total_supply(":0".to_string()).0, to_yocto("1"));
         testing_env!(context.attached_deposit(1).build());
         contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("50"))], None);
         assert_eq!(
             contract.mft_balance_of(":0".to_string(), accounts(3)).0,
             to_yocto("2")
         );
-        assert_eq!(
-            contract.mft_total_supply(":0".to_string()).0,
-            to_yocto("2")
-        );
+        assert_eq!(contract.mft_total_supply(":0".to_string()).0, to_yocto("2"));
 
         // register another user
         testing_env!(context
@@ -804,10 +803,7 @@ mod tests {
             contract.mft_balance_of(":0".to_string(), accounts(4)).0,
             to_yocto("1")
         );
-        assert_eq!(
-            contract.mft_total_supply(":0".to_string()).0,
-            to_yocto("2")
-        );
+        assert_eq!(contract.mft_total_supply(":0".to_string()).0, to_yocto("2"));
         // remove lpt for account 3
         testing_env!(context
             .predecessor_account_id(accounts(3))
@@ -860,7 +856,7 @@ mod tests {
         // account(0) -- swap contract
         // account(1) -- token0 contract
         // account(2) -- token1 contract
-        // account(3) -- user account 
+        // account(3) -- user account
         let (mut context, mut contract) = setup_contract();
         deposit_tokens(
             &mut context,
