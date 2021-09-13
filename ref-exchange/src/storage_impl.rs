@@ -45,8 +45,8 @@ impl StorageManagement for Contract {
         assert_one_yocto();
         let account_id = env::predecessor_account_id();
         let amount = amount.unwrap_or(U128(0)).0;
-        self.internal_storage_withdraw(&account_id, amount);
-        Promise::new(account_id.clone()).transfer(amount);
+        let withdraw_amount = self.internal_storage_withdraw(&account_id, amount);
+        Promise::new(account_id.clone()).transfer(withdraw_amount);
         self.storage_balance_of(account_id.try_into().unwrap())
             .unwrap()
     }
