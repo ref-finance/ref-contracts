@@ -1,13 +1,13 @@
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance, Timestamp};
 
 use crate::errors::{ERR13_LP_NOT_REGISTERED, ERR14_LP_ALREADY_REGISTERED};
 use crate::fees::SwapFees;
-use crate::stable_swap::math::{Fees, StableSwap, SwapResult, N_COINS};
+use crate::stable_swap::math::{Fees, StableSwap, SwapResult, MAX_AMP, MIN_AMP, N_COINS};
 use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR};
 use crate::StorageKey;
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 
 mod math;
 
@@ -42,8 +42,12 @@ impl StableSwapPool {
         amp_factor: u64,
         total_fee: u32,
     ) -> Self {
+        assert!(
+            amp_factor >= MIN_AMP && amp_factor <= MAX_AMP,
+            "ERR_WRONG_AMP"
+        );
         assert_eq!(
-            token_account_ids.len() as u64,
+            token_account_ids.len() as u32,
             math::N_COINS,
             "ERR_WRONG_TOKEN_COUNT"
         );
@@ -82,7 +86,12 @@ impl StableSwapPool {
 
     /// Add liquidity into the pool.
     /// Allows to add liquidity of a subset of tokens.
-    pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>) -> Balance {
+    pub fn add_liquidity(
+        &mut self,
+        sender_id: &AccountId,
+        amounts: &mut Vec<Balance>,
+        fees: &SwapFees,
+    ) -> Balance {
         assert_eq!(
             amounts.len(),
             self.token_account_ids.len(),
@@ -109,10 +118,7 @@ impl StableSwapPool {
                     self.amounts[0],
                     self.amounts[1],
                     self.shares_total_supply,
-                    &Fees {
-                        trade_fee: self.total_fee as u64,
-                        admin_fee: 0,
-                    },
+                    &Fees::new(self.total_fee, &fees),
                 )
                 // TODO: proper error
                 .expect("ERR_CALC_FAILED")
@@ -126,15 +132,6 @@ impl StableSwapPool {
         new_shares
     }
 
-    /// Mint new shares for given user.
-    fn mint_shares(&mut self, account_id: &AccountId, shares: Balance) {
-        if shares == 0 {
-            return;
-        }
-        self.shares_total_supply += shares;
-        add_to_collection(&mut self.shares, &account_id, shares);
-    }
-
     /// Remove liquidity from the pool.
     /// Allows to remove liquidity of a subset of tokens, by providing 0 in `min_amount` for the tokens to not withdraw.
     pub fn remove_liquidity(
@@ -142,6 +139,7 @@ impl StableSwapPool {
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
+        fees: &SwapFees,
     ) -> Vec<Balance> {
         assert_eq!(
             min_amounts.len(),
@@ -158,6 +156,8 @@ impl StableSwapPool {
             self.init_amp_time,
             self.future_amp_time,
         );
+        let mut fee_amounts = vec![0u128; N_COINS as usize];
+        let stable_swap_fees = Fees::new(self.total_fee, &fees);
         for (idx, min_amount) in min_amounts.iter().enumerate() {
             if *min_amount != 0 {
                 let (amount_out, fee) = invariant
@@ -166,17 +166,15 @@ impl StableSwapPool {
                         self.shares_total_supply,
                         self.amounts[idx],
                         self.amounts[1 - idx],
-                        &Fees {
-                            trade_fee: self.total_fee as u64,
-                            admin_fee: 0,
-                        },
+                        &stable_swap_fees,
                     )
                     .expect("ERR_CALC");
                 assert!(amount_out >= *min_amount, "ERR_SLIPPAGE");
-                // todo: fees
+                fee_amounts[idx] += fee;
                 result[idx] = amount_out;
             }
         }
+        println!("fees: {:?}", fee_amounts);
         for i in 0..N_COINS {
             self.amounts[i as usize] = self.amounts[i as usize]
                 .checked_sub(result[i as usize])
@@ -207,7 +205,7 @@ impl StableSwapPool {
         token_in: usize,
         amount_in: Balance,
         token_out: usize,
-        fees: SwapFees,
+        fees: &SwapFees,
     ) -> SwapResult {
         let invariant = StableSwap::new(
             self.init_amp_factor,
@@ -221,10 +219,7 @@ impl StableSwapPool {
                 amount_in,
                 self.amounts[token_in],
                 self.amounts[token_out],
-                &Fees {
-                    trade_fee: self.total_fee as u64,
-                    admin_fee: 0,
-                },
+                &Fees::new(self.total_fee, &fees),
             )
             .expect("ERR_CALC")
     }
@@ -235,13 +230,13 @@ impl StableSwapPool {
         token_in: &AccountId,
         amount_in: Balance,
         token_out: &AccountId,
-        fees: SwapFees,
+        fees: &SwapFees,
     ) -> Balance {
         self.internal_get_return(
             self.token_index(token_in),
             amount_in,
             self.token_index(token_out),
-            fees,
+            &fees,
         )
         .amount_swapped
     }
@@ -254,13 +249,12 @@ impl StableSwapPool {
         amount_in: Balance,
         token_out: &AccountId,
         min_amount_out: Balance,
-        fees: SwapFees,
+        fees: &SwapFees,
     ) -> Balance {
         assert_ne!(token_in, token_out, "ERR_SAME_TOKEN_SWAP");
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
-        let result = self.internal_get_return(in_idx, amount_in, out_idx, fees);
-        println!("{:?}", result);
+        let result = self.internal_get_return(in_idx, amount_in, out_idx, &fees);
         assert!(result.amount_swapped >= min_amount_out, "ERR_MIN_AMOUNT");
         env::log(
             format!(
@@ -276,6 +270,15 @@ impl StableSwapPool {
         // TODO: add admin / referral fee here.
 
         result.amount_swapped
+    }
+
+    /// Mint new shares for given user.
+    fn mint_shares(&mut self, account_id: &AccountId, shares: Balance) {
+        if shares == 0 {
+            return;
+        }
+        self.shares_total_supply += shares;
+        add_to_collection(&mut self.shares, &account_id, shares);
     }
 
     /// Register given account with 0 balance in shares.
@@ -332,10 +335,11 @@ impl StableSwapPool {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use near_sdk::test_utils::{accounts, VMContextBuilder};
     use near_sdk::{testing_env, MockedBlockchain};
     use near_sdk_sim::to_yocto;
+
+    use super::*;
 
     fn swap(
         pool: &mut StableSwapPool,
@@ -348,12 +352,7 @@ mod tests {
             amount_in,
             accounts(token_out).as_ref(),
             1,
-            SwapFees {
-                exchange_fee: 0,
-                exchange_id: accounts(1).as_ref().clone(),
-                referral_fee: 0,
-                referral_id: None,
-            },
+            &SwapFees::zero(),
         )
     }
 
@@ -361,6 +360,7 @@ mod tests {
     fn test_basics() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let fees = SwapFees::zero();
         let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], 1, 0);
         assert_eq!(
             pool.tokens(),
@@ -368,7 +368,7 @@ mod tests {
         );
 
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
 
         let out = swap(&mut pool, 1, to_yocto("1"), 2);
         assert_eq!(out, 1313682630255414606428571);
@@ -379,11 +379,25 @@ mod tests {
 
         // Add only one side of the capital.
         let mut amounts2 = vec![to_yocto("5"), to_yocto("0")];
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, &fees);
 
         // Withdraw on another side of the capital.
-        let amounts_out = pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![0, 1]);
+        let amounts_out =
+            pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![0, 1], &fees);
         assert_eq!(amounts_out, vec![0, to_yocto("5")]);
+    }
+
+    #[test]
+    fn test_with_fees() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], 1, 2000);
+        let mut amounts = vec![to_yocto("5"), to_yocto("10")];
+        let fees = SwapFees::new(1000);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
+        let amounts_out =
+            pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1], &fees);
+        println!("amount out: {:?}", amounts_out);
     }
 
     /// Test that adding and then removing all of the liquidity leaves the pool empty and with no shares.
@@ -393,7 +407,8 @@ mod tests {
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], 1, 0);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
+        let fees = SwapFees::zero();
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
         assert!(num_shares > 1);
         assert_eq!(num_shares, pool.share_balance_of(accounts(0).as_ref()));
@@ -408,7 +423,8 @@ mod tests {
 
         // Remove all liquidity.
         testing_env!(context.predecessor_account_id(accounts(3)).build());
-        let out_amounts = pool.remove_liquidity(accounts(3).as_ref(), num_shares, vec![1, 1]);
+        let out_amounts =
+            pool.remove_liquidity(accounts(3).as_ref(), num_shares, vec![1, 1], &fees);
 
         // Check it's all taken out. Due to precision there is ~1 yN.
         assert_eq!(

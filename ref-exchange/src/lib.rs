@@ -160,7 +160,16 @@ impl Contract {
         let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         // Add amounts given to liquidity first. It will return the balanced amounts.
-        pool.add_liquidity(&sender_id, &mut amounts);
+        pool.add_liquidity(
+            &sender_id,
+            &mut amounts,
+            SwapFees {
+                exchange_fee: self.exchange_fee,
+                exchange_id: self.owner_id.clone(),
+                referral_fee: 0,
+                referral_id: None,
+            },
+        );
         if let Some(min_amounts) = min_amounts {
             // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
             for (amount, min_amount) in amounts.iter().zip(min_amounts.iter()) {
@@ -192,6 +201,12 @@ impl Contract {
                 .into_iter()
                 .map(|amount| amount.into())
                 .collect(),
+            SwapFees {
+                exchange_fee: self.exchange_fee,
+                exchange_id: self.owner_id.clone(),
+                referral_fee: 0,
+                referral_id: None,
+            },
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();

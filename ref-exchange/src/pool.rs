@@ -33,10 +33,15 @@ impl Pool {
 
     /// Adds liquidity into underlying pool.
     /// Updates amounts to amount kept in the pool.
-    pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>) -> Balance {
+    pub fn add_liquidity(
+        &mut self,
+        sender_id: &AccountId,
+        amounts: &mut Vec<Balance>,
+        fees: SwapFees,
+    ) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts),
-            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts),
+            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, &fees),
         }
     }
 
@@ -46,10 +51,13 @@ impl Pool {
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
+        fees: SwapFees,
     ) -> Vec<Balance> {
         match self {
             Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts),
-            Pool::StableSwapPool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts),
+            Pool::StableSwapPool(pool) => {
+                pool.remove_liquidity(sender_id, shares, min_amounts, &fees)
+            }
         }
     }
 
@@ -97,7 +105,7 @@ impl Pool {
                 pool.swap(token_in, amount_in, token_out, min_amount_out, fees)
             }
             Pool::StableSwapPool(pool) => {
-                pool.swap(token_in, amount_in, token_out, min_amount_out, fees)
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &fees)
             }
         }
     }

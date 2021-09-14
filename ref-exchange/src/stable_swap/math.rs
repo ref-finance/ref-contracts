@@ -2,37 +2,44 @@
 ///! Large part of the code was taken from https://github.com/saber-hq/stable-swap/blob/master/stable-swap-math/src/curve.rs
 use near_sdk::{Balance, Timestamp};
 
-use crate::utils::U256;
+use crate::fees::SwapFees;
+use crate::utils::{FEE_DIVISOR, U256};
 
 /// Number of coins in the pool.
-pub const N_COINS: u64 = 2;
-/// Timestamp at 0
-pub const ZERO_TS: i64 = 0;
-/// Minimum ramp duration
+pub const N_COINS: u32 = 2;
+/// Minimum ramp duration.
 pub const MIN_RAMP_DURATION: i64 = 86400;
-/// Min amplification coefficient
+/// Min amplification coefficient.
 pub const MIN_AMP: u64 = 1;
-/// Max amplification coefficient
+/// Max amplification coefficient.
 pub const MAX_AMP: u64 = 1_000_000;
 /// Max number of tokens to swap at once.
 pub const MAX_TOKENS_IN: u64 = u64::MAX >> 4;
 
+/// Stable Swap Fee calculator.
 pub struct Fees {
-    pub trade_fee: u64,
-    pub admin_fee: u64,
+    pub trade_fee: u32,
+    pub admin_fee: u32,
 }
 
 impl Fees {
-    pub fn trade_fee(&self, amount: Balance) -> Option<Balance> {
-        Some(0)
+    pub fn new(total_fee: u32, fees: &SwapFees) -> Self {
+        Self {
+            trade_fee: total_fee - fees.exchange_fee,
+            admin_fee: fees.exchange_fee,
+        }
+    }
+    pub fn trade_fee(&self, amount: Balance) -> Balance {
+        amount * (self.trade_fee as u128) / (FEE_DIVISOR as u128)
     }
 
-    pub fn admin_trade_fee(&self, amount: Balance) -> Option<Balance> {
-        Some(0)
+    pub fn admin_trade_fee(&self, amount: Balance) -> Balance {
+        amount * (self.admin_fee as u128) / (FEE_DIVISOR as u128)
     }
 
-    pub fn normalized_trade_fee(&self, num_coins: u64, amount: Balance) -> Option<Balance> {
-        Some(0)
+    pub fn normalized_trade_fee(&self, num_coins: u32, amount: Balance) -> Balance {
+        let adjusted_trade_fee = (self.trade_fee * num_coins) / (4 * (num_coins - 1));
+        amount * (adjusted_trade_fee as u128) / (FEE_DIVISOR as u128)
     }
 }
 
@@ -211,7 +218,7 @@ impl StableSwap {
                 } else {
                     new_balances[i].checked_sub(ideal_balance)?
                 };
-                let fee = fees.normalized_trade_fee(N_COINS, difference)?;
+                let fee = fees.normalized_trade_fee(N_COINS, difference);
                 new_balances[i] = new_balances[i].checked_sub(fee)?;
             }
 
@@ -304,10 +311,10 @@ impl StableSwap {
         )?;
         // new_base_amount = swap_base_amount - expected_base_amount * fee / fee_denominator;
         let new_base_amount = swap_base_amount
-            .checked_sub(fees.normalized_trade_fee(N_COINS, expected_base_amount)?)?;
+            .checked_sub(fees.normalized_trade_fee(N_COINS, expected_base_amount))?;
         // new_quote_amount = swap_quote_amount - expected_quote_amount * fee / fee_denominator;
         let new_quote_amount = swap_quote_amount
-            .checked_sub(fees.normalized_trade_fee(N_COINS, expected_quote_amount)?)?;
+            .checked_sub(fees.normalized_trade_fee(N_COINS, expected_quote_amount))?;
         let dy = new_base_amount
             .checked_sub(self.compute_y(new_quote_amount, d_1))?
             .checked_sub(1)?; // Withdraw less to account for rounding errors
@@ -329,8 +336,8 @@ impl StableSwap {
             self.compute_d(swap_source_amount, swap_destination_amount)?,
         );
         let dy = swap_destination_amount.checked_sub(y)?;
-        let dy_fee = fees.trade_fee(dy)?;
-        let admin_fee = fees.admin_trade_fee(dy_fee)?;
+        let dy_fee = fees.trade_fee(dy);
+        let admin_fee = fees.admin_trade_fee(dy_fee);
 
         let amount_swapped = dy.checked_sub(dy_fee)?;
         let new_destination_amount = swap_destination_amount
