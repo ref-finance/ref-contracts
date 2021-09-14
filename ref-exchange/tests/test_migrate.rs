@@ -124,7 +124,7 @@ fn account_upgrade_enough_storage() {
 
 #[test]
 fn account_upgrade_not_enough_storage() {
-    let (root, owner, pool, token1, _, _) = setup_old_pool_with_liquidity();
+    let (root, owner, pool, token1, token2, _) = setup_old_pool_with_liquidity();
 
     let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
     call!(
@@ -182,9 +182,68 @@ fn account_upgrade_not_enough_storage() {
         new_user.valid_account_id())
         .get(&token1.account_id()).unwrap().0, to_yocto("5"));
     
-    // TODO: instant swap would ?
+    // instant swap would success
+    call!(
+        new_user,
+        token2.mint(to_va(new_user.account_id.clone()), U128(to_yocto("10")))
+    )
+    .assert_success();
+    let msg = format!(
+        "{{\"pool_id\": {}, \"token_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
+        0, token2.account_id(), token1.account_id(), 1
+    );
+    let msg_str = format!("{{\"force\": 0, \"actions\": [{}]}}", msg);
+    let out_come = call!(
+        new_user,
+        token2.ft_transfer_call(to_va(swap()), to_yocto("1").into(), None, msg_str.clone()),
+        deposit = 1
+    );
+    out_come.assert_success();
+    assert_eq!(get_error_count(&out_come), 0);
+    assert!(balance_of(&token1, &new_user.account_id) > to_yocto("5.47"));
+    assert_eq!(get_deposits(&pool, 
+        new_user.valid_account_id())
+        .get(&token1.account_id()).unwrap().0, to_yocto("5"));
 
+    // instant swap with token out unregistered would go to inner account
+    call!(new_user, token1.storage_unregister(Some(true)), deposit = 1).assert_success();
+    let out_come = call!(
+        new_user,
+        token2.ft_transfer_call(to_va(swap()), to_yocto("1").into(), None, msg_str.clone()),
+        deposit = 1
+    );
+    out_come.assert_success();
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_deposits(&pool, 
+        new_user.valid_account_id())
+        .get(&token1.account_id()).unwrap().0 > to_yocto("5.43"));
 
+    // instant swap with token out unregistered would go to lostfound 
+    // when token_out wasn't resgsitered in inner account
+    call!(
+        new_user,
+        token1.mint(to_va(new_user.account_id.clone()), U128(to_yocto("10")))
+    )
+    .assert_success();
+    call!(new_user, token2.storage_unregister(Some(true)), deposit = 1).assert_success();
+    let msg = format!(
+        "{{\"pool_id\": {}, \"token_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
+        0, token1.account_id(), token2.account_id(), 1
+    );
+    let msg_str = format!("{{\"force\": 0, \"actions\": [{}]}}", msg);
+    let out_come = call!(
+        new_user,
+        token1.ft_transfer_call(to_va(swap()), to_yocto("1").into(), None, msg_str.clone()),
+        deposit = 1
+    );
+    out_come.assert_success();
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_deposits(&pool, 
+        new_user.valid_account_id())
+        .get(&token2.account_id()).is_none());
+    assert!(get_deposits(&pool, 
+        owner.valid_account_id())
+        .get(&token2.account_id()).unwrap().0 > to_yocto("2.17"));
 }
 
 #[test]
@@ -226,7 +285,8 @@ fn account_upgrade_view_before_modify() {
         .get(&token1.account_id()).unwrap().0, to_yocto("5"));
     
     let sb = get_storage_balance(&pool, new_user.valid_account_id()).unwrap();
-    println!("after upgrade, t:{} a:{}", sb.total.0, sb.available.0);
+    // println!("after upgrade, t:{} a:{}", sb.total.0, sb.available.0);
+    assert_eq!(sb.available.0, to_yocto("0.99754"));
 
     // let vr = view!(pool.storage_balance_of(new_user.valid_account_id()));
     // println!("{}", vr.unwrap_err());

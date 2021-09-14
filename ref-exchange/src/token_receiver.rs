@@ -81,7 +81,8 @@ impl Contract {
         // [AUDIT_12] always save back account for a resident user
         if is_resident_user {
             // To avoid race conditions, we actually going to insert 0 to all changed tokens and save that.
-            self.internal_save_account(sender_id, account);
+            // for instant swap, we won't increase any storage, so direct save without storage check
+            self.accounts.insert(sender_id, &account.into());
         }
         result
     }
