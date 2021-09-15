@@ -107,7 +107,7 @@ impl Contract {
             for action in &actions {
                 for token in action.tokens() {
                     assert!(
-                        !account.tokens.get(&token).is_none()
+                        account.tokens.get(&token).is_some() 
                             || self.whitelisted_tokens.contains(&token),
                         "{}",
                         // [AUDIT_05]
