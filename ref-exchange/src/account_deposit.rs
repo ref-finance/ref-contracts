@@ -247,6 +247,20 @@ impl Contract {
         self.internal_save_account(&account_id, account);
     }
 
+    /// storage withdraw
+    pub(crate) fn internal_storage_withdraw(&mut self, account_id: &AccountId, amount: Balance) -> u128 {
+        let mut account = self.internal_unwrap_account(&account_id);
+        let available = account.storage_available();
+        let mut withdraw_amount = amount;
+        if amount == 0 {
+            withdraw_amount = available;
+        }
+        assert!(withdraw_amount <= available, "ERR_STORAGE_WITHDRAW_TOO_MUCH");
+        account.near_amount -= withdraw_amount;
+        self.internal_save_account(&account_id, account);
+        withdraw_amount
+    }
+
     /// Record deposit of some number of tokens to this contract.
     /// Fails if account is not registered or if token isn't whitelisted.
     pub(crate) fn internal_deposit(

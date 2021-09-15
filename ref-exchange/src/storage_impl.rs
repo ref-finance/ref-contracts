@@ -44,11 +44,9 @@ impl StorageManagement for Contract {
     fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
         assert_one_yocto();
         let account_id = env::predecessor_account_id();
-        let account_deposit = self.internal_unwrap_account(&account_id);
-        let available = account_deposit.storage_available();
-        let amount = amount.map(|a| a.0).unwrap_or(available);
-        assert!(amount <= available, "ERR_STORAGE_WITHDRAW_TOO_MUCH");
-        Promise::new(account_id.clone()).transfer(amount);
+        let amount = amount.unwrap_or(U128(0)).0;
+        let withdraw_amount = self.internal_storage_withdraw(&account_id, amount);
+        Promise::new(account_id.clone()).transfer(withdraw_amount);
         self.storage_balance_of(account_id.try_into().unwrap())
             .unwrap()
     }
