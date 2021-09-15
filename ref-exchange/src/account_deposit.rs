@@ -359,8 +359,8 @@ impl Contract {
         self.internal_save_account(&account_id, account);
     }
 
-     /// storage withdraw
-     pub(crate) fn internal_storage_withdraw(&mut self, account_id: &AccountId, amount: Balance) -> u128 {
+    /// storage withdraw
+    pub(crate) fn internal_storage_withdraw(&mut self, account_id: &AccountId, amount: Balance) -> u128 {
         let mut account = self.internal_unwrap_account(&account_id);
         let available = account.storage_available();
         assert!(available > 0, "ERR_NO_STORAGE_CAN_WITHDRAW");
