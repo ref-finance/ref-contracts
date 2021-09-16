@@ -33,6 +33,25 @@ impl Contract {
         }
     }
 
+    /// Change state of contract, Only can be called by owner or guardians.
+    #[payable]
+    pub fn change_state(&mut self, state: RunningState) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
+        let cur_state: String = (&self.state).into();
+        let new_state: String = (&state).into();
+        if new_state != cur_state {
+            self.state = state;
+            env::log(
+                format!(
+                    "Contract state changed from {} to {} by {}",
+                    cur_state, new_state, env::predecessor_account_id()
+                )
+                .as_bytes(),
+            );       
+        }
+    }
+
     /// Extend whitelisted tokens with new tokens. Only can be called by owner.
     #[payable]
     pub fn extend_whitelisted_tokens(&mut self, tokens: Vec<ValidAccountId>) {
