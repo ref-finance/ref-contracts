@@ -3,6 +3,7 @@ use std::convert::TryInto;
 use near_contract_standards::storage_management::{
     StorageBalance, StorageBalanceBounds, StorageManagement,
 };
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
@@ -17,8 +18,8 @@ use crate::action::{Action, ActionResult};
 use crate::errors::*;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
-use crate::utils::check_token_duplicates;
-pub use crate::views::PoolInfo;
+use crate::utils::{check_token_duplicates, is_contract_running};
+pub use crate::views::{PoolInfo, ContractMetadata};
 
 mod account_deposit;
 mod action;
@@ -41,6 +42,21 @@ pub(crate) enum StorageKey {
     Accounts,
     Shares { pool_id: u32 },
     Whitelist,
+    Guardian,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub enum RunningState {
+    Running, Paused
+}
+impl From<&RunningState> for String {
+    fn from(state: &RunningState) -> Self {
+        match *state {
+            RunningState::Running => { String::from("Running") },
+            RunningState::Paused => { String::from("Paused") },
+        }
+    }
 }
 
 #[near_bindgen]
@@ -58,6 +74,10 @@ pub struct Contract {
     accounts: LookupMap<AccountId, VAccount>,
     /// Set of whitelisted tokens by "owner".
     whitelisted_tokens: UnorderedSet<AccountId>,
+    /// Set of guardians.
+    guardians: UnorderedSet<AccountId>,
+    /// Running state
+    state: RunningState,
 }
 
 #[near_bindgen]
@@ -71,6 +91,8 @@ impl Contract {
             pools: Vector::new(StorageKey::Pools),
             accounts: LookupMap::new(StorageKey::Accounts),
             whitelisted_tokens: UnorderedSet::new(StorageKey::Whitelist),
+            guardians: UnorderedSet::new(StorageKey::Guardian),
+            state: RunningState::Running,
         }
     }
 
@@ -78,6 +100,7 @@ impl Contract {
     /// Attached NEAR should be enough to cover the added storage.
     #[payable]
     pub fn add_simple_pool(&mut self, tokens: Vec<ValidAccountId>, fee: u32) -> u64 {
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
@@ -99,6 +122,7 @@ impl Contract {
         actions: Vec<Action>,
         referral_id: Option<ValidAccountId>,
     ) -> ActionResult {
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         let sender_id = env::predecessor_account_id();
         let mut account = self.internal_unwrap_account(&sender_id);
         // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
@@ -127,6 +151,7 @@ impl Contract {
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
     #[payable]
     pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         assert_ne!(actions.len(), 0, "ERR_AT_LEAST_ONE_SWAP");
         U128(
             self.execute_actions(
@@ -148,6 +173,7 @@ impl Contract {
         amounts: Vec<U128>,
         min_amounts: Option<Vec<U128>>,
     ) {
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         assert!(
             env::attached_deposit() > 0,
             "Requires attached deposit of at least 1 yoctoNEAR"
@@ -179,6 +205,7 @@ impl Contract {
     #[payable]
     pub fn remove_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
         assert_one_yocto();
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");

@@ -10,7 +10,7 @@ use near_sdk::{
     AccountId, Balance, PromiseResult, StorageUsage,
 };
 
-use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER};
+use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER, is_contract_running};
 use crate::*;
 
 // [AUDIT_01]
@@ -147,6 +147,7 @@ impl Contract {
     #[payable]
     pub fn register_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         assert_one_yocto();
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.internal_unwrap_account(&sender_id);
         deposits.register(&token_ids);
@@ -158,6 +159,7 @@ impl Contract {
     #[payable]
     pub fn unregister_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         assert_one_yocto();
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.internal_unwrap_account(&sender_id);
         for token_id in token_ids {
@@ -177,6 +179,7 @@ impl Contract {
         unregister: Option<bool>,
     ) -> Promise {
         assert_one_yocto();
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         let token_id: AccountId = token_id.into();
         let amount: u128 = amount.into();
         let sender_id = env::predecessor_account_id();

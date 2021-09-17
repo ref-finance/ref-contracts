@@ -2,7 +2,7 @@ use near_contract_standards::fungible_token::metadata::{FungibleTokenMetadata};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{ext_contract, near_bindgen, Balance, PromiseOrValue};
 
-use crate::utils::{GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_RESOLVE_TRANSFER, NO_DEPOSIT};
+use crate::utils::{GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_RESOLVE_TRANSFER, NO_DEPOSIT, is_contract_running};
 use crate::*;
 
 #[ext_contract(ext_self)]
@@ -143,6 +143,7 @@ impl Contract {
     /// Fails if token_id is not a pool.
     #[payable]
     pub fn mft_register(&mut self, token_id: String, account_id: ValidAccountId) {
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         let prev_storage = env::storage_usage();
         match parse_token_id(token_id) {
             TokenOrPool::Token(_) => env::panic(b"ERR_INVALID_REGISTER"),
@@ -166,6 +167,7 @@ impl Contract {
         memo: Option<String>,
     ) {
         assert_one_yocto();
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         self.internal_mft_transfer(
             token_id,
             &env::predecessor_account_id(),
@@ -185,6 +187,7 @@ impl Contract {
         msg: String,
     ) -> PromiseOrValue<U128> {
         assert_one_yocto();
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         let sender_id = env::predecessor_account_id();
         self.internal_mft_transfer(
             token_id.clone(),
