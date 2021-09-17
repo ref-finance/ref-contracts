@@ -9,6 +9,7 @@ impl StorageManagement for Contract {
         account_id: Option<ValidAccountId>,
         registration_only: Option<bool>,
     ) -> StorageBalance {
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         let amount = env::attached_deposit();
         let account_id = account_id
             .map(|a| a.into())
@@ -43,6 +44,7 @@ impl StorageManagement for Contract {
     #[payable]
     fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
         assert_one_yocto();
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         let account_id = env::predecessor_account_id();
         let amount = amount.unwrap_or(U128(0)).0;
         let withdraw_amount = self.internal_storage_withdraw(&account_id, amount);
@@ -55,6 +57,7 @@ impl StorageManagement for Contract {
     #[payable]
     fn storage_unregister(&mut self, force: Option<bool>) -> bool {
         assert_one_yocto();
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         let account_id = env::predecessor_account_id();
         if let Some(account_deposit) = self.internal_get_account(&account_id) {
             // TODO: figure out force option logic.

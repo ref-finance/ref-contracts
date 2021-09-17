@@ -98,6 +98,7 @@ impl FungibleTokenReceiver for Contract {
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
+        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
         let token_in = env::predecessor_account_id();
         if msg.is_empty() {
             // Simple deposit.
