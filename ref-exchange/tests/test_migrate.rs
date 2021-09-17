@@ -44,11 +44,6 @@ fn test_upgrade() {
         0,
     )
     .assert_success();
-    let metadata = get_metadata(&pool);
-    // println!("{:#?}", metadata);
-    assert_eq!(metadata.version, "1.1.0".to_string());
-    assert_eq!(metadata.state, "Running".to_string());
-    
 
     // Upgrade to the same code migration is skipped.
     root.call(
