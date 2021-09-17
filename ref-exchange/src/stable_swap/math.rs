@@ -8,13 +8,13 @@ use crate::utils::{FEE_DIVISOR, U256};
 /// Number of coins in the pool.
 pub const N_COINS: u32 = 2;
 /// Minimum ramp duration.
-pub const MIN_RAMP_DURATION: i64 = 86400;
+pub const MIN_RAMP_DURATION: Timestamp = 86400;
 /// Min amplification coefficient.
-pub const MIN_AMP: u64 = 1;
+pub const MIN_AMP: u128 = 1;
 /// Max amplification coefficient.
-pub const MAX_AMP: u64 = 1_000_000;
-/// Max number of tokens to swap at once.
-pub const MAX_TOKENS_IN: u64 = u64::MAX >> 4;
+pub const MAX_AMP: u128 = 1_000_000;
+/// Max amplification change.
+pub const MAX_AMP_CHANGE: u128 = 10;
 
 /// Stable Swap Fee calculator.
 pub struct Fees {
@@ -30,6 +30,11 @@ impl Fees {
         }
     }
     pub fn trade_fee(&self, amount: Balance) -> Balance {
+        println!(
+            "trade fee: {} {}",
+            amount * (self.trade_fee as u128) / (FEE_DIVISOR as u128),
+            amount
+        );
         amount * (self.trade_fee as u128) / (FEE_DIVISOR as u128)
     }
 
@@ -61,9 +66,9 @@ pub struct SwapResult {
 /// The StableSwap invariant calculator.
 pub struct StableSwap {
     /// Initial amplification coefficient (A)
-    initial_amp_factor: u64,
+    initial_amp_factor: u128,
     /// Target amplification coefficient (A)
-    target_amp_factor: u64,
+    target_amp_factor: u128,
     /// Current unix timestamp
     current_ts: Timestamp,
     /// Ramp A start timestamp
@@ -74,8 +79,8 @@ pub struct StableSwap {
 
 impl StableSwap {
     pub fn new(
-        initial_amp_factor: u64,
-        target_amp_factor: u64,
+        initial_amp_factor: u128,
+        target_amp_factor: u128,
         current_ts: Timestamp,
         start_ramp_ts: Timestamp,
         stop_ramp_ts: Timestamp,
@@ -91,7 +96,7 @@ impl StableSwap {
 
     fn compute_next_d(
         &self,
-        amp_factor: u64,
+        amp_factor: u128,
         d_init: U256,
         d_prod: U256,
         sum_x: Balance,
@@ -124,7 +129,7 @@ impl StableSwap {
                     .checked_sub(self.initial_amp_factor)?;
                 let amp_delta = (amp_range as u128)
                     .checked_mul(time_delta as u128)?
-                    .checked_div(time_range as u128)? as u64;
+                    .checked_div(time_range as u128)?;
                 self.initial_amp_factor
                     .checked_add(amp_delta)
                     .map(|x| x as u128)
@@ -135,7 +140,7 @@ impl StableSwap {
                     .checked_sub(self.target_amp_factor)?;
                 let amp_delta = (amp_range as u128)
                     .checked_mul(time_delta as u128)?
-                    .checked_div(time_range as u128)? as u64;
+                    .checked_div(time_range as u128)?;
                 self.initial_amp_factor
                     .checked_sub(amp_delta)
                     .map(|x| x as u128)
@@ -170,7 +175,7 @@ impl StableSwap {
                     .checked_mul(d)?
                     .checked_div(amount_b_times_coins.into())?;
                 d_prev = d;
-                d = self.compute_next_d(amp_factor as u64, d, d_prod, sum_x)?;
+                d = self.compute_next_d(amp_factor, d, d_prod, sum_x)?;
                 // Equality with the precision of 1
                 if d > d_prev {
                     if d.checked_sub(d_prev)? <= 1.into() {

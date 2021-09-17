@@ -5,7 +5,9 @@ use near_sdk::{env, AccountId, Balance, Timestamp};
 
 use crate::errors::{ERR13_LP_NOT_REGISTERED, ERR14_LP_ALREADY_REGISTERED};
 use crate::fees::SwapFees;
-use crate::stable_swap::math::{Fees, StableSwap, SwapResult, MAX_AMP, MIN_AMP, N_COINS};
+use crate::stable_swap::math::{
+    Fees, StableSwap, SwapResult, MAX_AMP, MAX_AMP_CHANGE, MIN_AMP, MIN_RAMP_DURATION, N_COINS,
+};
 use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR};
 use crate::StorageKey;
 
@@ -26,20 +28,20 @@ pub struct StableSwapPool {
     /// Total number of shares.
     pub shares_total_supply: Balance,
     /// Initial amplification coefficient.
-    pub init_amp_factor: u64,
-    /// Future amplification coefficient.
-    pub future_amp_factor: u64,
+    pub init_amp_factor: u128,
+    /// Target for ramping up amplification coefficient.
+    pub target_amp_factor: u128,
     /// Initial amplification time.
     pub init_amp_time: Timestamp,
-    /// Future amplification time.
-    pub future_amp_time: Timestamp,
+    /// Stop ramp up amplification time.
+    pub stop_amp_time: Timestamp,
 }
 
 impl StableSwapPool {
     pub fn new(
         id: u32,
         token_account_ids: Vec<ValidAccountId>,
-        amp_factor: u64,
+        amp_factor: u128,
         total_fee: u32,
     ) -> Self {
         assert!(
@@ -60,9 +62,9 @@ impl StableSwapPool {
             shares: LookupMap::new(StorageKey::Shares { pool_id: id }),
             shares_total_supply: 0,
             init_amp_factor: amp_factor,
-            future_amp_factor: amp_factor,
+            target_amp_factor: amp_factor,
             init_amp_time: 0,
-            future_amp_time: 0,
+            stop_amp_time: 0,
         }
     }
 
@@ -99,10 +101,10 @@ impl StableSwapPool {
         );
         let invariant = StableSwap::new(
             self.init_amp_factor,
-            self.future_amp_factor,
+            self.target_amp_factor,
             env::block_timestamp(),
             self.init_amp_time,
-            self.future_amp_time,
+            self.stop_amp_time,
         );
         let new_shares = if self.shares_total_supply == 0 {
             // Bootstrapping the pool.
@@ -151,10 +153,10 @@ impl StableSwapPool {
         let mut result = vec![0u128; N_COINS as usize];
         let invariant = StableSwap::new(
             self.init_amp_factor,
-            self.future_amp_factor,
+            self.target_amp_factor,
             env::block_timestamp(),
             self.init_amp_time,
-            self.future_amp_time,
+            self.stop_amp_time,
         );
         let mut fee_amounts = vec![0u128; N_COINS as usize];
         let stable_swap_fees = Fees::new(self.total_fee, &fees);
@@ -180,9 +182,7 @@ impl StableSwapPool {
                 .checked_sub(result[i as usize])
                 .expect("ERR_CALC");
         }
-        // Never unregister an LP when liquidity is removed.
-        self.shares
-            .insert(&sender_id, &(prev_shares_amount - shares));
+        self.burn_shares(&sender_id, prev_shares_amount, shares);
         env::log(
             format!(
                 "{} shares of liquidity removed: receive back {:?}",
@@ -195,7 +195,6 @@ impl StableSwapPool {
             )
             .as_bytes(),
         );
-        self.shares_total_supply -= shares;
         result
     }
     /// Returns number of tokens in outcome, given amount.
@@ -209,10 +208,10 @@ impl StableSwapPool {
     ) -> SwapResult {
         let invariant = StableSwap::new(
             self.init_amp_factor,
-            self.future_amp_factor,
+            self.target_amp_factor,
             env::block_timestamp(),
             self.init_amp_time,
-            self.future_amp_time,
+            self.stop_amp_time,
         );
         invariant
             .swap_to(
@@ -269,6 +268,9 @@ impl StableSwapPool {
 
         // TODO: add admin / referral fee here.
 
+        // mint
+        println!("{:?}", self.amounts);
+
         result.amount_swapped
     }
 
@@ -279,6 +281,22 @@ impl StableSwapPool {
         }
         self.shares_total_supply += shares;
         add_to_collection(&mut self.shares, &account_id, shares);
+    }
+
+    /// Burn shares from given user's balance.
+    fn burn_shares(
+        &mut self,
+        account_id: &AccountId,
+        prev_shares_amount: Balance,
+        shares: Balance,
+    ) {
+        if shares == 0 {
+            return;
+        }
+        // Never remove shares from storage to allow to bring it back without extra storage deposit.
+        self.shares_total_supply -= shares;
+        self.shares
+            .insert(&account_id, &(prev_shares_amount - shares));
     }
 
     /// Register given account with 0 balance in shares.
@@ -321,15 +339,55 @@ impl StableSwapPool {
     }
 
     /// [Admin function] increase the amplification factor.
-    pub fn ramp_amplification(&mut self, future_amp_factor: u64, future_amp_time: Timestamp) {
-        // TODO: proper implementation
-        self.future_amp_factor = future_amp_time;
-        self.future_amp_factor = future_amp_factor;
+    pub fn ramp_amplification(&mut self, future_amp_factor: u128, future_amp_time: Timestamp) {
+        let current_time = env::block_timestamp();
+        assert!(
+            current_time >= self.init_amp_time + MIN_RAMP_DURATION,
+            "ERR_RAMP_LOCKED"
+        );
+        assert!(
+            future_amp_time >= current_time + MIN_RAMP_DURATION,
+            "ERR_INSUFFICIENT_RAMP_TIME"
+        );
+        let invariant = StableSwap::new(
+            self.init_amp_factor,
+            self.target_amp_factor,
+            current_time,
+            self.init_amp_time,
+            self.stop_amp_time,
+        );
+        let amp_factor = invariant.compute_amp_factor().expect("ERR_CALC");
+        assert!(
+            future_amp_factor > 0 && future_amp_factor < MAX_AMP,
+            "ERR_INVALID_AMP_FACTOR"
+        );
+        assert!(
+            (future_amp_factor >= amp_factor && future_amp_factor <= amp_factor * MAX_AMP_CHANGE)
+                || (future_amp_factor < amp_factor
+                    && future_amp_factor * MAX_AMP_CHANGE >= amp_factor),
+            "ERR_AMP_LARGE_CHANGE"
+        );
+        self.init_amp_factor = amp_factor;
+        self.init_amp_time = current_time;
+        self.target_amp_factor = future_amp_factor;
+        self.stop_amp_time = future_amp_time;
     }
 
     /// [Admin function] Stop increase of amplification factor.
     pub fn stop_ramp_amplification(&mut self) {
-        // TODO: implement
+        let current_time = env::block_timestamp();
+        let invariant = StableSwap::new(
+            self.init_amp_factor,
+            self.target_amp_factor,
+            current_time,
+            self.init_amp_time,
+            self.stop_amp_time,
+        );
+        let amp_factor = invariant.compute_amp_factor().expect("ERR_CALC");
+        self.init_amp_factor = amp_factor;
+        self.target_amp_factor = amp_factor;
+        self.init_amp_time = current_time;
+        self.stop_amp_time = current_time;
     }
 }
 
@@ -387,6 +445,7 @@ mod tests {
         assert_eq!(amounts_out, vec![0, to_yocto("5")]);
     }
 
+    /// Test everything with fees.
     #[test]
     fn test_with_fees() {
         let mut context = VMContextBuilder::new();
@@ -395,9 +454,17 @@ mod tests {
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let fees = SwapFees::new(1000);
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
-        let amounts_out =
-            pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1], &fees);
-        println!("amount out: {:?}", amounts_out);
+        let amount_out = pool.swap(
+            accounts(1).as_ref(),
+            to_yocto("1"),
+            accounts(2).as_ref(),
+            1,
+            &fees,
+        );
+        println!("swap out: {}", amount_out);
+        // let amounts_out =
+        //     pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1], &fees);
+        // println!("amount out: {:?}", amounts_out);
     }
 
     /// Test that adding and then removing all of the liquidity leaves the pool empty and with no shares.
@@ -435,5 +502,25 @@ mod tests {
         assert_eq!(pool.share_balance_of(accounts(0).as_ref()), 0);
         assert_eq!(pool.share_balance_of(accounts(3).as_ref()), 0);
         assert_eq!(pool.amounts, vec![1, 1]);
+    }
+
+    /// Test ramping up amplification factor, ramping it even more and then stopping.
+    #[test]
+    fn test_ramp_amp() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], 1, 0);
+
+        let start_ts = 1_000_000_000;
+        testing_env!(context.block_timestamp(start_ts).build());
+        pool.ramp_amplification(5, start_ts + MIN_RAMP_DURATION * 10);
+        testing_env!(context
+            .block_timestamp(start_ts + MIN_RAMP_DURATION * 3)
+            .build());
+        pool.ramp_amplification(15, start_ts + MIN_RAMP_DURATION * 20);
+        testing_env!(context
+            .block_timestamp(start_ts + MIN_RAMP_DURATION * 5)
+            .build());
+        pool.stop_ramp_amplification();
     }
 }
