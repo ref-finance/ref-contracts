@@ -7,7 +7,7 @@ pub mod common;
 
 #[test]
 fn guardians_scenario_01() {
-    let (root, owner, pool, token1, token2, _) = setup_pool_with_liquidity();
+    let (root, owner, pool, token1, _, _) = setup_pool_with_liquidity();
     let guard1 = root.create_user("guard1".to_string(), to_yocto("100"));
     let guard2 = root.create_user("guard2".to_string(), to_yocto("100"));
     let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
