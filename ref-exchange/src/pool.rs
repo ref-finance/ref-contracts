@@ -1,7 +1,9 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, Balance};
 
+use crate::fees::SwapFees;
 use crate::simple_pool::SimplePool;
+use crate::stable_swap::StableSwapPool;
 use crate::utils::SwapVolume;
 
 /// Generic Pool, providing wrapper around different implementations of swap pools.
@@ -9,6 +11,7 @@ use crate::utils::SwapVolume;
 #[derive(BorshSerialize, BorshDeserialize)]
 pub enum Pool {
     SimplePool(SimplePool),
+    StableSwapPool(StableSwapPool),
 }
 
 impl Pool {
@@ -16,6 +19,7 @@ impl Pool {
     pub fn kind(&self) -> String {
         match self {
             Pool::SimplePool(_) => "SIMPLE_POOL".to_string(),
+            Pool::StableSwapPool(_) => "STABLE_SWAP".to_string(),
         }
     }
 
@@ -23,14 +27,21 @@ impl Pool {
     pub fn tokens(&self) -> &[AccountId] {
         match self {
             Pool::SimplePool(pool) => pool.tokens(),
+            Pool::StableSwapPool(pool) => pool.tokens(),
         }
     }
 
     /// Adds liquidity into underlying pool.
     /// Updates amounts to amount kept in the pool.
-    pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>) -> Balance {
+    pub fn add_liquidity(
+        &mut self,
+        sender_id: &AccountId,
+        amounts: &mut Vec<Balance>,
+        fees: SwapFees,
+    ) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts),
+            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, &fees),
         }
     }
 
@@ -40,9 +51,13 @@ impl Pool {
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
+        fees: SwapFees,
     ) -> Vec<Balance> {
         match self {
             Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts),
+            Pool::StableSwapPool(pool) => {
+                pool.remove_liquidity(sender_id, shares, min_amounts, &fees)
+            }
         }
     }
 
@@ -55,6 +70,8 @@ impl Pool {
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.get_return(token_in, amount_in, token_out),
+            _ => 0
+            // Pool::StableSwapPool(pool) => pool.get_return(token_in, amount_in, token_out),
         }
     }
 
@@ -62,6 +79,7 @@ impl Pool {
     pub fn get_fee(&self) -> u32 {
         match self {
             Pool::SimplePool(pool) => pool.get_fee(),
+            Pool::StableSwapPool(pool) => pool.get_fee(),
         }
     }
 
@@ -69,6 +87,7 @@ impl Pool {
     pub fn get_volumes(&self) -> Vec<SwapVolume> {
         match self {
             Pool::SimplePool(pool) => pool.get_volumes(),
+            Pool::StableSwapPool(pool) => pool.get_volumes(),
         }
     }
 
@@ -79,42 +98,43 @@ impl Pool {
         amount_in: Balance,
         token_out: &AccountId,
         min_amount_out: Balance,
-        exchange_id: &AccountId,
-        referral_id: &Option<AccountId>,
+        fees: SwapFees,
     ) -> Balance {
         match self {
-            Pool::SimplePool(pool) => pool.swap(
-                token_in,
-                amount_in,
-                token_out,
-                min_amount_out,
-                exchange_id,
-                referral_id,
-            ),
+            Pool::SimplePool(pool) => {
+                pool.swap(token_in, amount_in, token_out, min_amount_out, fees)
+            }
+            Pool::StableSwapPool(pool) => {
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &fees)
+            }
         }
     }
 
     pub fn share_total_balance(&self) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.share_total_balance(),
+            Pool::StableSwapPool(pool) => pool.share_total_balance(),
         }
     }
 
     pub fn share_balances(&self, account_id: &AccountId) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.share_balance_of(account_id),
+            Pool::StableSwapPool(pool) => pool.share_balance_of(account_id),
         }
     }
 
     pub fn share_transfer(&mut self, sender_id: &AccountId, receiver_id: &AccountId, amount: u128) {
         match self {
             Pool::SimplePool(pool) => pool.share_transfer(sender_id, receiver_id, amount),
+            Pool::StableSwapPool(pool) => pool.share_transfer(sender_id, receiver_id, amount),
         }
     }
 
     pub fn share_register(&mut self, account_id: &AccountId) {
         match self {
             Pool::SimplePool(pool) => pool.share_register(account_id),
+            Pool::StableSwapPool(pool) => pool.share_register(account_id),
         }
     }
 }

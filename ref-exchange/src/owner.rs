@@ -1,5 +1,7 @@
 //! Implement all the relevant logic for owner of this contract.
 
+use near_sdk::json_types::WrappedTimestamp;
+
 use crate::*;
 
 #[near_bindgen]
@@ -48,6 +50,33 @@ impl Contract {
             self.owner_id,
             "ERR_NOT_ALLOWED"
         );
+    }
+
+    pub fn stable_swap_ramp_amp(
+        &mut self,
+        pool_id: u64,
+        future_amp_factor: u64,
+        future_amp_time: WrappedTimestamp,
+    ) {
+        self.assert_owner();
+        let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        match &mut pool {
+            Pool::StableSwapPool(pool) => {
+                pool.ramp_amplification(future_amp_factor as u128, future_amp_time.0)
+            }
+            _ => env::panic(b"ERR_NOT_STABLE_POOL"),
+        }
+        self.pools.replace(pool_id, &pool);
+    }
+
+    pub fn stable_swap_stop_ramp_amp(&mut self, pool_id: u64) {
+        let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        match &mut pool {
+            Pool::StableSwapPool(pool) => pool.stop_ramp_amplification(),
+            _ => env::panic(b"ERR_NOT_STABLE_POOL"),
+        }
+        self.assert_owner();
+        self.pools.replace(pool_id, &pool);
     }
 }
 

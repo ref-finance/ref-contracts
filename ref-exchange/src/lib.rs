@@ -7,27 +7,31 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
-    assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
-    PromiseResult, StorageUsage, BorshStorageKey
+    assert_one_yocto, env, log, near_bindgen, AccountId, Balance, BorshStorageKey, PanicOnDefault,
+    Promise, PromiseResult, StorageUsage,
 };
 
-use crate::account_deposit::{VAccount, Account};
+use crate::account_deposit::{Account, VAccount};
 pub use crate::action::SwapAction;
 use crate::action::{Action, ActionResult};
 use crate::errors::*;
+use crate::fees::SwapFees;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
+use crate::stable_swap::StableSwapPool;
 use crate::utils::check_token_duplicates;
 pub use crate::views::PoolInfo;
 
 mod account_deposit;
 mod action;
 mod errors;
+mod fees;
 mod legacy;
 mod multi_fungible_token;
 mod owner;
 mod pool;
 mod simple_pool;
+mod stable_swap;
 mod storage_impl;
 mod token_receiver;
 mod utils;
@@ -88,7 +92,23 @@ impl Contract {
         )))
     }
 
-    /// [AUDIT_03_reject(NOPE action is allowed by design)] 
+    #[payable]
+    pub fn add_stable_swap_pool(
+        &mut self,
+        tokens: Vec<ValidAccountId>,
+        fee: u32,
+        amp_factor: u64,
+    ) -> u64 {
+        check_token_duplicates(&tokens);
+        self.internal_add_pool(Pool::StableSwapPool(StableSwapPool::new(
+            self.pools.len() as u32,
+            tokens,
+            amp_factor as u128,
+            fee + self.exchange_fee + self.referral_fee,
+        )))
+    }
+
+    /// [AUDIT_03_reject(NOPE action is allowed by design)]
     /// [AUDIT_04]
     /// Executes generic set of actions.
     /// If referrer provided, pays referral_fee to it.
@@ -157,7 +177,16 @@ impl Contract {
         let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         // Add amounts given to liquidity first. It will return the balanced amounts.
-        pool.add_liquidity(&sender_id, &mut amounts);
+        pool.add_liquidity(
+            &sender_id,
+            &mut amounts,
+            SwapFees {
+                exchange_fee: self.exchange_fee,
+                exchange_id: self.owner_id.clone(),
+                referral_fee: 0,
+                referral_id: None,
+            },
+        );
         if let Some(min_amounts) = min_amounts {
             // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
             for (amount, min_amount) in amounts.iter().zip(min_amounts.iter()) {
@@ -189,6 +218,12 @@ impl Contract {
                 .into_iter()
                 .map(|amount| amount.into())
                 .collect(),
+            SwapFees {
+                exchange_fee: self.exchange_fee,
+                exchange_id: self.owner_id.clone(),
+                referral_fee: 0,
+                referral_id: None,
+            },
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
@@ -207,7 +242,6 @@ impl Contract {
 
 /// Internal methods implementation.
 impl Contract {
-
     /// Check how much storage taken costs and refund the left over back.
     fn internal_check_storage(&self, prev_storage: StorageUsage) {
         let storage_cost = env::storage_usage()
@@ -297,8 +331,12 @@ impl Contract {
             amount_in,
             token_out,
             min_amount_out,
-            &self.owner_id,
-            referral_id,
+            SwapFees {
+                exchange_fee: self.exchange_fee,
+                exchange_id: self.owner_id.clone(),
+                referral_fee: self.referral_fee,
+                referral_id: referral_id.clone(),
+            },
         );
         self.pools.replace(pool_id, &pool);
         amount_out
@@ -745,7 +783,7 @@ mod tests {
         // account(0) -- swap contract
         // account(1) -- token0 contract
         // account(2) -- token1 contract
-        // account(3) -- user account 
+        // account(3) -- user account
         // account(4) -- another user account
         let (mut context, mut contract) = setup_contract();
         deposit_tokens(
@@ -768,20 +806,14 @@ mod tests {
             contract.mft_balance_of(":0".to_string(), accounts(3)).0,
             to_yocto("1")
         );
-        assert_eq!(
-            contract.mft_total_supply(":0".to_string()).0,
-            to_yocto("1")
-        );
+        assert_eq!(contract.mft_total_supply(":0".to_string()).0, to_yocto("1"));
         testing_env!(context.attached_deposit(1).build());
         contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("50"))], None);
         assert_eq!(
             contract.mft_balance_of(":0".to_string(), accounts(3)).0,
             to_yocto("2")
         );
-        assert_eq!(
-            contract.mft_total_supply(":0".to_string()).0,
-            to_yocto("2")
-        );
+        assert_eq!(contract.mft_total_supply(":0".to_string()).0, to_yocto("2"));
 
         // register another user
         testing_env!(context
@@ -803,10 +835,7 @@ mod tests {
             contract.mft_balance_of(":0".to_string(), accounts(4)).0,
             to_yocto("1")
         );
-        assert_eq!(
-            contract.mft_total_supply(":0".to_string()).0,
-            to_yocto("2")
-        );
+        assert_eq!(contract.mft_total_supply(":0".to_string()).0, to_yocto("2"));
         // remove lpt for account 3
         testing_env!(context
             .predecessor_account_id(accounts(3))
@@ -859,7 +888,7 @@ mod tests {
         // account(0) -- swap contract
         // account(1) -- token0 contract
         // account(2) -- token1 contract
-        // account(3) -- user account 
+        // account(3) -- user account
         let (mut context, mut contract) = setup_contract();
         deposit_tokens(
             &mut context,
