@@ -18,6 +18,7 @@ use crate::errors::*;
 use crate::fees::SwapFees;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
+use crate::stable_swap::StableSwapPool;
 use crate::utils::check_token_duplicates;
 pub use crate::views::PoolInfo;
 
@@ -88,6 +89,22 @@ impl Contract {
             fee + self.exchange_fee + self.referral_fee,
             self.exchange_fee,
             self.referral_fee,
+        )))
+    }
+
+    #[payable]
+    pub fn add_stable_swap_pool(
+        &mut self,
+        tokens: Vec<ValidAccountId>,
+        fee: u32,
+        amp_factor: u64,
+    ) -> u64 {
+        check_token_duplicates(&tokens);
+        self.internal_add_pool(Pool::StableSwapPool(StableSwapPool::new(
+            self.pools.len() as u32,
+            tokens,
+            amp_factor as u128,
+            fee + self.exchange_fee + self.referral_fee,
         )))
     }
 

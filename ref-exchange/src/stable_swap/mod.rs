@@ -462,9 +462,9 @@ mod tests {
             &fees,
         );
         println!("swap out: {}", amount_out);
-        // let amounts_out =
-        //     pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1], &fees);
-        // println!("amount out: {:?}", amounts_out);
+        let amounts_out =
+            pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1], &fees);
+        println!("amount out: {:?}", amounts_out);
     }
 
     /// Test that adding and then removing all of the liquidity leaves the pool empty and with no shares.
