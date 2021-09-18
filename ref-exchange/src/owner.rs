@@ -38,21 +38,20 @@ impl Contract {
     pub fn change_state(&mut self, state: RunningState) {
         assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
-        let cur_state: String = (&self.state).into();
-        let new_state: String = (&state).into();
-        if new_state != cur_state {
-            if new_state == RunningState::Running {
+
+        if self.state != state {
+            if state == RunningState::Running {
                 // only owner can resume the contract
                 self.assert_owner();
             }
-            self.state = state;
             env::log(
                 format!(
                     "Contract state changed from {} to {} by {}",
-                    cur_state, new_state, env::predecessor_account_id()
+                    self.state, state, env::predecessor_account_id()
                 )
                 .as_bytes(),
             );       
+            self.state = state;
         }
     }
 

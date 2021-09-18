@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::fmt;
 
 use near_contract_standards::storage_management::{
     StorageBalance, StorageBalanceBounds, StorageManagement,
@@ -45,16 +46,18 @@ pub(crate) enum StorageKey {
     Guardian,
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]
 #[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 pub enum RunningState {
     Running, Paused
 }
-impl From<&RunningState> for String {
-    fn from(state: &RunningState) -> Self {
-        match *state {
-            RunningState::Running => { String::from("Running") },
-            RunningState::Paused => { String::from("Paused") },
+
+impl fmt::Display for RunningState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RunningState::Running => write!(f, "Running"),
+            RunningState::Paused => write!(f, "Paused"),
         }
     }
 }

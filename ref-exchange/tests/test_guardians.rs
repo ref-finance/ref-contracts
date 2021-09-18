@@ -100,7 +100,7 @@ fn guardians_scenario_01() {
     assert_eq!(get_error_count(&out_come), 1);
     assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
     let metadata = get_metadata(&pool);
-    assert_eq!(metadata.state, "Running".to_string());
+    assert_eq!(metadata.state, RunningState::Running);
 
     let out_come = call!(
         guard1,
@@ -110,7 +110,7 @@ fn guardians_scenario_01() {
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
     let metadata = get_metadata(&pool);
-    assert_eq!(metadata.state, "Paused".to_string());
+    assert_eq!(metadata.state, RunningState::Paused);
 
     // register user would fail
     let out_come = call!(
@@ -211,7 +211,7 @@ fn guardians_scenario_01() {
     assert_eq!(get_error_count(&out_come), 1);
     assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
     let metadata = get_metadata(&pool);
-    assert_eq!(metadata.state, "Paused".to_string());
+    assert_eq!(metadata.state, RunningState::Paused);
 
     let out_come = call!(
         guard2,
@@ -222,7 +222,7 @@ fn guardians_scenario_01() {
     assert_eq!(get_error_count(&out_come), 1);
     assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
     let metadata = get_metadata(&pool);
-    assert_eq!(metadata.state, "Paused".to_string());
+    assert_eq!(metadata.state, RunningState::Paused);
 
     let out_come = call!(
         owner,
@@ -232,7 +232,7 @@ fn guardians_scenario_01() {
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
     let metadata = get_metadata(&pool);
-    assert_eq!(metadata.state, "Running".to_string());
+    assert_eq!(metadata.state, RunningState::Running);
 
     let out_come = call!(
         new_user,
