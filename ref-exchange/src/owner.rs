@@ -41,7 +41,7 @@ impl Contract {
         let cur_state: String = (&self.state).into();
         let new_state: String = (&state).into();
         if new_state != cur_state {
-            if new_state == "Running".to_string() {
+            if new_state == RunningState::Running {
                 // only owner can resume the contract
                 self.assert_owner();
             }

@@ -17,7 +17,7 @@ pub struct ContractMetadata {
     pub owner: AccountId,
     pub guardians: Vec<AccountId>,
     pub pool_count: u64,
-    pub state: String,
+    pub state: RunningState,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -60,7 +60,7 @@ impl Contract {
             owner: self.owner_id.clone(),
             guardians: self.guardians.to_vec(),
             pool_count: self.pools.len(),
-            state: (&self.state).into(),
+            state: self.state.clone(),
         }
     }
 
