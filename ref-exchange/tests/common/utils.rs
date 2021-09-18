@@ -14,7 +14,7 @@ use test_token::ContractContract as TestToken;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
-    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_101.wasm",
+    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_102.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange_release.wasm",
 }
 
