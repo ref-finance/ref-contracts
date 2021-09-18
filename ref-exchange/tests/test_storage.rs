@@ -18,7 +18,7 @@ fn storage_scenario_01() {
     .assert_success();
     let sb = get_storage_balance(&pool, new_user.valid_account_id()).unwrap();
     assert_eq!(sb.total.0, to_yocto("1"));
-    assert_eq!(sb.total.0 - sb.available.0, to_yocto("0.00098"));
+    assert_eq!(sb.total.0 - sb.available.0, to_yocto("0.00102"));
     let orig_user_balance = new_user.account().unwrap().amount;
     
     // withdraw as much storage near as he can
@@ -30,7 +30,7 @@ fn storage_scenario_01() {
     out_come.assert_success();
 
     let sb = get_storage_balance(&pool, new_user.valid_account_id()).unwrap();
-    assert_eq!(sb.total.0, to_yocto("0.00098"));
+    assert_eq!(sb.total.0, to_yocto("0.00102"));
     assert_eq!(sb.available.0, to_yocto("0"));
     // println!("{}", new_user.account().unwrap().amount - orig_user_balance);
     assert!(
