@@ -1,6 +1,8 @@
+
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{serde_json, PromiseOrValue};
+use std::collections::HashMap;
 
 use crate::*;
 
@@ -34,16 +36,23 @@ impl Contract {
     ) -> Vec<(AccountId, Balance)> {
         // [AUDIT_12] always save back account for a resident user
         let mut is_resident_user: bool = true;
-        let mut initial_account: Account = self.accounts.get(sender_id).unwrap_or_else(|| {
+
+        let mut account: Account = self.internal_get_account(sender_id).unwrap_or_else(|| {
             is_resident_user = false;
             if !force {
                 env::panic(ERR10_ACC_NOT_REGISTERED.as_bytes());
             } else {
-                Account::default().into()
+                Account::new(sender_id)
             }
-        }).into();
-        initial_account.deposit(&token_in, amount_in);
-        let mut account = initial_account.clone();
+        });
+
+        let tokens_snapshot: HashMap<String, u128> = account
+            .tokens
+            .iter()
+            .map(|(token, balance)| (token, balance))
+            .collect();
+
+        account.deposit(&token_in, amount_in);
         let _ = self.internal_execute_actions(
             &mut account,
             &referral_id,
@@ -51,34 +60,40 @@ impl Contract {
             // [AUDIT_02]
             ActionResult::Amount(U128(amount_in)),
         );
+
         let mut result = vec![];
-        for (token, amount) in account.tokens.clone().into_iter() {
-            let value = initial_account.tokens.get(&token);
-            // Remove tokens that were transient from the account.
-            if amount == 0 && value.is_none() {
-                account.tokens.remove(&token);
-            } else {
-                let initial_amount = *value.unwrap_or(&0);
-                if amount > initial_amount {
-                    result.push((token.clone(), amount - initial_amount));
-                    account.tokens.insert(token, initial_amount);
+        for (token, amount) in account.tokens.to_vec() {
+            if let Some(initial_amount) = tokens_snapshot.get(&token) {
+                // restore token balance to original state if have more
+                // but keep cur state if have less
+                if amount > *initial_amount {
+                    result.push((token.clone(), amount - *initial_amount));
+                    account.tokens.insert(&token, initial_amount);
                 }
+            } else {
+                // this token not in original state
+                if amount > 0 {
+                    result.push((token.clone(), amount));
+                }
+                // should keep it unregistered
+                account.tokens.remove(&token);
             }
         }
         // [AUDIT_12] always save back account for a resident user
         if is_resident_user {
             // To avoid race conditions, we actually going to insert 0 to all changed tokens and save that.
-            self.internal_save_account(sender_id, account);
+            // for instant swap, we won't increase any storage, so direct save without storage check
+            self.accounts.insert(sender_id, &account.into());
         }
         result
     }
 }
 
 #[near_bindgen]
-#[allow(unreachable_code)]
 impl FungibleTokenReceiver for Contract {
     /// Callback on receiving tokens by this contract.
     /// `msg` format is either "" for deposit or `TokenReceiverMessage`.
+    #[allow(unreachable_code)]
     fn ft_on_transfer(
         &mut self,
         sender_id: ValidAccountId,
@@ -94,8 +109,9 @@ impl FungibleTokenReceiver for Contract {
             // [AUDIT14] shutdown instant swap from interface
             env::panic(b"Instant Swap Feature Not Open Yet");
 
+            // instant swap
             let message =
-                serde_json::from_str::<TokenReceiverMessage>(&msg).expect("ERR_MSG_WRONG_FORMAT");
+                serde_json::from_str::<TokenReceiverMessage>(&msg).expect(ERR28_WRONG_MSG_FORMAT);
             match message {
                 TokenReceiverMessage::Execute {
                     referral_id,
