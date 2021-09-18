@@ -1,14 +1,12 @@
-use near_sdk::json_types::{U128, ValidAccountId};
+use near_sdk::json_types::{U128};
 use near_sdk_sim::{call, to_yocto};
-
-use ref_exchange::ContractContract as Exchange;
 
 use crate::common::utils::*;
 pub mod common;
 
 #[test]
 fn storage_scenario_01() {
-    let (root, owner, pool, token1, token2, _) = setup_pool_with_liquidity();
+    let (root, _, pool, token1, _, _) = setup_pool_with_liquidity();
     let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
 
     println!("Storage Case 0101: withdraw MAX using None");
