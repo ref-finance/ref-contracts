@@ -129,7 +129,9 @@ impl FungibleTokenReceiver for Contract {
                         &actions,
                     );
                     for (token_out, amount_out) in out_amounts.into_iter() {
-                        self.internal_send_tokens(sender_id.as_ref(), &token_out, amount_out);
+                        if amount_out > 0 {
+                            self.internal_send_tokens(sender_id.as_ref(), &token_out, amount_out);
+                        }
                     }
                     // Even if send tokens fails, we don't return funds back to sender.
                     PromiseOrValue::Value(U128(0))

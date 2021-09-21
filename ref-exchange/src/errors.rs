@@ -19,6 +19,7 @@ pub const ERR25_CALLBACK_POST_WITHDRAW_INVALID: &str =
 pub const ERR27_DEPOSIT_NEEDED: &str = 
     "E27: attach 1yN to swap tokens not in whitelist";
 pub const ERR28_WRONG_MSG_FORMAT: &str = "E28: Illegal msg in ft_transfer_call";
+pub const ERR29_ILLEGAL_WITHDRAW_AMOUNT: &str = "E29: Illegal withdraw amount";
 
 // Liquidity operations.
 

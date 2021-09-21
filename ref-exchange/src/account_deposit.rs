@@ -86,14 +86,32 @@ impl Account {
         }
     }
 
+    pub fn get_balance(&self, token_id: &AccountId) -> Option<Balance> {
+        if let Some(token_balance) = self.tokens.get(token_id) {
+            Some(token_balance)
+        } else if let Some(legacy_token_balance) = self.legacy_tokens.get(token_id) {
+            Some(*legacy_token_balance)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_tokens(&self) -> Vec<AccountId> {
+        let mut a: Vec<AccountId> = self.tokens.keys().collect();
+        let b: Vec<AccountId> = self.legacy_tokens
+            .keys()
+            .cloned()
+            .collect();
+        a.extend(b);
+        a
+    }
+
     /// Deposit amount to the balance of given token,
     /// if given token not register and not enough storage, deposit fails 
     pub(crate) fn deposit_with_storage_check(&mut self, token: &AccountId, amount: Balance) -> bool { 
         if let Some(balance) = self.tokens.get(token) {
             // token has been registered, just add without storage check, 
-            let new_balance = balance
-                .checked_add(amount)
-                .expect("errors::BALANCE_OVERFLOW");
+            let new_balance = balance + amount;
             self.tokens.insert(token, &new_balance);
             true
         } else if let Some(x) = self.legacy_tokens.get_mut(token) {
@@ -114,12 +132,10 @@ impl Account {
 
     /// Deposit amount to the balance of given token.
     pub(crate) fn deposit(&mut self, token: &AccountId, amount: Balance) {
-        if self.legacy_tokens.contains_key(token) {
+        if let Some(x) = self.legacy_tokens.remove(token) {
             // need convert to tokens
-            let x = self.legacy_tokens.remove(token).unwrap();
             self.tokens.insert(token, &(amount + x));
-        } else if self.tokens.get(&token).is_some() {
-            let x = self.tokens.get(token).unwrap();
+        } else if let Some(x) = self.tokens.get(token) {
             self.tokens.insert(token, &(amount + x));
         } else {
             self.tokens.insert(token, &amount);
@@ -129,13 +145,11 @@ impl Account {
     /// Withdraw amount of `token` from the internal balance.
     /// Panics if `amount` is bigger than the current balance.
     pub(crate) fn withdraw(&mut self, token: &AccountId, amount: Balance) {
-        if self.legacy_tokens.contains_key(token) {
-            // need convert to tokens
-            let x = self.legacy_tokens.remove(token).unwrap();
+        if let Some(x) = self.legacy_tokens.remove(token) {
+            // need convert to 
             assert!(x >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
             self.tokens.insert(token, &(x - amount));
-        } else if self.tokens.get(&token).is_some() {
-            let x = self.tokens.get(token).unwrap();
+        } else if let Some(x) = self.tokens.get(token) {
             assert!(x >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
             self.tokens.insert(token, &(x - amount));
         } else {
@@ -182,8 +196,7 @@ impl Account {
     pub(crate) fn register(&mut self, token_ids: &Vec<ValidAccountId>) {
         for token_id in token_ids {
             let t = token_id.as_ref();
-            if !self.legacy_tokens.contains_key(t) 
-                && self.tokens.get(t).is_none() {
+            if self.get_balance(t).is_none() {
                 self.tokens.insert(t, &0);
             }
         }
@@ -241,6 +254,7 @@ impl Contract {
         self.assert_contract_running();
         let token_id: AccountId = token_id.into();
         let amount: u128 = amount.into();
+        assert!(amount > 0, "{}", ERR29_ILLEGAL_WITHDRAW_AMOUNT);
         let sender_id = env::predecessor_account_id();
         let mut account = self.internal_unwrap_account(&sender_id);
         // Note: subtraction and deregistration will be reverted if the promise fails.
@@ -359,8 +373,7 @@ impl Contract {
         let mut account = self.internal_unwrap_account(sender_id);
         assert!(
             self.whitelisted_tokens.contains(token_id) 
-                || account.legacy_tokens.contains_key(token_id) 
-                || account.tokens.get(token_id).is_some(),
+                || account.get_balance(token_id).is_some(),
             "{}",
             ERR12_TOKEN_NOT_WHITELISTED
         );
@@ -391,10 +404,7 @@ impl Contract {
         token_id: &AccountId,
     ) -> Balance {
         self.internal_get_account(sender_id)
-            .map(|a| 
-                    a.tokens.get(token_id).unwrap_or(0) + 
-                    a.legacy_tokens.get(token_id).unwrap_or(&0)
-            )
+            .and_then(|x| x.get_balance(token_id))
             .unwrap_or(0)
     }
 

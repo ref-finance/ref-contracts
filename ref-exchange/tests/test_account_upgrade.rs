@@ -115,6 +115,7 @@ fn account_upgrade_enough_storage() {
         deposit = 1
     );
     out_come.assert_success();
+    // println!("{:#?}", out_come.promise_results());
     assert_eq!(get_error_count(&out_come), 0);
 
     let ss = get_storage_state(&pool, user.valid_account_id()).unwrap();

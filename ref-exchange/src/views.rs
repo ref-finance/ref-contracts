@@ -133,17 +133,10 @@ impl Contract {
     pub fn get_deposits(&self, account_id: ValidAccountId) -> HashMap<AccountId, U128> {
         let wrapped_account = self.internal_get_account(account_id.as_ref());
         if let Some(account) = wrapped_account {
-            let mut a: HashMap<AccountId, U128> = account.tokens
-                .to_vec()
+            account.get_tokens()
                 .iter()
-                .map(|(token, balance)| (token.clone(), U128(*balance)))
-                .collect();
-            let b: HashMap<AccountId, U128> = account.legacy_tokens
-                .into_iter()
-                .map(|(acc, bal)| (acc.clone(), U128(bal)))
-                .collect();
-            a.extend(b);
-            a
+                .map(|token| (token.clone(), U128(account.get_balance(token).unwrap())))
+                .collect()
         } else {
             HashMap::new()
         }
@@ -175,18 +168,9 @@ impl Contract {
 
     /// Get specific user whitelisted tokens.
     pub fn get_user_whitelisted_tokens(&self, account_id: ValidAccountId) -> Vec<AccountId> {
-        let acc = self.internal_get_account(account_id.as_ref());
-        if let Some(account) = acc {
-            let mut a: Vec<AccountId> = account.tokens.keys().collect();
-            let b: Vec<AccountId> = account.legacy_tokens
-                .keys()
-                .cloned()
-                .collect();
-            a.extend(b);
-            a
-        } else {
-            Vec::new()
-        }
+        self.internal_get_account(account_id.as_ref())
+            .map(|x| x.get_tokens())
+            .unwrap_or_default()
     }
 
     /// Get user's storage deposit and needed in the account of current version
