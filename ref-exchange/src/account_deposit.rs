@@ -391,11 +391,9 @@ impl Contract {
         token_id: &AccountId,
     ) -> Balance {
         self.internal_get_account(sender_id)
-            .and_then(|a| 
-                Some(
+            .map(|a| 
                     a.tokens.get(token_id).unwrap_or(0) + 
                     a.legacy_tokens.get(token_id).unwrap_or(&0)
-                )
             )
             .unwrap_or(0)
     }

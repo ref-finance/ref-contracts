@@ -180,7 +180,7 @@ impl Contract {
             let mut a: Vec<AccountId> = account.tokens.keys().collect();
             let b: Vec<AccountId> = account.legacy_tokens
                 .keys()
-                .map(|x| x.clone())
+                .cloned()
                 .collect();
             a.extend(b);
             a
