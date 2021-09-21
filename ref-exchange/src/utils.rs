@@ -5,7 +5,6 @@ use near_sdk::collections::LookupMap;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{ext_contract, AccountId, Balance, Gas};
-use crate::RunningState;
 use uint::construct_uint;
 
 /// Attach no deposit.
@@ -77,13 +76,6 @@ pub fn integer_sqrt(value: U256) -> U256 {
         guess = (value / guess + guess) >> 1;
     }
     res
-}
-
-pub fn is_contract_running(state: &RunningState) -> bool {
-    match state {
-        RunningState::Running => true,
-        _ => false,
-    }
 }
 
 #[cfg(test)]

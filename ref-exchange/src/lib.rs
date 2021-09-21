@@ -19,7 +19,7 @@ use crate::action::{Action, ActionResult};
 use crate::errors::*;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
-use crate::utils::{check_token_duplicates, is_contract_running};
+use crate::utils::{check_token_duplicates};
 pub use crate::views::{PoolInfo, ContractMetadata};
 
 mod account_deposit;
@@ -103,7 +103,7 @@ impl Contract {
     /// Attached NEAR should be enough to cover the added storage.
     #[payable]
     pub fn add_simple_pool(&mut self, tokens: Vec<ValidAccountId>, fee: u32) -> u64 {
-        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
+        self.assert_contract_running();
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
@@ -125,7 +125,7 @@ impl Contract {
         actions: Vec<Action>,
         referral_id: Option<ValidAccountId>,
     ) -> ActionResult {
-        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
+        self.assert_contract_running();
         let sender_id = env::predecessor_account_id();
         let mut account = self.internal_unwrap_account(&sender_id);
         // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
@@ -154,7 +154,7 @@ impl Contract {
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
     #[payable]
     pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
-        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
+        self.assert_contract_running();
         assert_ne!(actions.len(), 0, "ERR_AT_LEAST_ONE_SWAP");
         U128(
             self.execute_actions(
@@ -176,7 +176,7 @@ impl Contract {
         amounts: Vec<U128>,
         min_amounts: Option<Vec<U128>>,
     ) {
-        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
+        self.assert_contract_running();
         assert!(
             env::attached_deposit() > 0,
             "Requires attached deposit of at least 1 yoctoNEAR"
@@ -208,7 +208,7 @@ impl Contract {
     #[payable]
     pub fn remove_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
         assert_one_yocto();
-        assert!(is_contract_running(&self.state), "{}", ERR51_CONTRACT_PAUSED);
+        self.assert_contract_running();
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
@@ -237,6 +237,13 @@ impl Contract {
 
 /// Internal methods implementation.
 impl Contract {
+
+    fn assert_contract_running(&self) {
+        match self.state {
+            RunningState::Running => (),
+            _ => env::panic(ERR51_CONTRACT_PAUSED.as_bytes()),
+        };
+    }
 
     /// Check how much storage taken costs and refund the left over back.
     fn internal_check_storage(&self, prev_storage: StorageUsage) {
