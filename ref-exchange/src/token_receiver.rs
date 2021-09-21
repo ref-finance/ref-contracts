@@ -85,6 +85,7 @@ impl FungibleTokenReceiver for Contract {
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
+        self.assert_contract_running();
         let token_in = env::predecessor_account_id();
         if msg.is_empty() {
             // Simple deposit.

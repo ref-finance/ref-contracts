@@ -147,6 +147,7 @@ impl Contract {
     #[payable]
     pub fn register_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         assert_one_yocto();
+        self.assert_contract_running();
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.internal_unwrap_account(&sender_id);
         deposits.register(&token_ids);
@@ -158,6 +159,7 @@ impl Contract {
     #[payable]
     pub fn unregister_tokens(&mut self, token_ids: Vec<ValidAccountId>) {
         assert_one_yocto();
+        self.assert_contract_running();
         let sender_id = env::predecessor_account_id();
         let mut deposits = self.internal_unwrap_account(&sender_id);
         for token_id in token_ids {
@@ -177,6 +179,7 @@ impl Contract {
         unregister: Option<bool>,
     ) -> Promise {
         assert_one_yocto();
+        self.assert_contract_running();
         let token_id: AccountId = token_id.into();
         let amount: u128 = amount.into();
         let sender_id = env::predecessor_account_id();

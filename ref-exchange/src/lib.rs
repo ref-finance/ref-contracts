@@ -1,8 +1,10 @@
 use std::convert::TryInto;
+use std::fmt;
 
 use near_contract_standards::storage_management::{
     StorageBalance, StorageBalanceBounds, StorageManagement,
 };
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
@@ -17,8 +19,8 @@ use crate::action::{Action, ActionResult};
 use crate::errors::*;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
-use crate::utils::check_token_duplicates;
-pub use crate::views::PoolInfo;
+use crate::utils::{check_token_duplicates};
+pub use crate::views::{PoolInfo, ContractMetadata};
 
 mod account_deposit;
 mod action;
@@ -41,6 +43,23 @@ pub(crate) enum StorageKey {
     Accounts,
     Shares { pool_id: u32 },
     Whitelist,
+    Guardian,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub enum RunningState {
+    Running, Paused
+}
+
+impl fmt::Display for RunningState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RunningState::Running => write!(f, "Running"),
+            RunningState::Paused => write!(f, "Paused"),
+        }
+    }
 }
 
 #[near_bindgen]
@@ -58,6 +77,10 @@ pub struct Contract {
     accounts: LookupMap<AccountId, VAccount>,
     /// Set of whitelisted tokens by "owner".
     whitelisted_tokens: UnorderedSet<AccountId>,
+    /// Set of guardians.
+    guardians: UnorderedSet<AccountId>,
+    /// Running state
+    state: RunningState,
 }
 
 #[near_bindgen]
@@ -71,6 +94,8 @@ impl Contract {
             pools: Vector::new(StorageKey::Pools),
             accounts: LookupMap::new(StorageKey::Accounts),
             whitelisted_tokens: UnorderedSet::new(StorageKey::Whitelist),
+            guardians: UnorderedSet::new(StorageKey::Guardian),
+            state: RunningState::Running,
         }
     }
 
@@ -78,6 +103,7 @@ impl Contract {
     /// Attached NEAR should be enough to cover the added storage.
     #[payable]
     pub fn add_simple_pool(&mut self, tokens: Vec<ValidAccountId>, fee: u32) -> u64 {
+        self.assert_contract_running();
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
@@ -99,6 +125,7 @@ impl Contract {
         actions: Vec<Action>,
         referral_id: Option<ValidAccountId>,
     ) -> ActionResult {
+        self.assert_contract_running();
         let sender_id = env::predecessor_account_id();
         let mut account = self.internal_unwrap_account(&sender_id);
         // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
@@ -127,6 +154,7 @@ impl Contract {
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
     #[payable]
     pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
+        self.assert_contract_running();
         assert_ne!(actions.len(), 0, "ERR_AT_LEAST_ONE_SWAP");
         U128(
             self.execute_actions(
@@ -148,6 +176,7 @@ impl Contract {
         amounts: Vec<U128>,
         min_amounts: Option<Vec<U128>>,
     ) {
+        self.assert_contract_running();
         assert!(
             env::attached_deposit() > 0,
             "Requires attached deposit of at least 1 yoctoNEAR"
@@ -179,6 +208,7 @@ impl Contract {
     #[payable]
     pub fn remove_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
         assert_one_yocto();
+        self.assert_contract_running();
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
@@ -207,6 +237,13 @@ impl Contract {
 
 /// Internal methods implementation.
 impl Contract {
+
+    fn assert_contract_running(&self) {
+        match self.state {
+            RunningState::Running => (),
+            _ => env::panic(ERR51_CONTRACT_PAUSED.as_bytes()),
+        };
+    }
 
     /// Check how much storage taken costs and refund the left over back.
     fn internal_check_storage(&self, prev_storage: StorageUsage) {

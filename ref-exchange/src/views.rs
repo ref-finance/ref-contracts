@@ -9,6 +9,17 @@ use near_sdk::{near_bindgen, AccountId};
 use crate::utils::SwapVolume;
 use crate::*;
 
+#[derive(Serialize)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Deserialize, Debug))]
+pub struct ContractMetadata {
+    pub version: String,
+    pub owner: AccountId,
+    pub guardians: Vec<AccountId>,
+    pub pool_count: u64,
+    pub state: RunningState,
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 #[serde(crate = "near_sdk::serde")]
 pub struct PoolInfo {
@@ -41,6 +52,23 @@ impl From<Pool> for PoolInfo {
 
 #[near_bindgen]
 impl Contract {
+
+    /// Return contract basic info
+    pub fn metadata(&self) -> ContractMetadata {
+        ContractMetadata {
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            owner: self.owner_id.clone(),
+            guardians: self.guardians.to_vec(),
+            pool_count: self.pools.len(),
+            state: self.state.clone(),
+        }
+    }
+
+    /// Only get guardians info
+    pub fn get_guardians(&self) -> Vec<AccountId> {
+        self.guardians.to_vec()
+    }
+    
     /// Returns semver of this contract.
     pub fn version(&self) -> String {
         env!("CARGO_PKG_VERSION").to_string()

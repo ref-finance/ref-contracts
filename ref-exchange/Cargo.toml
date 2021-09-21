@@ -1,6 +1,6 @@
 [package]
 name = "ref-exchange"
-version = "1.0.2"
+version = "1.1.0"
 authors = ["Illia Polosukhin <illia.polosukhin@gmail.com>"]
 edition = "2018"
 publish = false

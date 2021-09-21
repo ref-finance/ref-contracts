@@ -28,3 +28,6 @@ pub const ERR33_TRANSFER_TO_SELF: &str = "E33: transfer to self";
 // Action result.
 
 pub const ERR41_WRONG_ACTION_RESULT: &str = "E41: wrong action result type";
+
+// Contract Level
+pub const ERR51_CONTRACT_PAUSED: &str = "E51: contract paused";

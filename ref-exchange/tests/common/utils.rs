@@ -9,7 +9,7 @@ use near_sdk_sim::{
     call, deploy, init_simulator, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
 
-use ref_exchange::{ContractContract as Exchange, PoolInfo};
+use ref_exchange::{ContractContract as Exchange, PoolInfo, ContractMetadata};
 use test_token::ContractContract as TestToken;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
@@ -111,6 +111,11 @@ pub fn is_register_to_token(
 /// get user's ft balance of given token
 pub fn balance_of(token: &ContractAccount<TestToken>, account_id: &AccountId) -> u128 {
     view!(token.ft_balance_of(to_va(account_id.clone()))).unwrap_json::<U128>().0
+}
+
+/// get ref-exchange's metadata
+pub fn get_metadata(pool: &ContractAccount<Exchange>) -> ContractMetadata {
+    view!(pool.metadata()).unwrap_json::<ContractMetadata>()
 }
 
 /// get ref-exchange's version
