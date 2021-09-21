@@ -135,6 +135,7 @@ impl Contract {
     /// Fails if token_id is not a pool.
     #[payable]
     pub fn mft_register(&mut self, token_id: String, account_id: ValidAccountId) {
+        self.assert_contract_running();
         let prev_storage = env::storage_usage();
         match parse_token_id(token_id) {
             TokenOrPool::Token(_) => env::panic(b"ERR_INVALID_REGISTER"),
@@ -158,6 +159,7 @@ impl Contract {
         memo: Option<String>,
     ) {
         assert_one_yocto();
+        self.assert_contract_running();
         self.internal_mft_transfer(
             token_id,
             &env::predecessor_account_id(),
@@ -177,6 +179,7 @@ impl Contract {
         msg: String,
     ) -> PromiseOrValue<U128> {
         assert_one_yocto();
+        self.assert_contract_running();
         let sender_id = env::predecessor_account_id();
         self.internal_mft_transfer(
             token_id.clone(),
