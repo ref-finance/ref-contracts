@@ -268,10 +268,6 @@ impl Contract {
         let prev_storage = env::storage_usage();
         let id = self.pools.len() as u64;
         self.pools.push(&pool);
-        // to prepare for lostfound storage
-        for token in pool.tokens() {
-            self.internal_lostfound(token, 0);
-        }
         self.internal_check_storage(prev_storage);
         id
     }
@@ -412,7 +408,7 @@ mod tests {
         contract.extend_whitelisted_tokens(tokens.clone());
         testing_env!(context
             .predecessor_account_id(account_id.clone())
-            .attached_deposit(env::storage_byte_cost() * 800)
+            .attached_deposit(env::storage_byte_cost() * 300)
             .build());
         let pool_id = contract.add_simple_pool(tokens, 25);
         testing_env!(context
