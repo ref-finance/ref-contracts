@@ -333,14 +333,14 @@ fn test_withdraw_failure() {
     assert_eq!(balances_after.get(&dai()).unwrap(), &to_yocto("105").into());
 }
 
-fn direct_swap(user: &UserAccount, contract: &ContractAccount<TestToken>, force: u8) {
+fn direct_swap(user: &UserAccount, contract: &ContractAccount<TestToken>) {
     call!(
         user,
         contract.ft_transfer_call(
             to_va(swap()),
             to_yocto("1").into(),
             None,
-            format!("{{\"force\": {}, \"actions\": [{{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"eth\", \"min_amount_out\": \"1\"}}]}}", force)
+            format!("{{\"actions\": [{{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"eth\", \"min_amount_out\": \"1\"}}]}}")
         ),
         deposit = 1
     ).assert_success();
@@ -367,42 +367,37 @@ fn test_direct_swap() {
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("10"));
     assert_eq!(balance_of(&token2, &new_user.account_id), to_yocto("0"));
 
-    // Test that if non-force and account doesn't exist for this user, it fails on swap and returns everything.
-    direct_swap(&new_user, &token1, 0);
-    assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("10"));
-    assert_eq!(balance_of(&token2, &new_user.account_id), to_yocto("0"));
-
-    // Test that if force and token2 account doesn't exist, the balance of token1 is taken, owner received token2.
-    direct_swap(&new_user, &token1, 1);
+    // Test that token2 account doesn't exist, the balance of token1 is taken, owner received token2.
+    direct_swap(&new_user, &token1);
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("9"));
     assert_eq!(balance_of(&token2, &new_user.account_id), to_yocto("0"));
     assert!(mft_balance_of(&pool, &token2.account_id(), &owner.account_id) > to_yocto("1"));
 
-    // Test that if force and token2 account exists, everything works.
+    // Test that token2 account exists, everything works.
     call!(
         new_user,
         token2.storage_deposit(None, None),
         deposit = to_yocto("1")
     )
     .assert_success();
-    direct_swap(&new_user, &token1, 1);
+    direct_swap(&new_user, &token1);
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("8"));
     assert!(balance_of(&token2, &new_user.account_id) > to_yocto("1"));
 
-    // Test that if force is false and account in pool and token2 account exist, everything works.
+    // Test that account in pool and token2 account exist, everything works.
     call!(
         new_user,
         pool.storage_deposit(None, None),
         deposit = to_yocto("1")
     )
     .assert_success();
-    direct_swap(&new_user, &token1, 0);
+    direct_swap(&new_user, &token1);
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("7"));
     assert!(balance_of(&token2, &new_user.account_id) > to_yocto("2"));
 
-    // Test that if force is false, account in pool exists but token2 account doesn't exist, final balance is in the pool.
+    // Test that account in pool exists but token2 account doesn't exist, final balance is in the pool.
     call!(new_user, token2.storage_unregister(Some(true)), deposit = 1).assert_success();
-    direct_swap(&new_user, &token1, 0);
+    direct_swap(&new_user, &token1);
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("6"));
     assert_eq!(balance_of(&token2, &new_user.account_id), 0);
     assert!(mft_balance_of(&pool, &token2.account_id(), &new_user.account_id) > to_yocto("0.5"));

@@ -19,6 +19,7 @@ pub const ERR25_CALLBACK_POST_WITHDRAW_INVALID: &str =
 pub const ERR27_DEPOSIT_NEEDED: &str = 
     "E27: attach 1yN to swap tokens not in whitelist";
 pub const ERR28_WRONG_MSG_FORMAT: &str = "E28: Illegal msg in ft_transfer_call";
+pub const ERR29_ILLEGAL_WITHDRAW_AMOUNT: &str = "E29: Illegal withdraw amount";
 
 // Liquidity operations.
 
@@ -29,3 +30,6 @@ pub const ERR33_TRANSFER_TO_SELF: &str = "E33: transfer to self";
 // Action result.
 
 pub const ERR41_WRONG_ACTION_RESULT: &str = "E41: wrong action result type";
+
+// Contract Level
+pub const ERR51_CONTRACT_PAUSED: &str = "E51: contract paused";

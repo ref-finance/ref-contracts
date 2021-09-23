@@ -11,6 +11,17 @@ use crate::*;
 
 #[derive(Serialize)]
 #[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Deserialize, Debug))]
+pub struct ContractMetadata {
+    pub version: String,
+    pub owner: AccountId,
+    pub guardians: Vec<AccountId>,
+    pub pool_count: u64,
+    pub state: RunningState,
+}
+
+#[derive(Serialize, Deserialize, PartialEq)]
+#[serde(crate = "near_sdk::serde")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 pub struct RefStorageState {
     pub deposit: U128,
@@ -50,6 +61,23 @@ impl From<Pool> for PoolInfo {
 
 #[near_bindgen]
 impl Contract {
+
+    /// Return contract basic info
+    pub fn metadata(&self) -> ContractMetadata {
+        ContractMetadata {
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            owner: self.owner_id.clone(),
+            guardians: self.guardians.to_vec(),
+            pool_count: self.pools.len(),
+            state: self.state.clone(),
+        }
+    }
+
+    /// Only get guardians info
+    pub fn get_guardians(&self) -> Vec<AccountId> {
+        self.guardians.to_vec()
+    }
+    
     /// Returns semver of this contract.
     pub fn version(&self) -> String {
         env!("CARGO_PKG_VERSION").to_string()
@@ -103,14 +131,12 @@ impl Contract {
     /// Returns balances of the deposits for given user outside of any pools.
     /// Returns empty list if no tokens deposited.
     pub fn get_deposits(&self, account_id: ValidAccountId) -> HashMap<AccountId, U128> {
-        // let acc: Account = self.internal_unwrap_or_default_account(account_id.as_ref());
-        // acc.tokens
-        // .to_vec()
-        // .iter()
-        // .map(|(token, balance)| (token.clone(), U128(*balance)))
-        // .collect()
-        if let Some(va) = self.accounts.get(account_id.as_ref()) {
-            va.tokens_to_hashmap()
+        let wrapped_account = self.internal_get_account(account_id.as_ref());
+        if let Some(account) = wrapped_account {
+            account.get_tokens()
+                .iter()
+                .map(|token| (token.clone(), U128(account.get_balance(token).unwrap())))
+                .collect()
         } else {
             HashMap::new()
         }
@@ -118,13 +144,8 @@ impl Contract {
 
     /// Returns balance of the deposit for given user outside of any pools.
     pub fn get_deposit(&self, account_id: ValidAccountId, token_id: ValidAccountId) -> U128 {
-        // self.internal_get_deposit(account_id.as_ref(), token_id.as_ref())
-        //     .into()
-        if let Some(va) = self.accounts.get(account_id.as_ref()) {
-            *(va.tokens_to_hashmap().get(token_id.as_ref()).unwrap_or(&U128(0)))
-        } else {
-            U128(0)
-        }
+        self.internal_get_deposit(account_id.as_ref(), token_id.as_ref())
+            .into()
     }
 
     /// Given specific pool, returns amount of token_out recevied swapping amount_in of token_in.
@@ -147,19 +168,21 @@ impl Contract {
 
     /// Get specific user whitelisted tokens.
     pub fn get_user_whitelisted_tokens(&self, account_id: ValidAccountId) -> Vec<AccountId> {
-        // let acc: Account = self.internal_unwrap_or_default_account(account_id);
-        // acc.tokens.keys().collect()
-        if let Some(va) = self.accounts.get(account_id.as_ref()) {
-            va.tokens_to_hashmap().keys().map(|x| x.clone()).collect()
-        } else {
-            Vec::new()
-        }
+        self.internal_get_account(account_id.as_ref())
+            .map(|x| x.get_tokens())
+            .unwrap_or_default()
     }
 
     /// Get user's storage deposit and needed in the account of current version
     pub fn get_user_storage_state(&self, account_id: ValidAccountId) -> Option<RefStorageState> {
-        if let Some(va) = self.accounts.get(account_id.as_ref()) {
-            Some(va.storage_state())
+        let acc = self.internal_get_account(account_id.as_ref());
+        if let Some(account) = acc {
+            Some(
+                RefStorageState {
+                    deposit: U128(account.near_amount),
+                    usage: U128(account.storage_usage()),
+                }
+            )           
         } else {
             None
         }
