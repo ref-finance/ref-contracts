@@ -1,4 +1,4 @@
-use near_contract_standards::fungible_token::metadata::{FungibleTokenMetadata};
+use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{ext_contract, near_bindgen, Balance, PromiseOrValue};
 
@@ -36,7 +36,7 @@ enum TokenOrPool {
 /// This is used to parse token_id fields in mft protocol used in ref,
 /// So, if we choose #nn as a partern, should announce it in mft protocol.
 /// cause : is not allowed in a normal account id, it can be a partern leading char
-fn try_identify_pool_id(token_id: &String) ->Result<u64, &'static str> {
+fn try_identify_pool_id(token_id: &String) -> Result<u64, &'static str> {
     if token_id.starts_with(":") {
         if let Ok(pool_id) = str::parse::<u64>(&token_id[1..token_id.len()]) {
             Ok(pool_id)
@@ -82,16 +82,8 @@ impl Contract {
                 );
             }
             TokenOrPool::Token(token_id) => {
-                let mut sender_account: Account = self
-                    .accounts
-                    .get(&sender_id)
-                    .expect(ERR10_ACC_NOT_REGISTERED)
-                    .into();
-                let mut receiver_account: Account = self
-                    .accounts
-                    .get(receiver_id)
-                    .expect(ERR10_ACC_NOT_REGISTERED)
-                    .into();
+                let mut sender_account: Account = self.internal_unwrap_account(&sender_id);
+                let mut receiver_account: Account = self.internal_unwrap_account(&receiver_id);
                 
                 sender_account.withdraw(&token_id, amount);
                 receiver_account.deposit(&token_id, amount);

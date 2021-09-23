@@ -1,14 +1,12 @@
-use near_sdk::json_types::{U128, ValidAccountId};
+use near_sdk::json_types::{U128};
 use near_sdk_sim::{call, to_yocto};
-
-use ref_exchange::ContractContract as Exchange;
 
 use crate::common::utils::*;
 pub mod common;
 
 #[test]
 fn storage_scenario_01() {
-    let (root, owner, pool, token1, token2, _) = setup_pool_with_liquidity();
+    let (root, _, pool, token1, _, _) = setup_pool_with_liquidity();
     let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
 
     println!("Storage Case 0101: withdraw MAX using None");
@@ -20,7 +18,7 @@ fn storage_scenario_01() {
     .assert_success();
     let sb = get_storage_balance(&pool, new_user.valid_account_id()).unwrap();
     assert_eq!(sb.total.0, to_yocto("1"));
-    assert_eq!(sb.total.0 - sb.available.0, to_yocto("0.00098"));
+    assert_eq!(sb.total.0 - sb.available.0, to_yocto("0.00102"));
     let orig_user_balance = new_user.account().unwrap().amount;
     
     // withdraw as much storage near as he can
@@ -32,7 +30,7 @@ fn storage_scenario_01() {
     out_come.assert_success();
 
     let sb = get_storage_balance(&pool, new_user.valid_account_id()).unwrap();
-    assert_eq!(sb.total.0, to_yocto("0.00098"));
+    assert_eq!(sb.total.0, to_yocto("0.00102"));
     assert_eq!(sb.available.0, to_yocto("0"));
     // println!("{}", new_user.account().unwrap().amount - orig_user_balance);
     assert!(

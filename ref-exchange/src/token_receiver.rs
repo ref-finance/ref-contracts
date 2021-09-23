@@ -1,6 +1,8 @@
+
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{serde_json, PromiseOrValue};
+use std::collections::HashMap;
 
 use crate::*;
 
@@ -20,65 +22,11 @@ enum TokenReceiverMessage {
     },
 }
 
-impl Contract {
-    /// Executes set of actions on potentially virtual account.
-    /// Returns amounts to send to the sender directly.
-    fn internal_direct_actions(
-        &mut self,
-        token_in: AccountId,
-        amount_in: Balance,
-        sender_id: &AccountId,
-        force: bool,
-        referral_id: Option<AccountId>,
-        actions: &[Action],
-    ) -> Vec<(AccountId, Balance)> {
-        // [AUDIT_12] always save back account for a resident user
-        let mut is_resident_user: bool = true;
-        let mut initial_account: Account = self.accounts.get(sender_id).unwrap_or_else(|| {
-            is_resident_user = false;
-            if !force {
-                env::panic(ERR10_ACC_NOT_REGISTERED.as_bytes());
-            } else {
-                Account::default().into()
-            }
-        }).into();
-        initial_account.deposit(&token_in, amount_in);
-        let mut account = initial_account.clone();
-        let _ = self.internal_execute_actions(
-            &mut account,
-            &referral_id,
-            &actions,
-            // [AUDIT_02]
-            ActionResult::Amount(U128(amount_in)),
-        );
-        let mut result = vec![];
-        for (token, amount) in account.tokens.clone().into_iter() {
-            let value = initial_account.tokens.get(&token);
-            // Remove tokens that were transient from the account.
-            if amount == 0 && value.is_none() {
-                account.tokens.remove(&token);
-            } else {
-                let initial_amount = *value.unwrap_or(&0);
-                if amount > initial_amount {
-                    result.push((token.clone(), amount - initial_amount));
-                    account.tokens.insert(token, initial_amount);
-                }
-            }
-        }
-        // [AUDIT_12] always save back account for a resident user
-        if is_resident_user {
-            // To avoid race conditions, we actually going to insert 0 to all changed tokens and save that.
-            self.internal_save_account(sender_id, account);
-        }
-        result
-    }
-}
-
 #[near_bindgen]
-#[allow(unreachable_code)]
 impl FungibleTokenReceiver for Contract {
     /// Callback on receiving tokens by this contract.
     /// `msg` format is either "" for deposit or `TokenReceiverMessage`.
+    #[allow(unreachable_code)]
     fn ft_on_transfer(
         &mut self,
         sender_id: ValidAccountId,
@@ -94,31 +42,6 @@ impl FungibleTokenReceiver for Contract {
         } else {
             // [AUDIT14] shutdown instant swap from interface
             env::panic(b"Instant Swap Feature Not Open Yet");
-
-            let message =
-                serde_json::from_str::<TokenReceiverMessage>(&msg).expect("ERR_MSG_WRONG_FORMAT");
-            match message {
-                TokenReceiverMessage::Execute {
-                    referral_id,
-                    force,
-                    actions,
-                } => {
-                    let referral_id = referral_id.map(|x| x.to_string());
-                    let out_amounts = self.internal_direct_actions(
-                        token_in,
-                        amount.0,
-                        sender_id.as_ref(),
-                        force != 0,
-                        referral_id,
-                        &actions,
-                    );
-                    for (token_out, amount_out) in out_amounts.into_iter() {
-                        self.internal_send_tokens(sender_id.as_ref(), &token_out, amount_out);
-                    }
-                    // Even if send tokens fails, we don't return funds back to sender.
-                    PromiseOrValue::Value(U128(0))
-                }
-            }
         }
     }
 }

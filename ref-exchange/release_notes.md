@@ -1,5 +1,12 @@
 # Release Notes
 
+### Version 1.2.0
+---
+1. upgrade inner account;
+    * inner account upgrade to use `UnorderedMap`;
+    * keep exist deposits in `legacy_tokens` in `HashMap`; 
+    * move it to `tokens` in `UnorderedMap` when deposit or withdraw token;
+    
 ### Version 1.1.0
 ---
 1. feature Guardians;

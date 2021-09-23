@@ -14,6 +14,7 @@ use test_token::ContractContract as TestToken;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
+    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_102.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange_release.wasm",
 }
 
@@ -151,6 +152,11 @@ pub fn get_whitelist(pool: &ContractAccount<Exchange>) -> Vec<String> {
     view!(pool.get_whitelisted_tokens()).unwrap_json::<Vec<String>>()
 }
 
+/// get ref-exchange's user whitelisted tokens
+pub fn get_user_tokens(pool: &ContractAccount<Exchange>, account_id: ValidAccountId) -> Vec<String> {
+    view!(pool.get_user_whitelisted_tokens(account_id)).unwrap_json::<Vec<String>>()
+}
+
 pub fn get_storage_balance(
     pool: &ContractAccount<Exchange>, 
     account_id: ValidAccountId
@@ -161,6 +167,19 @@ pub fn get_storage_balance(
     } else {
         // near_sdk::serde_json::
         let ret: StorageBalance = from_value(sb).unwrap();
+        Some(ret)
+    }
+}
+
+pub fn get_storage_state(
+    pool: &ContractAccount<Exchange>, 
+    account_id: ValidAccountId
+) -> Option<RefStorageState> {
+    let sb = view!(pool.get_user_storage_state(account_id)).unwrap_json_value();
+    if let Value::Null = sb {
+        None
+    } else {
+        let ret: RefStorageState = from_value(sb).unwrap();
         Some(ret)
     }
 }
@@ -292,3 +311,99 @@ pub fn setup_pool_with_liquidity() -> (
     .assert_success();
     (root, owner, pool, token1, token2, token3)
 }
+
+pub fn setup_old_pool_with_liquidity() -> (
+    UserAccount,
+    UserAccount,
+    ContractAccount<Exchange>,
+    ContractAccount<TestToken>,
+    ContractAccount<TestToken>,
+    ContractAccount<TestToken>,
+) {
+    let root = init_simulator(None);
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let pool = deploy!(
+        contract: Exchange,
+        contract_id: swap(),
+        bytes: &PREV_EXCHANGE_WASM_BYTES,
+        signer_account: root,
+        init_method: new(to_va("owner".to_string()), 4, 1)
+    );
+    let token1 = test_token(&root, dai(), vec![swap()]);
+    let token2 = test_token(&root, eth(), vec![swap()]);
+    let token3 = test_token(&root, usdt(), vec![swap()]);
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth()), to_va(usdt())])
+    );
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(eth()), to_va(usdt())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(usdt()), to_va(dai())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        token1.ft_transfer_call(to_va(swap()), to_yocto("105").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        token2.ft_transfer_call(to_va(swap()), to_yocto("110").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        token3.ft_transfer_call(to_va(swap()), to_yocto("110").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_liquidity(0, vec![U128(to_yocto("10")), U128(to_yocto("20"))], None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_liquidity(1, vec![U128(to_yocto("20")), U128(to_yocto("10"))], None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_liquidity(1, vec![U128(to_yocto("10")), U128(to_yocto("10"))], None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+    (root, owner, pool, token1, token2, token3)
+} 
