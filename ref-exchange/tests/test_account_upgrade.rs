@@ -93,7 +93,7 @@ fn account_upgrade_enough_storage() {
     )
     .assert_success();
 
-    assert_eq!(get_version(&pool), String::from("1.2.0"));
+    assert_eq!(get_version(&pool), String::from("1.3.0"));
 
     let ss = get_storage_state(&pool, user.valid_account_id()).unwrap();
     assert_eq!(ss.deposit.0, to_yocto("0.00350"));
@@ -208,7 +208,7 @@ fn account_upgrade_not_enough_storage() {
         0,
     )
     .assert_success();
-    assert_eq!(get_version(&pool), String::from("1.2.0"));
+    assert_eq!(get_version(&pool), String::from("1.3.0"));
 
     // deposit would fail
     let out_come = call!(

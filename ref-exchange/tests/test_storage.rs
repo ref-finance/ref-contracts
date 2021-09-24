@@ -20,7 +20,7 @@ fn storage_scenario_01() {
     assert_eq!(sb.total.0, to_yocto("1"));
     assert_eq!(sb.total.0 - sb.available.0, to_yocto("0.00102"));
     let orig_user_balance = new_user.account().unwrap().amount;
-    
+
     // withdraw as much storage near as he can
     let out_come = call!(
         new_user,
@@ -72,7 +72,7 @@ fn storage_scenario_01() {
     let prev_sb = get_storage_balance(&pool, new_user.valid_account_id()).unwrap();
     let orig_user_balance = new_user.account().unwrap().amount;
     // println!("{:#?}", prev_sb);
-    
+
     let out_come = call!(
         new_user,
         pool.storage_withdraw(Some(U128(to_yocto("1")))),
@@ -88,7 +88,7 @@ fn storage_scenario_01() {
     println!("Storage Case 0105: storage withdraw specific amount");
     let prev_sb = get_storage_balance(&pool, new_user.valid_account_id()).unwrap();
     let orig_user_balance = new_user.account().unwrap().amount;
-    
+
     let out_come = call!(
         new_user,
         pool.storage_withdraw(Some(U128(to_yocto("0.5")))),
