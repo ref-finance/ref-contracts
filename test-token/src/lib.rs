@@ -1,5 +1,5 @@
 use near_contract_standards::fungible_token::metadata::{
-    FungibleTokenMetadata, FungibleTokenMetadataProvider,
+    FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
 };
 use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
@@ -12,19 +12,26 @@ near_sdk::setup_alloc!();
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 pub struct Contract {
     token: FungibleToken,
+    name: String,
+    symbol: String,
+    icon: Option<String>,
+    decimals: u8,
 }
 
 #[near_bindgen]
 impl Contract {
     #[init]
-    pub fn new() -> Self {
+    pub fn new(name: String, symbol: String, decimals: u8) -> Self {
         Self {
             token: FungibleToken::new(b"t".to_vec()),
+            name,
+            symbol,
+            icon: None,
+            decimals,
         }
     }
 
     pub fn mint(&mut self, account_id: ValidAccountId, amount: U128) {
-        self.token.internal_register_account(account_id.as_ref());
         self.token
             .internal_deposit(account_id.as_ref(), amount.into());
     }
@@ -32,6 +39,22 @@ impl Contract {
     pub fn burn(&mut self, account_id: ValidAccountId, amount: U128) {
         self.token
             .internal_withdraw(account_id.as_ref(), amount.into());
+    }
+
+    pub fn set_token_name(&mut self, name: String, symbol: String) {
+        assert_eq!(env::predecessor_account_id(), env::current_account_id(), "NO PERMISSION");
+        self.name = name;
+        self.symbol = symbol;
+    }
+
+    pub fn set_icon(&mut self, icon: String) {
+        assert_eq!(env::predecessor_account_id(), env::current_account_id(), "NO PERMISSION");
+        self.icon = Some(icon);
+    }
+
+    pub fn set_decimals(&mut self, dec: u8) {
+        assert_eq!(env::predecessor_account_id(), env::current_account_id(), "NO PERMISSION");
+        self.decimals = dec;
     }
 }
 
@@ -41,7 +64,15 @@ near_contract_standards::impl_fungible_token_storage!(Contract, token);
 #[near_bindgen]
 impl FungibleTokenMetadataProvider for Contract {
     fn ft_metadata(&self) -> FungibleTokenMetadata {
-        unimplemented!()
+        FungibleTokenMetadata {
+            spec: FT_METADATA_SPEC.to_string(),
+            name: self.name.clone(),
+            symbol: self.symbol.clone(),
+            icon: self.icon.clone(),
+            reference: None,
+            reference_hash: None,
+            decimals: self.decimals,
+        }
     }
 }
 
@@ -56,7 +87,7 @@ mod tests {
     fn test_basics() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.build());
-        let mut contract = Contract::new();
+        let mut contract = Contract::new(String::from("TBD"), String::from("TBD"), 24);
         testing_env!(context
             .attached_deposit(125 * env::storage_byte_cost())
             .build());
