@@ -26,4 +26,6 @@ near call token.testnet mint '{"account_id": "alice.testnet", "amount": "1000000
 
 # burn fake token
 near call token.testnet burn '{"account_id": "alice.testnet", "amount": "1000000000000"}' --account_id=alice.testnet
+
+# other operations can be found in NEP141 specifics
 ```
