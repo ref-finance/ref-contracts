@@ -525,7 +525,7 @@ fn do_add_liquidity(ctx: &mut OperationContext, rng: &mut Pcg32, root: &UserAcco
 
     let tokens = simple_pool_info.token_account_ids;
 
-    let (liquidity1, liquidity2) = (to_yocto("10"), to_yocto("10"));
+    let (liquidity1, liquidity2) = (to_yocto("20"), to_yocto("20"));
 
     loop{
         let (scenario, token1_account, token2_account, token1_deposit, token2_deposit) = 
@@ -535,10 +535,16 @@ fn do_add_liquidity(ctx: &mut OperationContext, rng: &mut Pcg32, root: &UserAcco
         match scenario {
             Scenario::Normal => {
                 if token1_deposit <  liquidity1{
+                    let out_come = add_liquidity_action(pool, operator, simple_pool_id, liquidity1, liquidity2);
+                    assert_eq!(get_error_count(&out_come), 1);
+                    assert!(get_error_status(&out_come).contains("E22: not enough tokens in deposit"));
                     add_token_deposit(ctx, root, operator, tokens.get(0).unwrap(), token1_account, liquidity1, token1_deposit);
                 }
 
                 if token2_deposit < liquidity2 {
+                    let out_come = add_liquidity_action(pool, operator, simple_pool_id, liquidity1, liquidity2);
+                    assert_eq!(get_error_count(&out_come), 1);
+                    assert!(get_error_status(&out_come).contains("E22: not enough tokens in deposit"));
                     add_token_deposit(ctx, root, operator, tokens.get(1).unwrap(), token2_account, liquidity2, token2_deposit);
                 }
 
