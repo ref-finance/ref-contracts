@@ -94,14 +94,15 @@ impl StableSwap {
         }
     }
 
+    /// given $A$, $D_k$, $D_{k,prod}$ and $\sum x_i$, calculate $D_{k+1}$ 
     fn compute_next_d(
         &self,
-        amp_factor: u128,
-        d_init: U256,
-        d_prod: U256,
-        sum_x: Balance,
+        amp_factor: u128, // $ A $
+        d_init: U256, // $ D_k $
+        d_prod: U256, // $ D_{k,prod} = \frac{D_k^{n+1}}{n^n \prod x_{i}} $
+        sum_x: Balance, // $ \sum x_i $
     ) -> Option<U256> {
-        let ann = amp_factor.checked_mul(N_COINS.into())?;
+        let ann = amp_factor.checked_mul(N_COINS.checked_pow(N_COINS)?.into())?;
         let leverage = (sum_x as u128).checked_mul(ann.into())?;
         // d = (ann * sum_x + d_prod * n_coins) * d / ((ann - 1) * d + (n_coins + 1) * d_prod)
         let numerator = d_init.checked_mul(
@@ -167,6 +168,7 @@ impl StableSwap {
             let mut d_prev: U256;
             let mut d: U256 = sum_x.into();
             for _ in 0..256 {
+                // $ D_{k,prod} = \frac{D_k^{n+1}}{n^n \prod x_{i}} = \frac{D^3}{4xy} $
                 let mut d_prod = d;
                 d_prod = d_prod
                     .checked_mul(d)?
@@ -243,7 +245,7 @@ impl StableSwap {
     /// y**2 + b*y = c
     pub fn compute_y_raw(&self, x: Balance, d: U256) -> Option<U256> {
         let amp_factor = self.compute_amp_factor()?;
-        let ann = amp_factor.checked_mul(N_COINS.into())?; // A * n ** n
+        let ann = amp_factor.checked_mul(N_COINS.checked_pow(N_COINS)?.into())?; // A * n ** n
 
         // sum' = prod' = x
         // c =  D ** (n + 1) / (n ** (2 * n) * prod' * A)
