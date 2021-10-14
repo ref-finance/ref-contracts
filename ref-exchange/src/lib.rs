@@ -123,6 +123,7 @@ impl Contract {
     pub fn add_stable_swap_pool(
         &mut self,
         tokens: Vec<ValidAccountId>,
+        decimals: Vec<u8>,
         fee: u32,
         amp_factor: u64,
     ) -> u64 {
@@ -130,6 +131,7 @@ impl Contract {
         self.internal_add_pool(Pool::StableSwapPool(StableSwapPool::new(
             self.pools.len() as u32,
             tokens,
+            decimals,
             amp_factor as u128,
             fee + self.exchange_fee + self.referral_fee,
         )))

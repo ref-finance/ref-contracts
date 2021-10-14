@@ -6,18 +6,22 @@ use near_sdk::{env, AccountId, Balance, Timestamp};
 use crate::errors::{ERR13_LP_NOT_REGISTERED, ERR14_LP_ALREADY_REGISTERED};
 use crate::fees::SwapFees;
 use crate::stable_swap::math::{
-    Fees, StableSwap, SwapResult, MAX_AMP, MAX_AMP_CHANGE, MIN_AMP, MIN_RAMP_DURATION, N_COINS,
+    Fees, StableSwap, SwapResult, MAX_AMP, MAX_AMP_CHANGE, MIN_AMP, MIN_RAMP_DURATION,
 };
 use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR};
 use crate::StorageKey;
 
 mod math;
 
+pub const TARGET_DECIMAL: u8 = 18;
+
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct StableSwapPool {
     /// List of tokens in the pool.
     pub token_account_ids: Vec<AccountId>,
-    /// How much NEAR this contract has.
+    /// Each decimals for tokens in the pool
+    pub token_decimals: Vec<u8>,
+    /// token amounts in original decimal.
     pub amounts: Vec<Balance>,
     /// Volumes accumulated by this pool.
     pub volumes: Vec<SwapVolume>,
@@ -41,6 +45,7 @@ impl StableSwapPool {
     pub fn new(
         id: u32,
         token_account_ids: Vec<ValidAccountId>,
+        token_decimals: Vec<u8>,
         amp_factor: u128,
         total_fee: u32,
     ) -> Self {
@@ -48,14 +53,10 @@ impl StableSwapPool {
             amp_factor >= MIN_AMP && amp_factor <= MAX_AMP,
             "ERR_WRONG_AMP"
         );
-        assert_eq!(
-            token_account_ids.len() as u32,
-            math::N_COINS,
-            "ERR_WRONG_TOKEN_COUNT"
-        );
         assert!(total_fee < FEE_DIVISOR, "ERR_FEE_TOO_LARGE");
         Self {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
+            token_decimals,
             amounts: vec![0u128; token_account_ids.len()],
             volumes: vec![SwapVolume::default(); token_account_ids.len()],
             total_fee,
@@ -68,7 +69,17 @@ impl StableSwapPool {
         }
     }
 
-    /// Returns token index for given pool.
+    fn get_invariant(&self) -> StableSwap {
+        StableSwap::new(
+            self.init_amp_factor,
+            self.target_amp_factor,
+            env::block_timestamp(),
+            self.init_amp_time,
+            self.stop_amp_time,
+        )
+    }
+
+    /// Returns token index for given token account_id.
     fn token_index(&self, token_id: &AccountId) -> usize {
         self.token_account_ids
             .iter()
@@ -86,39 +97,39 @@ impl StableSwapPool {
         self.volumes.clone()
     }
 
-    /// Add liquidity into the pool.
-    /// Allows to add liquidity of a subset of tokens.
-    pub fn add_liquidity(
-        &mut self,
-        sender_id: &AccountId,
-        amounts: &mut Vec<Balance>,
-        fees: &SwapFees,
-    ) -> Balance {
-        assert_eq!(
-            amounts.len(),
-            self.token_account_ids.len(),
-            "ERR_WRONG_TOKEN_COUNT"
-        );
-        let invariant = StableSwap::new(
-            self.init_amp_factor,
-            self.target_amp_factor,
-            env::block_timestamp(),
-            self.init_amp_time,
-            self.stop_amp_time,
-        );
+    /// Add liquidity into the pool, admin_fee free.
+    /// Allows to add liquidity of a subset of tokens,
+    /// by set other tokens balance into 0.
+    pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>, fees: &SwapFees) -> Balance {
+        assert_eq!(amounts.len(), self.token_account_ids.len(), "ERR_WRONG_TOKEN_COUNT");
+
+        let invariant = self.get_invariant();
+
+        // make amounts into comparable-amounts
+        let mut c_amounts = amounts.clone();
+        let mut c_current_amounts = self.amounts.clone();
+        for (index, value) in self.token_decimals.iter().enumerate() {
+            let factor = 10_u32.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
+            c_amounts[index] *= factor as u128;
+            c_current_amounts[index] *= factor as u128;
+        }
+
         let new_shares = if self.shares_total_supply == 0 {
-            // Bootstrapping the pool.
+            // Bootstrapping the pool, request providing all non-zero balances,
+            // and all fee free.
+            for c_amount in &c_amounts {
+                assert!(*c_amount > 0, "ERR_ZERO_AMOUNT_IN_INIT_STABLE_POOL");
+            }
             invariant
-                .compute_d(amounts[0], amounts[1])
+                .compute_d_ex(&c_amounts)
                 .expect("ERR_CALC_FAILED")
                 .as_u128()
         } else {
+            // Subsequent add liquidity will charge fee according to difference with ideal balance portions
             invariant
-                .compute_lp_amount_for_deposit(
-                    amounts[0],
-                    amounts[1],
-                    self.amounts[0],
-                    self.amounts[1],
+                .compute_lp_amount_for_deposit_ex(
+                    c_amounts.clone(),
+                    c_current_amounts.clone(),
                     self.shares_total_supply,
                     &Fees::new(self.total_fee, &fees),
                 )
@@ -127,76 +138,88 @@ impl StableSwapPool {
         };
 
         // TODO: add slippage check on the LP tokens.
-        self.amounts[0] += amounts[0];
-        self.amounts[1] += amounts[1];
+        // assert!(new_shares > min_shares, "ERR_SLIPPAGE");
+
+        // convert c_amount to amount and added to pool
+        for (index, value) in self.token_decimals.iter().enumerate() {
+            let factor = 10_u32.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
+            self.amounts[index] = (c_amounts[index] + c_current_amounts[index]).checked_div(factor.into()).unwrap();
+        }
 
         self.mint_shares(sender_id, new_shares);
         new_shares
     }
 
-    /// Remove liquidity from the pool.
-    /// Allows to remove liquidity of a subset of tokens, by providing 0 in `min_amount` for the tokens to not withdraw.
-    pub fn remove_liquidity(
-        &mut self,
+    /// balanced removal of liquidity would be free of charge.
+    pub fn remove_liquidity_by_shares(&mut self,
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
-        fees: &SwapFees,
     ) -> Vec<Balance> {
-        assert_eq!(
-            min_amounts.len(),
-            self.token_account_ids.len(),
-            "ERR_WRONG_TOKEN_COUNT"
-        );
+        let n_coins = self.token_account_ids.len();
+        assert_eq!(min_amounts.len(), n_coins, "ERR_WRONG_TOKEN_COUNT");
         let prev_shares_amount = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
         assert!(prev_shares_amount >= shares, "ERR_NOT_ENOUGH_SHARES");
-        let mut result = vec![0u128; N_COINS as usize];
-        let invariant = StableSwap::new(
-            self.init_amp_factor,
-            self.target_amp_factor,
-            env::block_timestamp(),
-            self.init_amp_time,
-            self.stop_amp_time,
-        );
-        let mut fee_amounts = vec![0u128; N_COINS as usize];
-        let stable_swap_fees = Fees::new(self.total_fee, &fees);
-        for (idx, min_amount) in min_amounts.iter().enumerate() {
-            if *min_amount != 0 {
-                let (amount_out, fee) = invariant
-                    .compute_withdraw_one(
-                        shares,
-                        self.shares_total_supply,
-                        self.amounts[idx],
-                        self.amounts[1 - idx],
-                        &stable_swap_fees,
-                    )
-                    .expect("ERR_CALC");
-                assert!(amount_out >= *min_amount, "ERR_SLIPPAGE");
-                fee_amounts[idx] += fee;
-                result[idx] = amount_out;
-            }
+        let mut result = vec![0u128; n_coins];
+        
+        for i in 0..n_coins {
+            result[i] = self.amounts[i]
+                .checked_mul(shares).unwrap()
+                .checked_div(prev_shares_amount).unwrap();
+            assert!(result[i] >= min_amounts[i], "ERR_SLIPPAGE");
+            self.amounts[i] = self.amounts[i].checked_sub(result[i]).unwrap();
         }
-        println!("fees: {:?}", fee_amounts);
-        for i in 0..N_COINS {
-            self.amounts[i as usize] = self.amounts[i as usize]
-                .checked_sub(result[i as usize])
-                .expect("ERR_CALC");
-        }
-        self.burn_shares(&sender_id, prev_shares_amount, shares);
-        env::log(
-            format!(
-                "{} shares of liquidity removed: receive back {:?}",
-                shares,
-                result
-                    .iter()
-                    .zip(self.token_account_ids.iter())
-                    .map(|(amount, token_id)| format!("{} {}", amount, token_id))
-                    .collect::<Vec<String>>(),
-            )
-            .as_bytes(),
-        );
+
         result
     }
+
+    /// Remove liquidity from the pool by fixed tokens-out,
+    /// allows to remove liquidity of a subset of tokens, by providing 0 in `amounts`.
+    /// Fee will be charged according to diff between ideal token portions.
+    pub fn remove_liquidity_by_tokens(
+        &mut self, 
+        sender_id: &AccountId, 
+        amounts: Vec<Balance>, 
+        max_burn_shares: Balance,
+        fees: &SwapFees,
+    ) -> Balance {
+        let n_coins = self.token_account_ids.len();
+        assert_eq!(amounts.len(), n_coins, "ERR_WRONG_TOKEN_COUNT");
+        let prev_shares_amount = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
+
+        // make amounts into comparable-amounts
+        let mut c_amounts = amounts.clone();
+        let mut c_current_amounts = self.amounts.clone();
+        for (index, value) in self.token_decimals.iter().enumerate() {
+            let factor = 10_u32.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
+            c_amounts[index] *= factor as u128;
+            c_current_amounts[index] *= factor as u128;
+        }
+
+        let invariant = self.get_invariant();
+
+        let (burn_shares, admin_fees) = invariant.compute_lp_amount_for_withdraw(
+            c_amounts.clone(),
+            c_current_amounts.clone(), 
+            self.shares_total_supply, 
+            &Fees::new(self.total_fee, &fees)).expect("ERR_WITHDRAW_ERR");
+        
+        assert!(burn_shares <= prev_shares_amount, "ERR_NOT_ENOUGH_SHARE_TO_WITHDRAW");
+        assert!(burn_shares <= max_burn_shares, "ERR_SLIPPAGE");
+
+        // convert c_amount to amount and subtract from pool
+        for (index, value) in self.token_decimals.iter().enumerate() {
+            let factor = 10_u32.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
+            self.amounts[index] = c_current_amounts[index]
+                .checked_sub(c_amounts[index]).unwrap()
+                .checked_sub(admin_fees[index]).unwrap()
+                .checked_div(factor.into()).unwrap();
+        }
+        self.burn_shares(&sender_id, prev_shares_amount, burn_shares);
+
+        burn_shares
+    } 
+
     /// Returns number of tokens in outcome, given amount.
     /// Tokens are provided as indexes into token list for given pool.
     fn internal_get_return(
@@ -206,21 +229,39 @@ impl StableSwapPool {
         token_out: usize,
         fees: &SwapFees,
     ) -> SwapResult {
-        let invariant = StableSwap::new(
-            self.init_amp_factor,
-            self.target_amp_factor,
-            env::block_timestamp(),
-            self.init_amp_time,
-            self.stop_amp_time,
-        );
-        invariant
-            .swap_to(
-                amount_in,
-                self.amounts[token_in],
-                self.amounts[token_out],
+
+        // make amounts into comparable-amounts
+        let mut c_amount_in = amount_in;
+        let mut c_current_amounts = self.amounts.clone();
+        for (index, value) in self.token_decimals.iter().enumerate() {
+            let factor = 10_u32.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
+            c_current_amounts[index] *= factor as u128;
+            if index == token_in {
+                c_amount_in *= factor as u128;
+            }
+        }
+
+        let invariant = self.get_invariant();
+
+        let mut ret = invariant
+            .swap_to_ex(
+                token_in,
+                c_current_amounts[token_in] + c_amount_in,
+                token_out,
+                c_current_amounts.clone(),
                 &Fees::new(self.total_fee, &fees),
             )
-            .expect("ERR_CALC")
+            .expect("ERR_CALC");
+
+        let factor_x = 10_u32.checked_pow((TARGET_DECIMAL - self.token_decimals[token_in]) as u32).unwrap();
+        let factor_y = 10_u32.checked_pow((TARGET_DECIMAL - self.token_decimals[token_out]) as u32).unwrap();
+        ret.new_source_amount = ret.new_source_amount.checked_div(factor_x.into()).unwrap();
+        ret.new_destination_amount = ret.new_destination_amount.checked_div(factor_y.into()).unwrap();
+        ret.amount_swapped = ret.amount_swapped.checked_div(factor_y.into()).unwrap();
+        ret.admin_fee = ret.admin_fee.checked_div(factor_y.into()).unwrap();
+        ret.fee = ret.fee.checked_div(factor_y.into()).unwrap();
+
+        ret
     }
 
     /// Returns how much token you will receive if swap `token_amount_in` of `token_in` for `token_out`.
@@ -267,9 +308,8 @@ impl StableSwapPool {
         self.amounts[out_idx] = result.new_destination_amount;
 
         // TODO: add admin / referral fee here.
-
         // mint
-        println!("{:?}", self.amounts);
+        // println!("{:?}", self.amounts);
 
         result.amount_swapped
     }
@@ -419,7 +459,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = SwapFees::zero();
-        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], 1, 0);
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1, 0);
         assert_eq!(
             pool.tokens(),
             vec![accounts(1).to_string(), accounts(2).to_string()]
@@ -441,7 +481,7 @@ mod tests {
 
         // Withdraw on another side of the capital.
         let amounts_out =
-            pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![0, 1], &fees);
+            pool.remove_liquidity_by_shares(accounts(0).as_ref(), num_shares, vec![0, 1]);
         assert_eq!(amounts_out, vec![0, to_yocto("5")]);
     }
 
@@ -450,7 +490,7 @@ mod tests {
     fn test_with_fees() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], 1, 2000);
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6],1, 2000);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let fees = SwapFees::new(1000);
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
@@ -463,7 +503,7 @@ mod tests {
         );
         println!("swap out: {}", amount_out);
         let amounts_out =
-            pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1], &fees);
+            pool.remove_liquidity_by_shares(accounts(0).as_ref(), num_shares, vec![1, 1]);
         println!("amount out: {:?}", amounts_out);
     }
 
@@ -472,7 +512,7 @@ mod tests {
     fn test_add_transfer_remove_liquidity() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], 1, 0);
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1, 0);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let fees = SwapFees::zero();
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
@@ -491,7 +531,7 @@ mod tests {
         // Remove all liquidity.
         testing_env!(context.predecessor_account_id(accounts(3)).build());
         let out_amounts =
-            pool.remove_liquidity(accounts(3).as_ref(), num_shares, vec![1, 1], &fees);
+            pool.remove_liquidity_by_shares(accounts(3).as_ref(), num_shares, vec![1, 1]);
 
         // Check it's all taken out. Due to precision there is ~1 yN.
         assert_eq!(
@@ -509,7 +549,7 @@ mod tests {
     fn test_ramp_amp() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], 1, 0);
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)],vec![6, 6], 1, 0);
 
         let start_ts = 1_000_000_000;
         testing_env!(context.block_timestamp(start_ts).build());

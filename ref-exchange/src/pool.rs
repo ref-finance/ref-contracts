@@ -56,7 +56,7 @@ impl Pool {
         match self {
             Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts),
             Pool::StableSwapPool(pool) => {
-                pool.remove_liquidity(sender_id, shares, min_amounts, &fees)
+                pool.remove_liquidity_by_shares(sender_id, shares, min_amounts)
             }
         }
     }
