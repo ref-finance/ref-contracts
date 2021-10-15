@@ -101,7 +101,8 @@ impl StableSwapPool {
     /// Allows to add liquidity of a subset of tokens,
     /// by set other tokens balance into 0.
     pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>, fees: &SwapFees) -> Balance {
-        assert_eq!(amounts.len(), self.token_account_ids.len(), "ERR_WRONG_TOKEN_COUNT");
+        let n_coins = self.token_account_ids.len();
+        assert_eq!(amounts.len(), n_coins, "ERR_WRONG_TOKEN_COUNT");
 
         let invariant = self.get_invariant();
 
@@ -140,10 +141,8 @@ impl StableSwapPool {
         // TODO: add slippage check on the LP tokens.
         // assert!(new_shares > min_shares, "ERR_SLIPPAGE");
 
-        // convert c_amount to amount and added to pool
-        for (index, value) in self.token_decimals.iter().enumerate() {
-            let factor = 10_u32.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
-            self.amounts[index] = (c_amounts[index] + c_current_amounts[index]).checked_div(factor.into()).unwrap();
+        for i in 0..n_coins {
+            self.amounts[i] = self.amounts[i].checked_add(amounts[i]).unwrap();
         }
 
         self.mint_shares(sender_id, new_shares);
@@ -214,27 +213,19 @@ impl StableSwapPool {
         }
 
         let invariant = self.get_invariant();
+        let trade_fee = Fees::new(self.total_fee, &fees);
 
-        let (burn_shares, admin_c_fees) = invariant.compute_lp_amount_for_withdraw(
-            c_amounts.clone(),
-            c_current_amounts.clone(), 
+        let (burn_shares, fee_part) = invariant.compute_lp_amount_for_withdraw(
+            &c_amounts,
+            &c_current_amounts, 
             self.shares_total_supply, 
-            &Fees::new(self.total_fee, &fees)).expect("ERR_WITHDRAW_ERR");
+            &trade_fee).expect("ERR_WITHDRAW_ERR");
         
         assert!(burn_shares <= prev_shares_amount, "ERR_NOT_ENOUGH_SHARE_TO_WITHDRAW");
         assert!(burn_shares <= max_burn_shares, "ERR_SLIPPAGE");
 
-        // convert c_amount to amount and subtract from pool
-        let mut admin_fees = admin_c_fees.clone();
-        let mut sum_fees = 0_u128;
-        for (index, value) in self.token_decimals.iter().enumerate() {
-            let factor = 10_u32.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
-            self.amounts[index] = c_current_amounts[index]
-                .checked_sub(c_amounts[index]).unwrap()
-                .checked_sub(admin_c_fees[index]).unwrap()
-                .checked_div(factor.into()).unwrap();
-            admin_fees[index] = admin_fees[index].checked_div(factor.into()).unwrap();
-            sum_fees += admin_fees[index];
+        for i in 0..n_coins {
+            self.amounts[i] = self.amounts[i].checked_sub(amounts[i]).unwrap();
         }
         self.burn_shares(&sender_id, prev_shares_amount, burn_shares);
         env::log(
@@ -245,47 +236,30 @@ impl StableSwapPool {
             .as_bytes(),
         );
 
-        // handle admin / referral fee.
-        if sum_fees > 0 && fees.referral_fee + fees.exchange_fee > 0 {
-            let mut fee_tokens = vec![0_u128; self.token_account_ids.len()];
-            // referral fee
-            if let Some(referral) = &fees.referral_id {
-                if self.shares.get(referral).is_some() {
-                    let mut sum_referral_fee = 0_u128;
-                    for i in 0..n_coins {
-                        fee_tokens[i] = admin_fees[i] * fees.referral_fee as u128 
-                            / (fees.referral_fee + fees.exchange_fee) as u128;
-                        sum_referral_fee += fee_tokens[i];
-                    }
-                    if sum_referral_fee > 0 {
-                        let referral_share = self.admin_fee_to_liquidity(referral, &fee_tokens);
-                        env::log(
-                            format!(
-                                "Referral {} got {} shares",
-                                referral, referral_share
-                            )
-                            .as_bytes(),
-                        );
-                    }
-                }
-            } 
-            // exchange fee = admin_fee - referral_fee
-            let mut sum_exchange_fee = 0_u128;
-            for i in 0..n_coins {
-                fee_tokens[i] = admin_fees[i] - fee_tokens[i];
-                sum_exchange_fee += fee_tokens[i];
-            }
-            if sum_exchange_fee > 0 {
-                let exchange_share = self.admin_fee_to_liquidity(&fees.exchange_id, &fee_tokens);
+        // referral fee
+        if let Some(referral) = &fees.referral_id {
+            if self.shares.get(referral).is_some() {
+                let referral_share = fee_part * fees.referral_fee as u128 / FEE_DIVISOR as u128;
+                self.mint_shares(referral, referral_share);
                 env::log(
                     format!(
-                        "Admin {} got {} shares",
-                        &fees.exchange_id, exchange_share
+                        "Referral {} got {} shares",
+                        referral, referral_share
                     )
                     .as_bytes(),
                 );
             }
-        }
+        } 
+        // exchange fee
+        let exchange_share = fee_part * fees.exchange_fee as u128 / FEE_DIVISOR as u128;
+        self.mint_shares(&fees.exchange_id, exchange_share);
+        env::log(
+            format!(
+                "Admin {} got {} shares",
+                &fees.exchange_id, exchange_share
+            )
+            .as_bytes(),
+        );
 
         burn_shares
     } 
@@ -314,11 +288,11 @@ impl StableSwapPool {
         let invariant = self.get_invariant();
 
         let mut ret = invariant
-            .swap_to_ex(
+            .swap_to(
                 token_in,
-                c_current_amounts[token_in] + c_amount_in,
+                c_amount_in,
                 token_out,
-                c_current_amounts.clone(),
+                &c_current_amounts,
                 &Fees::new(self.total_fee, &fees),
             )
             .expect("ERR_CALC");
@@ -379,14 +353,14 @@ impl StableSwapPool {
 
         // handle admin / referral fee.
         if fees.referral_fee + fees.exchange_fee > 0 {
-            let mut fee_tokens = vec![0_u128; self.token_account_ids.len()];
+            let mut fee_token = 0_u128;
             // referral fee
             if let Some(referral) = &fees.referral_id {
                 if self.shares.get(referral).is_some() {
-                    fee_tokens[out_idx] = result.admin_fee * fees.referral_fee as u128 
+                    fee_token = result.admin_fee * fees.referral_fee as u128 
                         / (fees.referral_fee + fees.exchange_fee) as u128;
-                    if fee_tokens[out_idx] > 0 {
-                        let referral_share = self.admin_fee_to_liquidity(referral, &fee_tokens);
+                    if fee_token > 0 {
+                        let referral_share = self.admin_fee_to_liquidity(referral, out_idx, fee_token);
                         env::log(
                             format!(
                                 "Referral {} got {} shares",
@@ -398,9 +372,9 @@ impl StableSwapPool {
                 }
             } 
             // exchange fee = admin_fee - referral_fee
-            fee_tokens[out_idx] = result.admin_fee - fee_tokens[out_idx];
-            if fee_tokens[out_idx] > 0 {
-                let exchange_share = self.admin_fee_to_liquidity(&fees.exchange_id, &fee_tokens);
+            fee_token = result.admin_fee - fee_token;
+            if fee_token > 0 {
+                let exchange_share = self.admin_fee_to_liquidity(&fees.exchange_id, out_idx, fee_token);
                 env::log(
                     format!(
                         "Admin {} got {} shares",
@@ -417,13 +391,13 @@ impl StableSwapPool {
 
     /// convert admin_fee into shares without any fee.
     /// return share minted this time for the admin/refferal.
-    fn admin_fee_to_liquidity(&mut self, sender_id: &AccountId, amounts: &Vec<Balance>) -> Balance {
-        assert_eq!(amounts.len(), self.token_account_ids.len(), "ERR_WRONG_TOKEN_COUNT");
+    fn admin_fee_to_liquidity(&mut self, sender_id: &AccountId, token_id: usize, amount: Balance) -> Balance {
 
         let invariant = self.get_invariant();
 
         // make amounts into comparable-amounts
-        let mut c_amounts = amounts.clone();
+        let mut c_amounts = self.amounts.clone();
+        c_amounts[token_id] += amount;
         let mut c_current_amounts = self.amounts.clone();
         for (index, value) in self.token_decimals.iter().enumerate() {
             let factor = 10_u32.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
@@ -438,12 +412,8 @@ impl StableSwapPool {
                     self.shares_total_supply,
                     &Fees::zero(),
                 ).expect("ERR_CALC_FAILED");
-
-        // convert c_amount to amount and added to pool
-        for (index, value) in self.token_decimals.iter().enumerate() {
-            let factor = 10_u32.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
-            self.amounts[index] = (c_amounts[index] + c_current_amounts[index]).checked_div(factor.into()).unwrap();
-        }
+        
+        self.amounts[token_id] += amount;
 
         self.mint_shares(sender_id, new_shares);
         new_shares

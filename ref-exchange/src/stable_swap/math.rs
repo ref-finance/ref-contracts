@@ -239,7 +239,7 @@ impl StableSwap {
     pub fn compute_y_ex(
         &self, 
         x_c_amount: Balance, 
-        current_c_amounts: Vec<Balance>, 
+        current_c_amounts: &Vec<Balance>, 
         index_x: usize, 
         index_y: usize, 
     ) -> Option<U256> {
@@ -247,7 +247,7 @@ impl StableSwap {
         let amp_factor = self.compute_amp_factor()?;
         let ann = amp_factor.checked_mul(n_coins as u128)?;
         // invariant
-        let d = self.compute_d_ex(&current_c_amounts)?;
+        let d = self.compute_d_ex(current_c_amounts)?;
         let mut s_ = x_c_amount;
         let mut c = d.checked_mul(d)?.checked_div(x_c_amount.into())?;
         for (idx, c_amount) in current_c_amounts.iter().enumerate() {
@@ -285,22 +285,21 @@ impl StableSwap {
 
 
     /// given token_out user want get and total tokens in pool and lp token supply,
-    /// return <lp_amount_to_burn, admin_fees_of_each_token_in_c_amount>
+    /// return <lp_amount_to_burn, lp_fees_part>
     /// all amounts are in c_amount (comparable amount)
     pub fn compute_lp_amount_for_withdraw(
         &self,
-        withdraw_c_amounts: Vec<Balance>,
-        current_c_amounts: Vec<Balance>,
-        pool_token_supply: Balance,
+        withdraw_c_amounts: &Vec<Balance>, // withdraw tokens in comparable precision,
+        old_c_amounts: &Vec<Balance>, // in-pool tokens comparable amounts vector, 
+        pool_token_supply: Balance, // total share supply
         fees: &Fees,
-    ) -> Option<(Balance, Vec<Balance>)> {
-        let n_coins = current_c_amounts.len();
+    ) -> Option<(Balance, Balance)> {
+        let n_coins = old_c_amounts.len();
         let mut admin_fees = vec![0_u128; n_coins];
         // Initial invariant, D0
-        let d_0 = self.compute_d_ex(&current_c_amounts)?;
-        let old_balances = current_c_amounts;
+        let d_0 = self.compute_d_ex(old_c_amounts)?;
 
-        // invariant after withdraw, D1
+        // real invariant after withdraw, D1
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in withdraw_c_amounts.iter().enumerate() {
             new_balances[index].checked_sub(*value)?;
@@ -314,7 +313,7 @@ impl StableSwap {
             // Recalculate the invariant accounting for fees
             for i in 0..new_balances.len() {
                 let ideal_balance = d_1
-                    .checked_mul(old_balances[i].into())?
+                    .checked_mul(old_c_amounts[i].into())?
                     .checked_div(d_0)?
                     .as_u128();
                 let difference = if ideal_balance > new_balances[i] {
@@ -330,49 +329,60 @@ impl StableSwap {
 
             let d_2 = self.compute_d_ex(&new_balances)?;
 
-            let shares_out = U256::from(pool_token_supply)
+            // d0 > d1 > d2, 
+            // (d0-d2) => burn_shares (plus fee),
+            // (d0-d1) => diff_shares (without fee),
+            // (d1-d2) => fee part,
+            // burn_shares = diff_shares + fee part
+            let burn_shares = U256::from(pool_token_supply)
                 .checked_mul(d_0.checked_sub(d_2)?)?
                 .checked_div(d_0)?
                 .as_u128();
+            let diff_shares = U256::from(pool_token_supply)
+            .checked_mul(d_0.checked_sub(d_1)?)?
+            .checked_div(d_0)?
+            .as_u128();
 
-            Some((shares_out, admin_fees))
+            Some((burn_shares, burn_shares-diff_shares))
         }
 
     }
 
-
     /// Compute SwapResult after an exchange
-    pub fn swap_to_ex(
+    /// all tokens in and out with comparable precision
+    pub fn swap_to(
         &self,
-        index_x: usize,
-        x_c_amount: Balance,
-        index_y: usize,
-        current_c_amounts: Vec<Balance>,
+        token_in_idx: usize, // token_in index in token vector,
+        token_in_amount: Balance, // token_in amount in comparable precision (1e18),
+        token_out_idx: usize, // token_out index in token vector,
+        current_c_amounts: &Vec<Balance>, // in-pool tokens comparable amounts vector, 
         fees: &Fees,
     ) -> Option<SwapResult> {
+
         let y = self.compute_y_ex(
-            x_c_amount, 
-            current_c_amounts.clone(),
-            index_x,
-            index_y,
+            token_in_amount + current_c_amounts[token_in_idx], 
+            current_c_amounts,
+            token_in_idx,
+            token_out_idx,
         ).unwrap().as_u128();
 
-        let dy = current_c_amounts[index_y].checked_sub(y)?;
-        let dy_fee = fees.trade_fee(dy);
-        let admin_fee = fees.admin_trade_fee(dy_fee);
+        let dy = current_c_amounts[token_out_idx].checked_sub(y)?;
+        let trade_fee = fees.trade_fee(dy);
+        let admin_fee = fees.admin_trade_fee(trade_fee);
+        let amount_swapped = dy.checked_sub(trade_fee)?;
 
-        let amount_swapped = dy.checked_sub(dy_fee)?;
-        let new_destination_amount = current_c_amounts[index_y]
+        let new_destination_amount = current_c_amounts[token_out_idx]
             .checked_sub(amount_swapped)?
             .checked_sub(admin_fee)?;
-        let new_source_amount = current_c_amounts[index_x].checked_add(x_c_amount)?;
+        let new_source_amount = current_c_amounts[token_in_idx]
+            .checked_add(token_in_amount)?;
 
         Some(SwapResult {
             new_source_amount,
             new_destination_amount,
             amount_swapped,
             admin_fee,
-            fee: dy_fee,
+            fee: trade_fee,
         })
     }
 }
