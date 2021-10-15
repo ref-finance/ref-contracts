@@ -123,7 +123,7 @@ impl StableSwapPool {
             }
             (
                 invariant
-                    .compute_d_ex(&c_amounts)
+                    .compute_d(&c_amounts)
                     .expect("ERR_CALC_FAILED")
                     .as_u128(),
                 0,

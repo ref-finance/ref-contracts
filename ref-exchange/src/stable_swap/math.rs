@@ -139,7 +139,7 @@ impl StableSwap {
     /// Compute stable swap invariant (D)
     /// Equation:
     /// A * sum(x_i) * n**n + D = A * D * n**n + D**(n+1) / (n**n * prod(x_i))
-    pub fn compute_d_ex(&self, c_amounts: &Vec<Balance>) -> Option<U256> {
+    pub fn compute_d(&self, c_amounts: &Vec<Balance>) -> Option<U256> {
         let n_coins = c_amounts.len() as u128;
         let sum_x = c_amounts.iter().fold(0, |sum, i| sum + i);
         if sum_x == 0 {
@@ -185,6 +185,7 @@ impl StableSwap {
     }
 
     /// Compute the amount of LP tokens to mint after a deposit
+    /// return <lp_amount_to_mint, lp_fees_part>
     pub fn compute_lp_amount_for_deposit(
         &self,
         deposit_c_amounts: &Vec<Balance>, // deposit tokens in comparable precision,
@@ -194,7 +195,7 @@ impl StableSwap {
     ) -> Option<(Balance, Balance)> {
         let n_coins = old_c_amounts.len();
         // Initial invariant
-        let d_0 = self.compute_d_ex(old_c_amounts)?;
+        let d_0 = self.compute_d(old_c_amounts)?;
 
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in deposit_c_amounts.iter().enumerate() {
@@ -202,7 +203,7 @@ impl StableSwap {
         }
 
         // Invariant after change
-        let d_1 = self.compute_d_ex(&new_balances)?;
+        let d_1 = self.compute_d(&new_balances)?;
         if d_1 <= d_0 {
             None
         } else {
@@ -221,7 +222,7 @@ impl StableSwap {
                 new_balances[i] = new_balances[i].checked_sub(fee)?;
             }
 
-            let d_2 = self.compute_d_ex(&new_balances)?;
+            let d_2 = self.compute_d(&new_balances)?;
 
             // d1 > d2 > d0, 
             // (d2-d0) => mint_shares (charged fee),
@@ -243,19 +244,20 @@ impl StableSwap {
         }
     }
 
-    /// Compute amount of swap out token 'y' with token 'x' amount change to x_c_amount
-    pub fn compute_y_ex(
+    /// Compute new amount of token 'y' with new amount of token 'x'
+    /// return new y_token amount according to the equation
+    pub fn compute_y(
         &self, 
-        x_c_amount: Balance, 
-        current_c_amounts: &Vec<Balance>, 
-        index_x: usize, 
-        index_y: usize, 
+        x_c_amount: Balance, // new x_token amount in comparable precision, 
+        current_c_amounts: &Vec<Balance>,  // in-pool tokens amount in comparable precision,
+        index_x: usize, // x token's index
+        index_y: usize, // y token's index
     ) -> Option<U256> {
         let n_coins = current_c_amounts.len();
         let amp_factor = self.compute_amp_factor()?;
         let ann = amp_factor.checked_mul(n_coins as u128)?;
         // invariant
-        let d = self.compute_d_ex(current_c_amounts)?;
+        let d = self.compute_d(current_c_amounts)?;
         let mut s_ = x_c_amount;
         let mut c = d.checked_mul(d)?.checked_div(x_c_amount.into())?;
         for (idx, c_amount) in current_c_amounts.iter().enumerate() {
@@ -304,14 +306,14 @@ impl StableSwap {
     ) -> Option<(Balance, Balance)> {
         let n_coins = old_c_amounts.len();
         // Initial invariant, D0
-        let d_0 = self.compute_d_ex(old_c_amounts)?;
+        let d_0 = self.compute_d(old_c_amounts)?;
 
         // real invariant after withdraw, D1
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in withdraw_c_amounts.iter().enumerate() {
             new_balances[index].checked_sub(*value)?;
         }
-        let d_1 = self.compute_d_ex(&new_balances)?;
+        let d_1 = self.compute_d(&new_balances)?;
 
         // compare ideal token portions from D1 with withdraws, to calculate diff fee.
         if d_1 >= d_0 {
@@ -333,7 +335,7 @@ impl StableSwap {
                 new_balances[i] = new_balances[i].checked_sub(fee)?;
             }
 
-            let d_2 = self.compute_d_ex(&new_balances)?;
+            let d_2 = self.compute_d(&new_balances)?;
 
             // d0 > d1 > d2, 
             // (d0-d2) => burn_shares (plus fee),
@@ -365,7 +367,7 @@ impl StableSwap {
         fees: &Fees,
     ) -> Option<SwapResult> {
 
-        let y = self.compute_y_ex(
+        let y = self.compute_y(
             token_in_amount + current_c_amounts[token_in_idx], 
             current_c_amounts,
             token_in_idx,
