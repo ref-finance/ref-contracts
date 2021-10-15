@@ -115,22 +115,25 @@ impl StableSwapPool {
             c_current_amounts[index] *= factor as u128;
         }
 
-        let new_shares = if self.shares_total_supply == 0 {
+        let (new_shares, fee_part) = if self.shares_total_supply == 0 {
             // Bootstrapping the pool, request providing all non-zero balances,
             // and all fee free.
             for c_amount in &c_amounts {
                 assert!(*c_amount > 0, "ERR_ZERO_AMOUNT_IN_INIT_STABLE_POOL");
             }
-            invariant
-                .compute_d_ex(&c_amounts)
-                .expect("ERR_CALC_FAILED")
-                .as_u128()
+            (
+                invariant
+                    .compute_d_ex(&c_amounts)
+                    .expect("ERR_CALC_FAILED")
+                    .as_u128(),
+                0,
+            )
         } else {
             // Subsequent add liquidity will charge fee according to difference with ideal balance portions
             invariant
-                .compute_lp_amount_for_deposit_ex(
-                    c_amounts.clone(),
-                    c_current_amounts.clone(),
+                .compute_lp_amount_for_deposit(
+                    &c_amounts,
+                    &c_current_amounts,
                     self.shares_total_supply,
                     &Fees::new(self.total_fee, &fees),
                 )
@@ -150,6 +153,31 @@ impl StableSwapPool {
             format!(
                 "Mint {} shares for {}",
                 new_shares, sender_id,
+            )
+            .as_bytes(),
+        );
+
+        // referral fee
+        if let Some(referral) = &fees.referral_id {
+            if self.shares.get(referral).is_some() {
+                let referral_share = fee_part * fees.referral_fee as u128 / FEE_DIVISOR as u128;
+                self.mint_shares(referral, referral_share);
+                env::log(
+                    format!(
+                        "Referral {} got {} shares",
+                        referral, referral_share
+                    )
+                    .as_bytes(),
+                );
+            }
+        } 
+        // exchange fee
+        let exchange_share = fee_part * fees.exchange_fee as u128 / FEE_DIVISOR as u128;
+        self.mint_shares(&fees.exchange_id, exchange_share);
+        env::log(
+            format!(
+                "Admin {} got {} shares",
+                &fees.exchange_id, exchange_share
             )
             .as_bytes(),
         );
@@ -405,10 +433,10 @@ impl StableSwapPool {
             c_current_amounts[index] *= factor as u128;
         }
 
-        let new_shares = invariant
-                .compute_lp_amount_for_deposit_ex(
-                    c_amounts.clone(),
-                    c_current_amounts.clone(),
+        let (new_shares, _) = invariant
+                .compute_lp_amount_for_deposit(
+                    &c_amounts,
+                    &c_current_amounts,
                     self.shares_total_supply,
                     &Fees::zero(),
                 ).expect("ERR_CALC_FAILED");

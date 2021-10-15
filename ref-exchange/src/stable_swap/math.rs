@@ -184,20 +184,17 @@ impl StableSwap {
         }
     }
 
-
-
     /// Compute the amount of LP tokens to mint after a deposit
-    pub fn compute_lp_amount_for_deposit_ex(
+    pub fn compute_lp_amount_for_deposit(
         &self,
-        deposit_c_amounts: Vec<Balance>,
-        current_c_amounts: Vec<Balance>,
-        pool_token_supply: Balance,
+        deposit_c_amounts: &Vec<Balance>, // deposit tokens in comparable precision,
+        old_c_amounts: &Vec<Balance>, // current in-pool tokens in comparable precision,
+        pool_token_supply: Balance, // current share supply
         fees: &Fees,
-    ) -> Option<Balance> {
-        let n_coins = current_c_amounts.len();
+    ) -> Option<(Balance, Balance)> {
+        let n_coins = old_c_amounts.len();
         // Initial invariant
-        let d_0 = self.compute_d_ex(&current_c_amounts)?;
-        let old_balances = current_c_amounts;
+        let d_0 = self.compute_d_ex(old_c_amounts)?;
 
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in deposit_c_amounts.iter().enumerate() {
@@ -212,7 +209,7 @@ impl StableSwap {
             // Recalculate the invariant accounting for fees
             for i in 0..new_balances.len() {
                 let ideal_balance = d_1
-                    .checked_mul(old_balances[i].into())?
+                    .checked_mul(old_c_amounts[i].into())?
                     .checked_div(d_0)?
                     .as_u128();
                 let difference = if ideal_balance > new_balances[i] {
@@ -226,12 +223,23 @@ impl StableSwap {
 
             let d_2 = self.compute_d_ex(&new_balances)?;
 
-            Some(
-                U256::from(pool_token_supply)
-                    .checked_mul(d_2.checked_sub(d_0)?)?
-                    .checked_div(d_0)?
-                    .as_u128(),
-            )
+            // d1 > d2 > d0, 
+            // (d2-d0) => mint_shares (charged fee),
+            // (d1-d0) => diff_shares (without fee),
+            // (d1-d2) => fee part,
+            // diff_shares = mint_shares + fee part
+
+            let mint_shares = U256::from(pool_token_supply)
+                .checked_mul(d_2.checked_sub(d_0)?)?
+                .checked_div(d_0)?
+                .as_u128();
+            
+            let diff_shares = U256::from(pool_token_supply)
+                .checked_mul(d_1.checked_sub(d_0)?)?
+                .checked_div(d_0)?
+                .as_u128();
+            
+            Some((mint_shares, diff_shares-mint_shares))
         }
     }
 
@@ -295,7 +303,6 @@ impl StableSwap {
         fees: &Fees,
     ) -> Option<(Balance, Balance)> {
         let n_coins = old_c_amounts.len();
-        let mut admin_fees = vec![0_u128; n_coins];
         // Initial invariant, D0
         let d_0 = self.compute_d_ex(old_c_amounts)?;
 
@@ -322,7 +329,6 @@ impl StableSwap {
                     new_balances[i].checked_sub(ideal_balance)?
                 };
                 let fee = fees.normalized_trade_fee(n_coins as u32, difference);
-                admin_fees[i] = fees.admin_trade_fee(fee);
                 // new_balance is for calculation D2, the one with fee charged
                 new_balances[i] = new_balances[i].checked_sub(fee)?;
             }
