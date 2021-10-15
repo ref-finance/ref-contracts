@@ -307,11 +307,76 @@ impl StableSwapPool {
         self.amounts[in_idx] = result.new_source_amount;
         self.amounts[out_idx] = result.new_destination_amount;
 
-        // TODO: add admin / referral fee here.
-        // mint
-        // println!("{:?}", self.amounts);
+        // handle admin / referral fee.
+        if fees.referral_fee + fees.exchange_fee > 0 {
+            let mut fee_tokens = vec![0_u128; self.token_account_ids.len()];
+            // referral fee
+            if let Some(referral) = &fees.referral_id {
+                if self.shares.get(referral).is_some() {
+                    fee_tokens[out_idx] = result.admin_fee * fees.referral_fee as u128 
+                        / (fees.referral_fee + fees.exchange_fee) as u128;
+                    if fee_tokens[out_idx] > 0 {
+                        let referral_share = self.admin_fee_to_liquidity(referral, &fee_tokens);
+                        env::log(
+                            format!(
+                                "Referral {} got {} shares",
+                                referral, referral_share
+                            )
+                            .as_bytes(),
+                        );
+                    }
+                }
+            } 
+            // exchange fee = admin_fee - referral_fee
+            fee_tokens[out_idx] = result.admin_fee - fee_tokens[out_idx];
+            if fee_tokens[out_idx] > 0 {
+                let exchange_share = self.admin_fee_to_liquidity(&fees.exchange_id, &fee_tokens);
+                env::log(
+                    format!(
+                        "Admin {} got {} shares",
+                        &fees.exchange_id, exchange_share
+                    )
+                    .as_bytes(),
+                );
+            }
+        }
 
         result.amount_swapped
+    }
+
+
+    /// convert admin_fee into shares without any fee.
+    /// return share minted this time for the admin/refferal.
+    fn admin_fee_to_liquidity(&mut self, sender_id: &AccountId, amounts: &Vec<Balance>) -> Balance {
+        assert_eq!(amounts.len(), self.token_account_ids.len(), "ERR_WRONG_TOKEN_COUNT");
+
+        let invariant = self.get_invariant();
+
+        // make amounts into comparable-amounts
+        let mut c_amounts = amounts.clone();
+        let mut c_current_amounts = self.amounts.clone();
+        for (index, value) in self.token_decimals.iter().enumerate() {
+            let factor = 10_u32.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
+            c_amounts[index] *= factor as u128;
+            c_current_amounts[index] *= factor as u128;
+        }
+
+        let new_shares = invariant
+                .compute_lp_amount_for_deposit_ex(
+                    c_amounts.clone(),
+                    c_current_amounts.clone(),
+                    self.shares_total_supply,
+                    &Fees::zero(),
+                ).expect("ERR_CALC_FAILED");
+
+        // convert c_amount to amount and added to pool
+        for (index, value) in self.token_decimals.iter().enumerate() {
+            let factor = 10_u32.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
+            self.amounts[index] = (c_amounts[index] + c_current_amounts[index]).checked_div(factor.into()).unwrap();
+        }
+
+        self.mint_shares(sender_id, new_shares);
+        new_shares
     }
 
     /// Mint new shares for given user.

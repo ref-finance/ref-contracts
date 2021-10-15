@@ -27,6 +27,14 @@ impl Fees {
             admin_fee: fees.exchange_fee,
         }
     }
+
+    pub fn zero() -> Self {
+        Self {
+            trade_fee: 0,
+            admin_fee: 0,
+        }
+    }
+
     pub fn trade_fee(&self, amount: Balance) -> Balance {
         println!(
             "trade fee: {} {}",
