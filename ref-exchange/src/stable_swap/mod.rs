@@ -147,6 +147,14 @@ impl StableSwapPool {
         }
 
         self.mint_shares(sender_id, new_shares);
+        env::log(
+            format!(
+                "Mint {} shares for {}",
+                new_shares, sender_id,
+            )
+            .as_bytes(),
+        );
+
         new_shares
     }
 
@@ -169,6 +177,15 @@ impl StableSwapPool {
             assert!(result[i] >= min_amounts[i], "ERR_SLIPPAGE");
             self.amounts[i] = self.amounts[i].checked_sub(result[i]).unwrap();
         }
+
+        self.burn_shares(&sender_id, prev_shares_amount, shares);
+        env::log(
+            format!(
+                "Burned {} shares from {} by given shares",
+                shares, sender_id,
+            )
+            .as_bytes(),
+        );
 
         result
     }
@@ -198,7 +215,7 @@ impl StableSwapPool {
 
         let invariant = self.get_invariant();
 
-        let (burn_shares, admin_fees) = invariant.compute_lp_amount_for_withdraw(
+        let (burn_shares, admin_c_fees) = invariant.compute_lp_amount_for_withdraw(
             c_amounts.clone(),
             c_current_amounts.clone(), 
             self.shares_total_supply, 
@@ -208,14 +225,67 @@ impl StableSwapPool {
         assert!(burn_shares <= max_burn_shares, "ERR_SLIPPAGE");
 
         // convert c_amount to amount and subtract from pool
+        let mut admin_fees = admin_c_fees.clone();
+        let mut sum_fees = 0_u128;
         for (index, value) in self.token_decimals.iter().enumerate() {
             let factor = 10_u32.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
             self.amounts[index] = c_current_amounts[index]
                 .checked_sub(c_amounts[index]).unwrap()
-                .checked_sub(admin_fees[index]).unwrap()
+                .checked_sub(admin_c_fees[index]).unwrap()
                 .checked_div(factor.into()).unwrap();
+            admin_fees[index] = admin_fees[index].checked_div(factor.into()).unwrap();
+            sum_fees += admin_fees[index];
         }
         self.burn_shares(&sender_id, prev_shares_amount, burn_shares);
+        env::log(
+            format!(
+                "Burned {} shares from {} by given tokens",
+                burn_shares, sender_id,
+            )
+            .as_bytes(),
+        );
+
+        // handle admin / referral fee.
+        if sum_fees > 0 && fees.referral_fee + fees.exchange_fee > 0 {
+            let mut fee_tokens = vec![0_u128; self.token_account_ids.len()];
+            // referral fee
+            if let Some(referral) = &fees.referral_id {
+                if self.shares.get(referral).is_some() {
+                    let mut sum_referral_fee = 0_u128;
+                    for i in 0..n_coins {
+                        fee_tokens[i] = admin_fees[i] * fees.referral_fee as u128 
+                            / (fees.referral_fee + fees.exchange_fee) as u128;
+                        sum_referral_fee += fee_tokens[i];
+                    }
+                    if sum_referral_fee > 0 {
+                        let referral_share = self.admin_fee_to_liquidity(referral, &fee_tokens);
+                        env::log(
+                            format!(
+                                "Referral {} got {} shares",
+                                referral, referral_share
+                            )
+                            .as_bytes(),
+                        );
+                    }
+                }
+            } 
+            // exchange fee = admin_fee - referral_fee
+            let mut sum_exchange_fee = 0_u128;
+            for i in 0..n_coins {
+                fee_tokens[i] = admin_fees[i] - fee_tokens[i];
+                sum_exchange_fee += fee_tokens[i];
+            }
+            if sum_exchange_fee > 0 {
+                let exchange_share = self.admin_fee_to_liquidity(&fees.exchange_id, &fee_tokens);
+                env::log(
+                    format!(
+                        "Admin {} got {} shares",
+                        &fees.exchange_id, exchange_share
+                    )
+                    .as_bytes(),
+                );
+            }
+        }
 
         burn_shares
     } 
