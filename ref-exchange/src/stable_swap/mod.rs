@@ -97,7 +97,7 @@ impl StableSwapPool {
         self.volumes.clone()
     }
 
-    /// Add liquidity into the pool, admin_fee free.
+    /// Add liquidity into the pool.
     /// Allows to add liquidity of a subset of tokens,
     /// by set other tokens balance into 0.
     pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>, fees: &SwapFees) -> Balance {
