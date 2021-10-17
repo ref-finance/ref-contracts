@@ -17,6 +17,7 @@ use crate::account_deposit::{VAccount, Account};
 pub use crate::action::SwapAction;
 use crate::action::{Action, ActionResult};
 use crate::errors::*;
+use crate::admin_fee::AdminFees;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
 use crate::utils::{check_token_duplicates};
@@ -25,6 +26,7 @@ pub use crate::views::{PoolInfo, ContractMetadata};
 mod account_deposit;
 mod action;
 mod errors;
+mod admin_fee;
 mod legacy;
 mod multi_fungible_token;
 mod owner;
@@ -109,9 +111,9 @@ impl Contract {
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
             tokens,
-            fee + self.exchange_fee + self.referral_fee,
-            self.exchange_fee,
-            self.referral_fee,
+            fee,
+            0,
+            0,
         )))
     }
 
@@ -187,7 +189,11 @@ impl Contract {
         let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         // Add amounts given to liquidity first. It will return the balanced amounts.
-        pool.add_liquidity(&sender_id, &mut amounts);
+        pool.add_liquidity(
+            &sender_id,
+            &mut amounts,
+            AdminFees::new(self.exchange_fee),
+        );
         if let Some(min_amounts) = min_amounts {
             // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
             for (amount, min_amount) in amounts.iter().zip(min_amounts.iter()) {
@@ -220,6 +226,8 @@ impl Contract {
                 .into_iter()
                 .map(|amount| amount.into())
                 .collect(),
+            AdminFees::new(self.exchange_fee),
+            
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
@@ -335,8 +343,12 @@ impl Contract {
             amount_in,
             token_out,
             min_amount_out,
-            &self.owner_id,
-            referral_id,
+            AdminFees {
+                exchange_fee: self.exchange_fee,
+                exchange_id: env::current_account_id(),
+                referral_fee: self.referral_fee,
+                referral_id: referral_id.clone(),
+            },
         );
         self.pools.replace(pool_id, &pool);
         amount_out
