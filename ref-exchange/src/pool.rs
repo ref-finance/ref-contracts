@@ -29,6 +29,7 @@ impl Pool {
 
     /// Adds liquidity into underlying pool.
     /// Updates amounts to amount kept in the pool.
+    #[allow(unused_variables)]
     pub fn add_liquidity(
         &mut self, 
         sender_id: &AccountId, 
@@ -41,6 +42,7 @@ impl Pool {
     }
 
     /// Removes liquidity from underlying pool.
+    #[allow(unused_variables)]
     pub fn remove_liquidity(
         &mut self,
         sender_id: &AccountId,

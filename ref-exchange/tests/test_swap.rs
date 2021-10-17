@@ -164,7 +164,7 @@ fn test_swap() {
             pool_kind: "SIMPLE_POOL".to_string(),
             token_account_ids: vec![dai(), eth()],
             amounts: vec![to_yocto("5").into(), to_yocto("10").into()],
-            total_fee: 30,
+            total_fee: 25,
             shares_total_supply: to_yocto("1").into(),
         }
     );
@@ -205,7 +205,7 @@ fn test_swap() {
         .unwrap_json::<HashMap<AccountId, U128>>();
     assert_eq!(
         balances.get(&eth()).unwrap(),
-        &U128(to_yocto("100") + 1662497915624478906119726)
+        &U128(to_yocto("100") + 1663192997082117548978741)
     );
     assert_eq!(balances.get(&dai()).unwrap(), &U128(to_yocto("99")));
 

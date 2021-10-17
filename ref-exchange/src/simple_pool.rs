@@ -298,18 +298,18 @@ impl SimplePool {
 
         // Allocate exchange fee as fraction of total fee by issuing LP shares proportionally.
         if admin_fee.exchange_fee > 0 && numerator > U256::zero() {
-            let denominator = new_invariant * FEE_DIVISOR / self.exchange_fee;
+            let denominator = new_invariant * FEE_DIVISOR / admin_fee.exchange_fee;
             self.mint_shares(&admin_fee.exchange_id, (numerator / denominator).as_u128());
         }
 
         // If there is referral provided and the account already registered LP, allocate it % of LP rewards.
-        if let Some(referral_id) = admin_fee.referral_id {
+        if let Some(referral_id) = &admin_fee.referral_id {
             if admin_fee.referral_fee > 0
                 && numerator > U256::zero()
-                && self.shares.contains_key(&referral_id)
+                && self.shares.contains_key(referral_id)
             {
-                let denominator = new_invariant * FEE_DIVISOR / self.referral_fee;
-                self.mint_shares(&referral_id, (numerator / denominator).as_u128());
+                let denominator = new_invariant * FEE_DIVISOR / admin_fee.referral_fee;
+                self.mint_shares(referral_id, (numerator / denominator).as_u128());
             }
         }
 
@@ -349,8 +349,12 @@ mod tests {
             one_near,
             accounts(2).as_ref(),
             1,
-            accounts(3).as_ref(),
-            &None,
+            &AdminFees {
+                exchange_fee: 0,
+                exchange_id: accounts(3).as_ref().clone(),
+                referral_fee: 0,
+                referral_id: None,
+            },
         );
         assert_eq!(
             pool.share_balance_of(accounts(0).as_ref()),
@@ -395,8 +399,12 @@ mod tests {
             one_near,
             accounts(2).as_ref(),
             1,
-            accounts(3).as_ref(),
-            &None,
+            &AdminFees {
+                exchange_fee: 100,
+                exchange_id: accounts(3).as_ref().clone(),
+                referral_fee: 0,
+                referral_id: None,
+            },
         );
         assert_eq!(
             pool.share_balance_of(accounts(0).as_ref()),

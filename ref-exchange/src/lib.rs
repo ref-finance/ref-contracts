@@ -422,7 +422,7 @@ mod tests {
             .predecessor_account_id(account_id.clone())
             .attached_deposit(env::storage_byte_cost() * 300)
             .build());
-        let pool_id = contract.add_simple_pool(tokens, 25);
+        let pool_id = contract.add_simple_pool(tokens, 30);
         testing_env!(context
             .predecessor_account_id(account_id.clone())
             .attached_deposit(to_yocto("0.03"))
@@ -541,7 +541,7 @@ mod tests {
         // Exchange fees left in the pool as liquidity + 1m from transfer.
         assert_eq!(
             contract.get_pool_total_shares(0).0,
-            33337501041992301475 + 1_000_000
+            100012503125976904 + 1_000_000
         );
 
         contract.withdraw(
