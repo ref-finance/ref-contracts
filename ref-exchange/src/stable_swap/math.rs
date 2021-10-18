@@ -36,11 +36,11 @@ impl Fees {
     }
 
     pub fn trade_fee(&self, amount: Balance) -> Balance {
-        println!(
-            "trade fee: {} {}",
-            amount * (self.trade_fee as u128) / (FEE_DIVISOR as u128),
-            amount
-        );
+        // println!(
+        //     "trade fee: {} {}",
+        //     amount * (self.trade_fee as u128) / (FEE_DIVISOR as u128),
+        //     amount
+        // );
         amount * (self.trade_fee as u128) / (FEE_DIVISOR as u128)
     }
 
