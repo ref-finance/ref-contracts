@@ -196,16 +196,23 @@ impl StableSwapPool {
         let prev_shares_amount = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
         assert!(prev_shares_amount >= shares, "ERR_NOT_ENOUGH_SHARES");
         let mut result = vec![0u128; n_coins];
+
+        println!("[remove_liquidity_by_shares] prev_shares_amount {}", prev_shares_amount);
+        println!("[remove_liquidity_by_shares] burn_shares_amount {}", shares);
+        println!("[remove_liquidity_by_shares] total_shares {}", self.shares_total_supply);
+        println!("[remove_liquidity_by_shares] in-pool tokens {:?}", self.amounts);
         
         for i in 0..n_coins {
             result[i] = self.amounts[i]
                 .checked_mul(shares).unwrap()
-                .checked_div(prev_shares_amount).unwrap();
+                .checked_div(self.shares_total_supply).unwrap();
             assert!(result[i] >= min_amounts[i], "ERR_SLIPPAGE");
             self.amounts[i] = self.amounts[i].checked_sub(result[i]).unwrap();
         }
 
         self.burn_shares(&sender_id, prev_shares_amount, shares);
+        println!("[remove_liquidity_by_shares] got tokens {:?}", result);
+        println!("[remove_liquidity_by_shares] Burned {} shares from {} by given shares", shares, sender_id);
         env::log(
             format!(
                 "Burned {} shares from {} by given shares",
@@ -593,7 +600,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = SwapFees::zero();
-        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1, 0);
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0);
         assert_eq!(
             pool.tokens(),
             vec![accounts(1).to_string(), accounts(2).to_string()]
@@ -603,20 +610,48 @@ mod tests {
         let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
 
         let out = swap(&mut pool, 1, 1000000, 2);
-        assert_eq!(out, 1313682);
-        assert_eq!(pool.amounts, vec![6000000, 8686318]);
+        assert_eq!(out, 1000062);
+        assert_eq!(pool.amounts, vec![6000000, 8999938]);
         let out2 = swap(&mut pool, 2, out, 1);
         assert_eq!(out2, 999999); // due to precision difference.
         assert_eq!(pool.amounts, vec![5000001, 10000000]);
 
-        // // Add only one side of the capital.
-        // let mut amounts2 = vec![to_yocto("5"), to_yocto("0")];
-        // let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, &fees);
+        // Add only one side of the capital.
+        let mut amounts2 = vec![5000000, 0];
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, &fees);
 
-        // // Withdraw on another side of the capital.
-        // let amounts_out =
-        //     pool.remove_liquidity_by_shares(accounts(0).as_ref(), num_shares, vec![0, 1]);
-        // assert_eq!(amounts_out, vec![0, to_yocto("5")]);
+        // Withdraw on same side of the capital.
+        let shares_burned = pool.remove_liquidity_by_tokens(
+            accounts(0).as_ref(), 
+            vec![5000000, 0], 
+            num_shares, 
+            &fees
+        );
+        assert_eq!(shares_burned, num_shares);
+
+        // Add only one side of the capital, and withdraw by share
+        let mut amounts2 = vec![5000000, 0];
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, &fees);
+
+        let tokens = pool.remove_liquidity_by_shares(
+            accounts(0).as_ref(), 
+            num_shares,
+            vec![1, 1], 
+        );
+        assert_eq!(tokens[0], 2500046);
+        assert_eq!(tokens[1], 2500046);
+
+        // Add only one side of the capital, and withdraw from another side
+        let mut amounts2 = vec![5000000, 0];
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, &fees);
+        let shares_burned = pool.remove_liquidity_by_tokens(
+            accounts(0).as_ref(), 
+            vec![0, 5000000-1200], 
+            num_shares, 
+            &fees
+        );
+        // as imbalance withdraw, will lose a little amount token
+        assert!(shares_burned < num_shares);
     }
 
     /// Test everything with fees.

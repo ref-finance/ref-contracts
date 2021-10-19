@@ -194,16 +194,21 @@ impl StableSwap {
         fees: &Fees,
     ) -> Option<(Balance, Balance)> {
         let n_coins = old_c_amounts.len();
+        
         // Initial invariant
         let d_0 = self.compute_d(old_c_amounts)?;
+        println!("[compute_lp_amount_for_deposit] d_0: {:?}", d_0);
+
+        println!("[compute_lp_amount_for_deposit] deposit_c_amounts: {:?}", deposit_c_amounts);
 
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in deposit_c_amounts.iter().enumerate() {
-            new_balances[index].checked_add(*value)?;
+            new_balances[index] = old_c_amounts[index].checked_add(*value)?;
         }
-
+        println!("[compute_lp_amount_for_deposit] new_balances: {:?}", new_balances);
         // Invariant after change
         let d_1 = self.compute_d(&new_balances)?;
+        println!("[compute_lp_amount_for_deposit] d_1: {:?}", d_1);
         if d_1 <= d_0 {
             None
         } else {
@@ -239,7 +244,11 @@ impl StableSwap {
                 .checked_mul(d_1.checked_sub(d_0)?)?
                 .checked_div(d_0)?
                 .as_u128();
-            
+
+            println!(
+                "[compute_lp_amount_for_deposit] mint_shares: {}, fee_parts: {}", 
+                mint_shares, diff_shares-mint_shares
+            );
             Some((mint_shares, diff_shares-mint_shares))
         }
     }
@@ -307,13 +316,16 @@ impl StableSwap {
         let n_coins = old_c_amounts.len();
         // Initial invariant, D0
         let d_0 = self.compute_d(old_c_amounts)?;
+        println!("[compute_lp_amount_for_withdraw] d_0: {:?}", d_0);
 
         // real invariant after withdraw, D1
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in withdraw_c_amounts.iter().enumerate() {
-            new_balances[index].checked_sub(*value)?;
+            new_balances[index] = old_c_amounts[index].checked_sub(*value)?;
         }
+        println!("[compute_lp_amount_for_withdraw] new_balances: {:?}", new_balances);
         let d_1 = self.compute_d(&new_balances)?;
+        println!("[compute_lp_amount_for_withdraw] d_1: {:?}", d_1);
 
         // compare ideal token portions from D1 with withdraws, to calculate diff fee.
         if d_1 >= d_0 {
@@ -347,10 +359,12 @@ impl StableSwap {
                 .checked_div(d_0)?
                 .as_u128();
             let diff_shares = U256::from(pool_token_supply)
-            .checked_mul(d_0.checked_sub(d_1)?)?
-            .checked_div(d_0)?
-            .as_u128();
+                .checked_mul(d_0.checked_sub(d_1)?)?
+                .checked_div(d_0)?
+                .as_u128();
 
+            println!("[compute_lp_amount_for_withdraw] burn_shares: {}, fee_parts: {}", 
+                burn_shares, burn_shares-diff_shares);
             Some((burn_shares, burn_shares-diff_shares))
         }
 
