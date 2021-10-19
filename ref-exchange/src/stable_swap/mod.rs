@@ -432,8 +432,8 @@ impl StableSwapPool {
         let invariant = self.get_invariant();
 
         // make amounts into comparable-amounts
-        let mut c_amounts = self.amounts.clone();
-        c_amounts[token_id] += amount;
+        let mut c_amounts = vec![0_u128; self.amounts.len()];
+        c_amounts[token_id] = amount;
         let mut c_current_amounts = self.amounts.clone();
         for (index, value) in self.token_decimals.iter().enumerate() {
             let factor = 10_u128.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
@@ -656,24 +656,31 @@ mod tests {
 
     /// Test everything with fees.
     #[test]
-    fn test_with_fees() {
+    fn test_stable_with_fees() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6],1, 2000);
-        let mut amounts = vec![to_yocto("5"), to_yocto("10")];
-        let fees = SwapFees::new(1000);
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6],10000, 2000);
+        let mut amounts = vec![5000000, 10000000];
+        let fees = SwapFees::new(1000);  // 10% exchange fee
+        println!("before add_liquidity");
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
+        println!("end of add_liquidity");
         let amount_out = pool.swap(
             accounts(1).as_ref(),
-            to_yocto("1"),
+            1000000,
             accounts(2).as_ref(),
             1,
             &fees,
         );
         println!("swap out: {}", amount_out);
-        let amounts_out =
-            pool.remove_liquidity_by_shares(accounts(0).as_ref(), num_shares, vec![1, 1]);
-        println!("amount out: {:?}", amounts_out);
+        let tokens = pool.remove_liquidity_by_shares(
+            accounts(0).as_ref(), 
+            num_shares,
+            vec![1, 1], 
+        );
+        // assert_eq!(tokens[0], 2500046);
+        // assert_eq!(tokens[1], 2500046);
+        println!("amount out: {:?}", tokens);
     }
 
     /// Test that adding and then removing all of the liquidity leaves the pool empty and with no shares.
