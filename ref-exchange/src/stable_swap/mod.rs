@@ -678,21 +678,20 @@ mod tests {
             num_shares,
             vec![1, 1], 
         );
-        // assert_eq!(tokens[0], 2500046);
-        // assert_eq!(tokens[1], 2500046);
-        println!("amount out: {:?}", tokens);
+        assert_eq!(tokens[0], 5996026);
+        assert_eq!(tokens[1], 9093917);
     }
 
     /// Test that adding and then removing all of the liquidity leaves the pool empty and with no shares.
     #[test]
-    fn test_add_transfer_remove_liquidity() {
+    fn test_stable_add_transfer_remove_liquidity() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1, 0);
-        let mut amounts = vec![to_yocto("5"), to_yocto("10")];
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0);
+        let mut amounts = vec![5000000, 10000000];
         let fees = SwapFees::zero();
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
-        assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
+        assert_eq!(amounts, vec![5000000, 10000000]);
         assert!(num_shares > 1);
         assert_eq!(num_shares, pool.share_balance_of(accounts(0).as_ref()));
         assert_eq!(pool.share_total_balance(), num_shares);
@@ -706,34 +705,37 @@ mod tests {
 
         // Remove all liquidity.
         testing_env!(context.predecessor_account_id(accounts(3)).build());
-        let out_amounts =
-            pool.remove_liquidity_by_shares(accounts(3).as_ref(), num_shares, vec![1, 1]);
+        let out_amounts = pool.remove_liquidity_by_shares(
+            accounts(3).as_ref(), 
+            num_shares,
+            vec![1, 1], 
+        );
 
-        // Check it's all taken out. Due to precision there is ~1 yN.
+        // Check it's all taken out.
         assert_eq!(
             vec![amounts[0], amounts[1]],
-            vec![out_amounts[0] + 1, out_amounts[1] + 1]
+            vec![out_amounts[0], out_amounts[1]]
         );
         assert_eq!(pool.share_total_balance(), 0);
         assert_eq!(pool.share_balance_of(accounts(0).as_ref()), 0);
         assert_eq!(pool.share_balance_of(accounts(3).as_ref()), 0);
-        assert_eq!(pool.amounts, vec![1, 1]);
+        assert_eq!(pool.amounts, vec![0, 0]);
     }
 
     /// Test ramping up amplification factor, ramping it even more and then stopping.
     #[test]
-    fn test_ramp_amp() {
+    fn test_stable_ramp_amp() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)],vec![6, 6], 1, 0);
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)],vec![6, 6], 10000, 0);
 
         let start_ts = 1_000_000_000;
         testing_env!(context.block_timestamp(start_ts).build());
-        pool.ramp_amplification(5, start_ts + MIN_RAMP_DURATION * 10);
+        pool.ramp_amplification(50000, start_ts + MIN_RAMP_DURATION * 10);
         testing_env!(context
             .block_timestamp(start_ts + MIN_RAMP_DURATION * 3)
             .build());
-        pool.ramp_amplification(15, start_ts + MIN_RAMP_DURATION * 20);
+        pool.ramp_amplification(150000, start_ts + MIN_RAMP_DURATION * 20);
         testing_env!(context
             .block_timestamp(start_ts + MIN_RAMP_DURATION * 5)
             .build());
