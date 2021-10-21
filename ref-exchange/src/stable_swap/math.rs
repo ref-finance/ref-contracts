@@ -157,8 +157,8 @@ impl StableSwap {
                 }
                 d_prev = d;
 
-                // let ann = amp_factor.checked_mul(N_COINS.checked_pow(N_COINS)?.into())?;
-                let ann = amp_factor.checked_mul(n_coins.into())?;
+                let ann = amp_factor.checked_mul(n_coins.checked_pow(n_coins as u32)?.into())?;
+                // let ann = amp_factor.checked_mul(n_coins.into())?;
                 let leverage = (sum_x as u128).checked_mul(ann.into())?;
                 // d = (ann * sum_x + d_prod * n_coins) * d_prev / ((ann - 1) * d_prev + (n_coins + 1) * d_prod)
                 let numerator = d_prev.checked_mul(
@@ -262,9 +262,10 @@ impl StableSwap {
         index_x: usize, // x token's index
         index_y: usize, // y token's index
     ) -> Option<U256> {
-        let n_coins = current_c_amounts.len();
+        let n_coins = current_c_amounts.len() as u128;
         let amp_factor = self.compute_amp_factor()?;
-        let ann = amp_factor.checked_mul(n_coins as u128)?;
+        // let ann = amp_factor.checked_mul(n_coins as u128)?;
+        let ann = amp_factor.checked_mul(n_coins.checked_pow(n_coins as u32)?.into())?;
         // invariant
         let d = self.compute_d(current_c_amounts)?;
         let mut s_ = x_c_amount;

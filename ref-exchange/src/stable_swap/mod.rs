@@ -610,8 +610,8 @@ mod tests {
         let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
 
         let out = swap(&mut pool, 1, 1000000, 2);
-        assert_eq!(out, 1000062);
-        assert_eq!(pool.amounts, vec![6000000, 8999938]);
+        assert_eq!(out, 1000031);
+        assert_eq!(pool.amounts, vec![6000000, 8999969]);
         let out2 = swap(&mut pool, 2, out, 1);
         assert_eq!(out2, 999999); // due to precision difference.
         assert_eq!(pool.amounts, vec![5000001, 10000000]);
@@ -638,8 +638,8 @@ mod tests {
             num_shares,
             vec![1, 1], 
         );
-        assert_eq!(tokens[0], 2500046);
-        assert_eq!(tokens[1], 2500046);
+        assert_eq!(tokens[0], 2500023);
+        assert_eq!(tokens[1], 2500023);
 
         // Add only one side of the capital, and withdraw from another side
         let mut amounts2 = vec![5000000, 0];
@@ -679,7 +679,7 @@ mod tests {
             vec![1, 1], 
         );
         assert_eq!(tokens[0], 5996026);
-        assert_eq!(tokens[1], 9093917);
+        assert_eq!(tokens[1], 9093945);
     }
 
     /// Test that adding and then removing all of the liquidity leaves the pool empty and with no shares.
