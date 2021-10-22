@@ -133,7 +133,7 @@ impl Contract {
             tokens,
             decimals,
             amp_factor as u128,
-            fee + self.exchange_fee + self.referral_fee,
+            fee,
         )))
     }
 

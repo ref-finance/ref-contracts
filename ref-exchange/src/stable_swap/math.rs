@@ -23,7 +23,7 @@ pub struct Fees {
 impl Fees {
     pub fn new(total_fee: u32, fees: &SwapFees) -> Self {
         Self {
-            trade_fee: total_fee - fees.exchange_fee,
+            trade_fee: total_fee,
             admin_fee: fees.exchange_fee,
         }
     }
@@ -180,6 +180,7 @@ impl StableSwap {
                     break;
                 }
             }
+            println!("D: {:?}", d);
             Some(d)
         }
     }
