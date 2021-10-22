@@ -51,12 +51,27 @@ impl Pool {
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
-        fees: SwapFees,
     ) -> Vec<Balance> {
         match self {
             Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts),
             Pool::StableSwapPool(pool) => {
                 pool.remove_liquidity_by_shares(sender_id, shares, min_amounts)
+            }
+        }
+    }
+
+    /// Removes liquidity from underlying pool.
+    pub fn remove_liquidity_by_tokens(
+        &mut self,
+        sender_id: &AccountId,
+        amounts: Vec<Balance>,
+        max_burn_shares: Balance,
+        fees: SwapFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(pool) => {
+                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &fees)
             }
         }
     }

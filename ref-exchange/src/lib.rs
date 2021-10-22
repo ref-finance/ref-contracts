@@ -251,6 +251,36 @@ impl Contract {
                 .into_iter()
                 .map(|amount| amount.into())
                 .collect(),
+        );
+        self.pools.replace(pool_id, &pool);
+        let tokens = pool.tokens();
+        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
+        for i in 0..tokens.len() {
+            deposits.deposit(&tokens[i], amounts[i]);
+        }
+        // Freed up storage balance from LP tokens will be returned to near_balance.
+        if prev_storage > env::storage_usage() {
+            deposits.near_amount +=
+                (prev_storage - env::storage_usage()) as Balance * env::storage_byte_cost();
+        }
+        self.internal_save_account(&sender_id, deposits);
+    }
+
+    #[payable]
+    pub fn remove_liquidity_by_tokens(&mut self, pool_id: u64, amounts: Vec<U128>, max_burn_shares: U128) {
+        assert_one_yocto();
+        self.assert_contract_running();
+        let prev_storage = env::storage_usage();
+        let sender_id = env::predecessor_account_id();
+        let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        pool.remove_liquidity_by_tokens(
+            &sender_id,
+            amounts
+                .clone()
+                .into_iter()
+                .map(|amount| amount.into())
+                .collect(),
+            max_burn_shares.into(),
             SwapFees {
                 exchange_fee: self.exchange_fee,
                 exchange_id: self.owner_id.clone(),
@@ -262,7 +292,7 @@ impl Contract {
         let tokens = pool.tokens();
         let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
         for i in 0..tokens.len() {
-            deposits.deposit(&tokens[i], amounts[i]);
+            deposits.deposit(&tokens[i], amounts[i].into());
         }
         // Freed up storage balance from LP tokens will be returned to near_balance.
         if prev_storage > env::storage_usage() {
