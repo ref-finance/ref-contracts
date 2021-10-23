@@ -36,11 +36,6 @@ impl Fees {
     }
 
     pub fn trade_fee(&self, amount: Balance) -> Balance {
-        // println!(
-        //     "trade fee: {} {}",
-        //     amount * (self.trade_fee as u128) / (FEE_DIVISOR as u128),
-        //     amount
-        // );
         amount * (self.trade_fee as u128) / (FEE_DIVISOR as u128)
     }
 
@@ -180,7 +175,7 @@ impl StableSwap {
                     break;
                 }
             }
-            println!("D: {:?}", d);
+            // println!("D: {:?}", d);
             Some(d)
         }
     }
@@ -198,18 +193,17 @@ impl StableSwap {
         
         // Initial invariant
         let d_0 = self.compute_d(old_c_amounts)?;
-        println!("[compute_lp_amount_for_deposit] d_0: {:?}", d_0);
-
-        println!("[compute_lp_amount_for_deposit] deposit_c_amounts: {:?}", deposit_c_amounts);
+        // println!("[compute_lp_amount_for_deposit] d_0: {:?}", d_0);
+        // println!("[compute_lp_amount_for_deposit] deposit_c_amounts: {:?}", deposit_c_amounts);
 
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in deposit_c_amounts.iter().enumerate() {
             new_balances[index] = old_c_amounts[index].checked_add(*value)?;
         }
-        println!("[compute_lp_amount_for_deposit] new_balances: {:?}", new_balances);
+        // println!("[compute_lp_amount_for_deposit] new_balances: {:?}", new_balances);
         // Invariant after change
         let d_1 = self.compute_d(&new_balances)?;
-        println!("[compute_lp_amount_for_deposit] d_1: {:?}", d_1);
+        // println!("[compute_lp_amount_for_deposit] d_1: {:?}", d_1);
         if d_1 <= d_0 {
             None
         } else {
@@ -246,10 +240,10 @@ impl StableSwap {
                 .checked_div(d_0)?
                 .as_u128();
 
-            println!(
-                "[compute_lp_amount_for_deposit] mint_shares: {}, fee_parts: {}", 
-                mint_shares, diff_shares-mint_shares
-            );
+            // println!(
+            //     "[compute_lp_amount_for_deposit] mint_shares: {}, fee_parts: {}", 
+            //     mint_shares, diff_shares-mint_shares
+            // );
             Some((mint_shares, diff_shares-mint_shares))
         }
     }
@@ -318,16 +312,16 @@ impl StableSwap {
         let n_coins = old_c_amounts.len();
         // Initial invariant, D0
         let d_0 = self.compute_d(old_c_amounts)?;
-        println!("[compute_lp_amount_for_withdraw] d_0: {:?}", d_0);
+        // println!("[compute_lp_amount_for_withdraw] d_0: {:?}", d_0);
 
         // real invariant after withdraw, D1
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in withdraw_c_amounts.iter().enumerate() {
             new_balances[index] = old_c_amounts[index].checked_sub(*value)?;
         }
-        println!("[compute_lp_amount_for_withdraw] new_balances: {:?}", new_balances);
+        // println!("[compute_lp_amount_for_withdraw] new_balances: {:?}", new_balances);
         let d_1 = self.compute_d(&new_balances)?;
-        println!("[compute_lp_amount_for_withdraw] d_1: {:?}", d_1);
+        // println!("[compute_lp_amount_for_withdraw] d_1: {:?}", d_1);
 
         // compare ideal token portions from D1 with withdraws, to calculate diff fee.
         if d_1 >= d_0 {
@@ -365,8 +359,8 @@ impl StableSwap {
                 .checked_div(d_0)?
                 .as_u128();
 
-            println!("[compute_lp_amount_for_withdraw] burn_shares: {}, fee_parts: {}", 
-                burn_shares, burn_shares-diff_shares);
+            // println!("[compute_lp_amount_for_withdraw] burn_shares: {}, fee_parts: {}", 
+            //     burn_shares, burn_shares-diff_shares);
             Some((burn_shares, burn_shares-diff_shares))
         }
 
@@ -382,13 +376,12 @@ impl StableSwap {
         current_c_amounts: &Vec<Balance>, // in-pool tokens comparable amounts vector, 
         fees: &Fees,
     ) -> Option<SwapResult> {
-
         let y = self.compute_y(
             token_in_amount + current_c_amounts[token_in_idx], 
             current_c_amounts,
             token_in_idx,
             token_out_idx,
-        ).unwrap().as_u128();
+        )?.as_u128();
 
         let dy = current_c_amounts[token_out_idx].checked_sub(y)?;
         let trade_fee = fees.trade_fee(dy);

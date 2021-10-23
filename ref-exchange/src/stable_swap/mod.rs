@@ -3,7 +3,7 @@ use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance, Timestamp};
 
-use crate::errors::{ERR13_LP_NOT_REGISTERED, ERR14_LP_ALREADY_REGISTERED};
+use crate::errors::*;
 use crate::fees::SwapFees;
 use crate::stable_swap::math::{
     Fees, StableSwap, SwapResult, MAX_AMP, MAX_AMP_CHANGE, MIN_AMP, MIN_RAMP_DURATION,
@@ -52,9 +52,9 @@ impl StableSwapPool {
     ) -> Self {
         assert!(
             amp_factor >= MIN_AMP && amp_factor <= MAX_AMP,
-            "ERR_WRONG_AMP"
+            "{}", ERR61_AMP_ILLEGAL
         );
-        assert!(total_fee < FEE_DIVISOR, "ERR_FEE_TOO_LARGE");
+        assert!(total_fee < FEE_DIVISOR, "{}", ERR62_FEE_ILLEGAL);
         Self {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
             token_decimals,
@@ -85,7 +85,7 @@ impl StableSwapPool {
         self.token_account_ids
             .iter()
             .position(|id| id == token_id)
-            .expect("ERR_MISSING_TOKEN")
+            .expect(ERR63_MISSING_TOKEN)
     }
 
     /// Returns given pool's total fee.
@@ -103,7 +103,7 @@ impl StableSwapPool {
     /// by set other tokens balance into 0.
     pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>, fees: &SwapFees) -> Balance {
         let n_coins = self.token_account_ids.len();
-        assert_eq!(amounts.len(), n_coins, "ERR_WRONG_TOKEN_COUNT");
+        assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
 
         let invariant = self.get_invariant();
 
@@ -120,12 +120,12 @@ impl StableSwapPool {
             // Bootstrapping the pool, request providing all non-zero balances,
             // and all fee free.
             for c_amount in &c_amounts {
-                assert!(*c_amount > 0, "ERR_ZERO_AMOUNT_IN_INIT_STABLE_POOL");
+                assert!(*c_amount > 0, "{}", ERR65_INIT_TOKEN_BALANCE);
             }
             (
                 invariant
                     .compute_d(&c_amounts)
-                    .expect("ERR_CALC_FAILED")
+                    .expect(ERR66_INVARIANT_CALC_ERR)
                     .as_u128(),
                 0,
             )
@@ -138,8 +138,7 @@ impl StableSwapPool {
                     self.shares_total_supply,
                     &Fees::new(self.total_fee, &fees),
                 )
-                // TODO: proper error
-                .expect("ERR_CALC_FAILED")
+                .expect(ERR67_LPSHARE_CALC_ERR)
         };
 
         // TODO: add slippage check on the LP tokens.
@@ -158,31 +157,33 @@ impl StableSwapPool {
             .as_bytes(),
         );
 
-        // referral fee
-        if let Some(referral) = &fees.referral_id {
-            if self.shares.get(referral).is_some() {
-                let referral_share = fee_part * fees.referral_fee as u128 / FEE_DIVISOR as u128;
-                self.mint_shares(referral, referral_share);
-                env::log(
-                    format!(
-                        "Referral {} got {} shares",
-                        referral, referral_share
-                    )
-                    .as_bytes(),
-                );
-            }
-        } 
-        // exchange fee
-        let exchange_share = fee_part * fees.exchange_fee as u128 / FEE_DIVISOR as u128;
-        self.mint_shares(&fees.exchange_id, exchange_share);
-        env::log(
-            format!(
-                "Admin {} got {} shares",
-                &fees.exchange_id, exchange_share
-            )
-            .as_bytes(),
-        );
-
+        if fee_part > 0 {
+            // referral fee
+            if let Some(referral) = &fees.referral_id {
+                if self.shares.get(referral).is_some() {
+                    let referral_share = fee_part * fees.referral_fee as u128 / FEE_DIVISOR as u128;
+                    self.mint_shares(referral, referral_share);
+                    env::log(
+                        format!(
+                            "Referral {} got {} shares",
+                            referral, referral_share
+                        )
+                        .as_bytes(),
+                    );
+                }
+            } 
+            // exchange fee
+            let exchange_share = fee_part * fees.exchange_fee as u128 / FEE_DIVISOR as u128;
+            self.mint_shares(&fees.exchange_id, exchange_share);
+            env::log(
+                format!(
+                    "Admin {} got {} shares",
+                    &fees.exchange_id, exchange_share
+                )
+                .as_bytes(),
+            );
+        }
+        
         new_shares
     }
 
@@ -193,29 +194,29 @@ impl StableSwapPool {
         min_amounts: Vec<Balance>,
     ) -> Vec<Balance> {
         let n_coins = self.token_account_ids.len();
-        assert_eq!(min_amounts.len(), n_coins, "ERR_WRONG_TOKEN_COUNT");
-        let prev_shares_amount = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
-        assert!(prev_shares_amount >= shares, "ERR_NOT_ENOUGH_SHARES");
+        assert_eq!(min_amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
+        let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
+        assert!(prev_shares_amount >= shares, "{}", ERR34_INSUFFICIENT_LP_SHARES);
         let mut result = vec![0u128; n_coins];
 
-        println!("[remove_liquidity_by_shares] prev_shares_amount {}", prev_shares_amount);
-        println!("[remove_liquidity_by_shares] burn_shares_amount {}", shares);
-        println!("[remove_liquidity_by_shares] total_shares {}", self.shares_total_supply);
-        println!("[remove_liquidity_by_shares] in-pool tokens {:?}", self.amounts);
+        // println!("[remove_liquidity_by_shares] prev_shares_amount {}", prev_shares_amount);
+        // println!("[remove_liquidity_by_shares] burn_shares_amount {}", shares);
+        // println!("[remove_liquidity_by_shares] total_shares {}", self.shares_total_supply);
+        // println!("[remove_liquidity_by_shares] in-pool tokens {:?}", self.amounts);
         
         for i in 0..n_coins {
             result[i] = self.amounts[i]
                 .checked_mul(shares).unwrap()
                 .checked_div(self.shares_total_supply).unwrap();
-            assert!(result[i] >= min_amounts[i], "ERR_SLIPPAGE");
+            assert!(result[i] >= min_amounts[i], "{}", ERR68_SLIPPAGE);
             self.amounts[i] = self.amounts[i].checked_sub(result[i]).unwrap();
             assert!(self.amounts[i] >= MIN_RESERVE * self.token_decimals[i] as u128, 
-                "ERR_VIOLATE_MIN_RESERVE");
+                "{}", ERR69_MIN_RESERVE);
         }
 
         self.burn_shares(&sender_id, prev_shares_amount, shares);
-        println!("[remove_liquidity_by_shares] got tokens {:?}", result);
-        println!("[remove_liquidity_by_shares] Burned {} shares from {} by given shares", shares, sender_id);
+        // println!("[remove_liquidity_by_shares] got tokens {:?}", result);
+        // println!("[remove_liquidity_by_shares] Burned {} shares from {} by given shares", shares, sender_id);
         env::log(
             format!(
                 "Burned {} shares from {} by given shares",
@@ -238,8 +239,8 @@ impl StableSwapPool {
         fees: &SwapFees,
     ) -> Balance {
         let n_coins = self.token_account_ids.len();
-        assert_eq!(amounts.len(), n_coins, "ERR_WRONG_TOKEN_COUNT");
-        let prev_shares_amount = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
+        assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
+        let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
 
         // make amounts into comparable-amounts
         let mut c_amounts = amounts.clone();
@@ -257,15 +258,15 @@ impl StableSwapPool {
             &c_amounts,
             &c_current_amounts, 
             self.shares_total_supply, 
-            &trade_fee).expect("ERR_WITHDRAW_ERR");
+            &trade_fee).expect(ERR67_LPSHARE_CALC_ERR);
         
-        assert!(burn_shares <= prev_shares_amount, "ERR_NOT_ENOUGH_SHARE_TO_WITHDRAW");
-        assert!(burn_shares <= max_burn_shares, "ERR_SLIPPAGE");
+        assert!(burn_shares <= prev_shares_amount, "{}", ERR34_INSUFFICIENT_LP_SHARES);
+        assert!(burn_shares <= max_burn_shares, "{}", ERR68_SLIPPAGE);
 
         for i in 0..n_coins {
             self.amounts[i] = self.amounts[i].checked_sub(amounts[i]).unwrap();
             assert!(self.amounts[i] >= MIN_RESERVE * self.token_decimals[i] as u128, 
-                "ERR_VIOLATE_MIN_RESERVE");
+                "{}", ERR69_MIN_RESERVE);
         }
         self.burn_shares(&sender_id, prev_shares_amount, burn_shares);
         env::log(
@@ -276,30 +277,32 @@ impl StableSwapPool {
             .as_bytes(),
         );
 
-        // referral fee
-        if let Some(referral) = &fees.referral_id {
-            if self.shares.get(referral).is_some() {
-                let referral_share = fee_part * fees.referral_fee as u128 / FEE_DIVISOR as u128;
-                self.mint_shares(referral, referral_share);
-                env::log(
-                    format!(
-                        "Referral {} got {} shares",
-                        referral, referral_share
-                    )
-                    .as_bytes(),
-                );
-            }
-        } 
-        // exchange fee
-        let exchange_share = fee_part * fees.exchange_fee as u128 / FEE_DIVISOR as u128;
-        self.mint_shares(&fees.exchange_id, exchange_share);
-        env::log(
-            format!(
-                "Admin {} got {} shares",
-                &fees.exchange_id, exchange_share
-            )
-            .as_bytes(),
-        );
+        if fee_part > 0 {
+            // referral fee
+            if let Some(referral) = &fees.referral_id {
+                if self.shares.get(referral).is_some() {
+                    let referral_share = fee_part * fees.referral_fee as u128 / FEE_DIVISOR as u128;
+                    self.mint_shares(referral, referral_share);
+                    env::log(
+                        format!(
+                            "Referral {} got {} shares",
+                            referral, referral_share
+                        )
+                        .as_bytes(),
+                    );
+                }
+            } 
+            // exchange fee
+            let exchange_share = fee_part * fees.exchange_fee as u128 / FEE_DIVISOR as u128;
+            self.mint_shares(&fees.exchange_id, exchange_share);
+            env::log(
+                format!(
+                    "Admin {} got {} shares",
+                    &fees.exchange_id, exchange_share
+                )
+                .as_bytes(),
+            );
+        }
 
         burn_shares
     } 
@@ -335,7 +338,7 @@ impl StableSwapPool {
                 &c_current_amounts,
                 &Fees::new(self.total_fee, &fees),
             )
-            .expect("ERR_CALC");
+            .expect(ERR70_SWAP_OUT_CALC_ERR);
 
         let factor_x = 10_u128.checked_pow((TARGET_DECIMAL - self.token_decimals[token_in]) as u32).unwrap();
         let factor_y = 10_u128.checked_pow((TARGET_DECIMAL - self.token_decimals[token_out]) as u32).unwrap();
@@ -378,11 +381,11 @@ impl StableSwapPool {
         min_amount_out: Balance,
         fees: &SwapFees,
     ) -> Balance {
-        assert_ne!(token_in, token_out, "ERR_SAME_TOKEN_SWAP");
+        assert_ne!(token_in, token_out, "{}", ERR71_SWAP_DUP_TOKENS);
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
         let result = self.internal_get_return(in_idx, amount_in, out_idx, &fees);
-        assert!(result.amount_swapped >= min_amount_out, "ERR_MIN_AMOUNT");
+        assert!(result.amount_swapped >= min_amount_out, "{}", ERR68_SLIPPAGE);
         env::log(
             format!(
                 "Swapped {} {} for {} {}",
@@ -394,7 +397,7 @@ impl StableSwapPool {
         self.amounts[in_idx] = result.new_source_amount;
         self.amounts[out_idx] = result.new_destination_amount;
         assert!(self.amounts[out_idx] >= MIN_RESERVE * self.token_decimals[out_idx] as u128, 
-            "ERR_VIOLATE_MIN_RESERVE");
+            "{}", ERR69_MIN_RESERVE);
 
         // handle admin / referral fee.
         if fees.referral_fee + fees.exchange_fee > 0 {
@@ -456,7 +459,7 @@ impl StableSwapPool {
                     &c_current_amounts,
                     self.shares_total_supply,
                     &Fees::zero(),
-                ).expect("ERR_CALC_FAILED");
+                ).expect(ERR67_LPSHARE_CALC_ERR);
         
         self.amounts[token_id] += amount;
 
@@ -500,11 +503,11 @@ impl StableSwapPool {
 
     /// Transfers shares from predecessor to receiver.
     pub fn share_transfer(&mut self, sender_id: &AccountId, receiver_id: &AccountId, amount: u128) {
-        let balance = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
+        let balance = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
         if let Some(new_balance) = balance.checked_sub(amount) {
             self.shares.insert(&sender_id, &new_balance);
         } else {
-            env::panic(b"ERR_NOT_ENOUGH_SHARES");
+            env::panic(ERR34_INSUFFICIENT_LP_SHARES.as_bytes());
         }
         let balance_out = self
             .shares
@@ -533,11 +536,11 @@ impl StableSwapPool {
         let current_time = env::block_timestamp();
         assert!(
             current_time >= self.init_amp_time + MIN_RAMP_DURATION,
-            "ERR_RAMP_LOCKED"
+            "{}", ERR81_AMP_IN_LOCK
         );
         assert!(
             future_amp_time >= current_time + MIN_RAMP_DURATION,
-            "ERR_INSUFFICIENT_RAMP_TIME"
+            "{}", ERR82_INSUFFICIENT_RAMP_TIME
         );
         let invariant = StableSwap::new(
             self.init_amp_factor,
@@ -546,16 +549,16 @@ impl StableSwapPool {
             self.init_amp_time,
             self.stop_amp_time,
         );
-        let amp_factor = invariant.compute_amp_factor().expect("ERR_CALC");
+        let amp_factor = invariant.compute_amp_factor().expect(ERR66_INVARIANT_CALC_ERR);
         assert!(
             future_amp_factor > 0 && future_amp_factor < MAX_AMP,
-            "ERR_INVALID_AMP_FACTOR"
+            "{}", ERR83_INVALID_AMP_FACTOR
         );
         assert!(
             (future_amp_factor >= amp_factor && future_amp_factor <= amp_factor * MAX_AMP_CHANGE)
                 || (future_amp_factor < amp_factor
                     && future_amp_factor * MAX_AMP_CHANGE >= amp_factor),
-            "ERR_AMP_LARGE_CHANGE"
+            "{}", ERR84_AMP_LARGE_CHANGE
         );
         self.init_amp_factor = amp_factor;
         self.init_amp_time = current_time;
@@ -573,7 +576,7 @@ impl StableSwapPool {
             self.init_amp_time,
             self.stop_amp_time,
         );
-        let amp_factor = invariant.compute_amp_factor().expect("ERR_CALC");
+        let amp_factor = invariant.compute_amp_factor().expect(ERR65_INIT_TOKEN_BALANCE);
         self.init_amp_factor = amp_factor;
         self.target_amp_factor = amp_factor;
         self.init_amp_time = current_time;
@@ -807,7 +810,7 @@ mod tests {
 
     /// Test that adding and then removing all of the liquidity leaves the pool empty and with no shares.
     #[test]
-    #[should_panic(expected = "ERR_VIOLATE_MIN_RESERVE")]
+    #[should_panic(expected = "E69: pool reserved token balance less than MIN_RESERVE")]
     fn test_stable_add_transfer_remove_liquidity() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
