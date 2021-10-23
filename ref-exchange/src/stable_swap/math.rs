@@ -24,7 +24,7 @@ impl Fees {
     pub fn new(total_fee: u32, fees: &SwapFees) -> Self {
         Self {
             trade_fee: total_fee,
-            admin_fee: fees.exchange_fee,
+            admin_fee: fees.exchange_fee + fees.referral_fee,
         }
     }
 

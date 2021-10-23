@@ -388,8 +388,8 @@ impl StableSwapPool {
         assert!(result.amount_swapped >= min_amount_out, "{}", ERR68_SLIPPAGE);
         env::log(
             format!(
-                "Swapped {} {} for {} {}",
-                amount_in, token_in, result.amount_swapped, token_out
+                "Swapped {} {} for {} {}, total fee {}, admin fee {}",
+                amount_in, token_in, result.amount_swapped, token_out, result.fee, result.admin_fee
             )
             .as_bytes(),
         );
@@ -411,8 +411,8 @@ impl StableSwapPool {
                         let referral_share = self.admin_fee_to_liquidity(referral, out_idx, fee_token);
                         env::log(
                             format!(
-                                "Referral {} got {} shares",
-                                referral, referral_share
+                                "Referral {} got {} shares from {} {}",
+                                referral, referral_share, fee_token, self.token_account_ids[out_idx]
                             )
                             .as_bytes(),
                         );
@@ -425,8 +425,8 @@ impl StableSwapPool {
                 let exchange_share = self.admin_fee_to_liquidity(&fees.exchange_id, out_idx, fee_token);
                 env::log(
                     format!(
-                        "Admin {} got {} shares",
-                        &fees.exchange_id, exchange_share
+                        "Admin {} got {} shares from {} {}",
+                        &fees.exchange_id, exchange_share, fee_token, self.token_account_ids[out_idx]
                     )
                     .as_bytes(),
                 );
