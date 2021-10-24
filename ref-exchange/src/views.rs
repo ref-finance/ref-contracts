@@ -117,6 +117,10 @@ impl Contract {
         self.pools.get(pool_id).expect("ERR_NO_POOL").get_volumes()
     }
 
+    pub fn get_pool_share_price(&self, pool_id: u64) -> U128 {
+        self.pools.get(pool_id).expect("ERR_NO_POOL").get_share_price().into()
+    }
+
     /// Returns number of shares given account has in given pool.
     pub fn get_pool_shares(&self, pool_id: u64, account_id: ValidAccountId) -> U128 {
         self.pools

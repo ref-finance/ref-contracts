@@ -106,6 +106,14 @@ impl Pool {
         }
     }
 
+    /// Returns given pool's share price.
+    pub fn get_share_price(&self) -> u128 {
+        match self {
+            Pool::SimplePool(pool) => unimplemented!(),
+            Pool::StableSwapPool(pool) => pool.get_share_price(),
+        }
+    }
+
     /// Swaps given number of token_in for token_out and returns received amount.
     pub fn swap(
         &mut self,

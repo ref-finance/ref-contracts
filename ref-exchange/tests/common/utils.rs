@@ -194,6 +194,24 @@ pub fn mft_balance_of(
         .0
 }
 
+pub fn mft_total_supply(
+    pool: &ContractAccount<Exchange>,
+    token_or_pool: &str,
+) -> u128 {
+    view!(pool.mft_total_supply(token_or_pool.to_string()))
+        .unwrap_json::<U128>()
+        .0
+}
+
+pub fn pool_share_price(
+    pool: &ContractAccount<Exchange>,
+    pool_id: u64,
+) -> u128 {
+    view!(pool.get_pool_share_price(pool_id))
+        .unwrap_json::<U128>()
+        .0
+}
+
 //************************************
 
 pub fn dai() -> AccountId {

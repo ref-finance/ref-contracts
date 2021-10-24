@@ -98,6 +98,22 @@ impl StableSwapPool {
         self.volumes.clone()
     }
 
+    /// Get per lp token price, with 1e8 precision
+    pub fn get_share_price(&self) -> u128 {
+        let mut c_current_amounts = self.amounts.clone();
+        let mut sum_token = 0_u128;
+        for (index, value) in self.token_decimals.iter().enumerate() {
+            let factor = 10_u128.checked_pow((TARGET_DECIMAL - value) as u32).unwrap();
+            c_current_amounts[index] *= factor;
+            sum_token += c_current_amounts[index];
+        }
+
+        U256::from(sum_token)
+            .checked_mul(100000000.into()).unwrap()
+            .checked_div(self.shares_total_supply.into()).unwrap()
+            .as_u128()
+    }
+
     /// Add liquidity into the pool.
     /// Allows to add liquidity of a subset of tokens,
     /// by set other tokens balance into 0.
