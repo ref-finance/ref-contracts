@@ -8,7 +8,7 @@ use crate::fees::SwapFees;
 use crate::stable_swap::math::{
     Fees, StableSwap, SwapResult, MAX_AMP, MAX_AMP_CHANGE, MIN_AMP, MIN_RAMP_DURATION,
 };
-use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR};
+use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR, U256};
 use crate::StorageKey;
 
 mod math;
@@ -151,7 +151,7 @@ impl StableSwapPool {
         self.mint_shares(sender_id, new_shares);
         env::log(
             format!(
-                "Mint {} shares for {}, fee part {}",
+                "Mint {} shares for {}, fee is {} shares",
                 new_shares, sender_id, fee_part,
             )
             .as_bytes(),
@@ -205,9 +205,10 @@ impl StableSwapPool {
         // println!("[remove_liquidity_by_shares] in-pool tokens {:?}", self.amounts);
         
         for i in 0..n_coins {
-            result[i] = self.amounts[i]
-                .checked_mul(shares).unwrap()
-                .checked_div(self.shares_total_supply).unwrap();
+            result[i] = U256::from(self.amounts[i])
+                .checked_mul(shares.into()).unwrap()
+                .checked_div(self.shares_total_supply.into()).unwrap()
+                .as_u128();
             assert!(result[i] >= min_amounts[i], "{}", ERR68_SLIPPAGE);
             self.amounts[i] = self.amounts[i].checked_sub(result[i]).unwrap();
             assert!(self.amounts[i] >= MIN_RESERVE * self.token_decimals[i] as u128, 
@@ -219,8 +220,8 @@ impl StableSwapPool {
         // println!("[remove_liquidity_by_shares] Burned {} shares from {} by given shares", shares, sender_id);
         env::log(
             format!(
-                "Burned {} shares from {} by given shares",
-                shares, sender_id,
+                "LP {} remove {} shares to gain tokens {:?}",
+                sender_id, shares, result
             )
             .as_bytes(),
         );
@@ -271,8 +272,8 @@ impl StableSwapPool {
         self.burn_shares(&sender_id, prev_shares_amount, burn_shares);
         env::log(
             format!(
-                "Burned {} shares from {} by given tokens",
-                burn_shares, sender_id,
+                "LP {} removed {} shares by given tokens, and fee is {} shares",
+                sender_id, burn_shares, fee_part
             )
             .as_bytes(),
         );
