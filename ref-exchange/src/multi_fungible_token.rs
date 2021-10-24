@@ -250,15 +250,22 @@ impl Contract {
 
     pub fn mft_metadata(&self, token_id: String) -> FungibleTokenMetadata {
         match parse_token_id(token_id) {
-            TokenOrPool::Pool(pool_id) => FungibleTokenMetadata {
-                // [AUDIT_08]
-                spec: "mft-1.0.0".to_string(),
-                name: format!("ref-pool-{}", pool_id),
-                symbol: format!("REF-POOL-{}", pool_id),
-                icon: None,
-                reference: None,
-                reference_hash: None,
-                decimals: 24,
+            TokenOrPool::Pool(pool_id) => {
+                let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+                let decimals = match pool.kind().as_str() {
+                    "STABLE_SWAP" => 18,
+                    _ => 24,
+                };
+                FungibleTokenMetadata {
+                    // [AUDIT_08]
+                    spec: "mft-1.0.0".to_string(),
+                    name: format!("ref-pool-{}", pool_id),
+                    symbol: format!("REF-POOL-{}", pool_id),
+                    icon: None,
+                    reference: None,
+                    reference_hash: None,
+                    decimals,
+                }
             },
             TokenOrPool::Token(_token_id) => unimplemented!(),
         }

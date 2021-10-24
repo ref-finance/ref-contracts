@@ -151,8 +151,8 @@ impl StableSwapPool {
         self.mint_shares(sender_id, new_shares);
         env::log(
             format!(
-                "Mint {} shares for {}",
-                new_shares, sender_id,
+                "Mint {} shares for {}, fee part {}",
+                new_shares, sender_id, fee_part,
             )
             .as_bytes(),
         );

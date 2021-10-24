@@ -322,7 +322,12 @@ impl Contract {
         // println!("need: {}, attached: {}", storage_cost, env::attached_deposit());
         let refund = env::attached_deposit()
             .checked_sub(storage_cost)
-            .expect("ERR_STORAGE_DEPOSIT");
+            .expect(
+                format!(
+                    "ERR_STORAGE_DEPOSIT need {}, attatched {}", 
+                    storage_cost, env::attached_deposit()
+                ).as_str()
+            );
         if refund > 0 {
             Promise::new(env::predecessor_account_id()).transfer(refund);
         }

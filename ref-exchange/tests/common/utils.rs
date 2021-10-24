@@ -78,7 +78,7 @@ pub fn test_token(
     call!(root, t.new()).assert_success();
     call!(
         root,
-        t.mint(to_va(root.account_id.clone()), to_yocto("1000").into())
+        t.mint(to_va(root.account_id.clone()), to_yocto("1000000000").into())
     )
     .assert_success();
     for account_id in accounts_to_register {
@@ -206,6 +206,10 @@ pub fn eth() -> AccountId {
 
 pub fn usdt() -> AccountId {
     "usdt".to_string()
+}
+
+pub fn usdc() -> AccountId {
+    "usdc".to_string()
 }
 
 pub fn swap() -> AccountId {
@@ -406,4 +410,116 @@ pub fn setup_old_pool_with_liquidity() -> (
     )
     .assert_success();
     (root, owner, pool, token1, token2, token3)
+}
+
+pub fn setup_stable_pool_with_liquidity(
+    tokens: Vec<String>,
+    amounts: Vec<u128>,
+    decimals: Vec<u8>,
+    pool_fee: u32,
+    amp: u64,
+) -> (
+    UserAccount,
+    UserAccount,
+    ContractAccount<Exchange>,
+    Vec<ContractAccount<TestToken>>,
+) {
+    let root = init_simulator(None);
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let pool = deploy!(
+        contract: Exchange,
+        contract_id: swap(),
+        bytes: &EXCHANGE_WASM_BYTES,
+        signer_account: root,
+        init_method: new(owner.valid_account_id(), 1600, 400)
+    );
+
+    let mut token_contracts: Vec<ContractAccount<TestToken>> = vec![];
+    for token_name in &tokens {
+        token_contracts.push(test_token(&root, token_name.clone(), vec![swap()]));
+    }
+
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(
+            (&token_contracts).into_iter().map(|x| x.valid_account_id()).collect()
+        )
+    );
+    call!(
+        root,
+        pool.add_stable_swap_pool(
+            (&token_contracts).into_iter().map(|x| x.valid_account_id()).collect(), 
+            decimals,
+            pool_fee,
+            amp
+        ),
+        deposit = to_yocto("1"))
+    .assert_success();
+
+    call!(
+        root,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    for (idx, amount) in amounts.clone().into_iter().enumerate() {
+        let c = token_contracts.get(idx).unwrap();
+        call!(
+            root,
+            c.ft_transfer_call(
+                pool.valid_account_id(), 
+                U128(amount), 
+                None, 
+                "".to_string()
+            ),
+            deposit = 1
+        )
+        .assert_success();
+    }
+
+    call!(
+        root,
+        pool.add_liquidity(0, amounts.into_iter().map(|x| U128(x)).collect(), None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+    (root, owner, pool, token_contracts)
+}
+
+pub fn mint_and_deposit_token(
+    user: &UserAccount,
+    token: &ContractAccount<TestToken>,
+    ex: &ContractAccount<Exchange>,
+    amount: u128,
+) {
+    call!(
+        user,
+        token.mint(user.valid_account_id(), U128(amount))
+    )
+    .assert_success();
+    call!(
+        user,
+        ex.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        user,
+        token.ft_transfer_call(
+            ex.valid_account_id(), 
+            U128(amount), 
+            None, 
+            "".to_string()
+        ),
+        deposit = 1
+    )
+    .assert_success();
 }
