@@ -415,6 +415,10 @@ impl StableSwapPool {
         self.amounts[out_idx] = result.new_destination_amount;
         assert!(self.amounts[out_idx] >= MIN_RESERVE * self.token_decimals[out_idx] as u128, 
             "{}", ERR69_MIN_RESERVE);
+        
+        // Keeping track of volume per each input traded separately.
+        self.volumes[in_idx].input.0 += amount_in;
+        self.volumes[out_idx].output.0 += result.amount_swapped;
 
         // handle admin / referral fee.
         if fees.referral_fee + fees.exchange_fee > 0 {

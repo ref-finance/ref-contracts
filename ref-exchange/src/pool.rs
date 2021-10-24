@@ -109,7 +109,7 @@ impl Pool {
     /// Returns given pool's share price.
     pub fn get_share_price(&self) -> u128 {
         match self {
-            Pool::SimplePool(pool) => unimplemented!(),
+            Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => pool.get_share_price(),
         }
     }
