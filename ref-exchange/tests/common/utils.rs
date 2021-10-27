@@ -305,7 +305,7 @@ pub fn setup_pool_with_liquidity() -> (
     .assert_success();
     call!(
         root,
-        pool.add_liquidity(1, vec![U128(to_yocto("10")), U128(to_yocto("10"))], None),
+        pool.add_liquidity(2, vec![U128(to_yocto("10")), U128(to_yocto("10"))], None),
         deposit = to_yocto("0.0007")
     )
     .assert_success();

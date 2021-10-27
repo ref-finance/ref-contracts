@@ -48,9 +48,9 @@ fn modify_admin_fee() {
         to_yocto("0")
     );
 
-    let mut prev_dai = to_yocto("95");
-    let mut prev_eth = to_yocto("60");
-    let mut prev_usdt = to_yocto("95");
+    let mut prev_dai = to_yocto("85");
+    let mut prev_eth = to_yocto("70");
+    let mut prev_usdt = to_yocto("90");
 
     // swap in 1 dai to get eth
     call!(
@@ -119,16 +119,14 @@ fn modify_admin_fee() {
         .unwrap_json::<HashMap<AccountId, U128>>();
     
     assert_eq!(balances.get(&usdt()).unwrap().0, prev_usdt - to_yocto("1"));
-    assert_eq!(balances.get(&eth()).unwrap().0, prev_eth + 1870604781997187060478199);
+    assert_eq!(balances.get(&eth()).unwrap().0, prev_eth + 1814048647419868151852693);
     prev_usdt -= to_yocto("1");
-    // Warning!!! Should be identical but ......
-    // prev_eth += 1814048647419868151852693;
-    prev_eth += 1870604781997187060478199;
+    prev_eth += 1814048647419868151852693;
     assert_eq!(
         view!(pool.mft_balance_of(":1".to_string(), pool.valid_account_id()))
             .unwrap_json::<U128>()
             .0,
-        18750732479101047531
+        18182851357079036914
     );
 
     // here, we remove exchange_fee liquidity
@@ -160,7 +158,7 @@ fn modify_admin_fee() {
 
     let out_come = call!(
         owner,
-        pool.remove_exchange_fee_liquidity(1, U128(18750732479101047531), vec![U128(1), U128(1)]),
+        pool.remove_exchange_fee_liquidity(1, U128(18182851357079036914), vec![U128(1), U128(1)]),
         deposit = 1
     );
     out_come.assert_success();
@@ -173,7 +171,7 @@ fn modify_admin_fee() {
     );
     let balances = view!(pool.get_deposits(owner.valid_account_id()))
         .unwrap_json::<HashMap<AccountId, U128>>();
-    assert_eq!(balances.get(&usdt()).unwrap_or(&U128(0)).0, 200005312946332869948);
-    assert_eq!(balances.get(&eth()).unwrap_or(&U128(0)).0, 352453461935982284469);
+    assert_eq!(balances.get(&usdt()).unwrap_or(&U128(0)).0, 200007728217076967880);
+    assert_eq!(balances.get(&eth()).unwrap_or(&U128(0)).0, 331493118860347246997);
     assert_eq!(balances.get(&dai()).unwrap_or(&U128(0)).0, 500028389589818806);
 }
