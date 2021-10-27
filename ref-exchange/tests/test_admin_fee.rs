@@ -19,12 +19,16 @@ fn modify_admin_fee() {
     let (root, owner, pool, token1, token2, _) = setup_pool_with_liquidity();
     let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
 
+    // pool 0, 10 dai -> 20 eth; pool 1, 20 eth -> 10 usdt
+
+    // make sure the exchange's initial admin fee is 4 & 1 bps
     let metadata = get_metadata(&pool);
     assert_eq!(metadata.exchange_fee, 4);
     assert_eq!(metadata.referral_fee, 1);
     let pool_fee = view!(pool.get_pool_fee(0)).unwrap_json::<u32>();
     assert_eq!(pool_fee, 25);
 
+    // make sure pool info, especially total_fee and share_total_supply
     assert_eq!(
         view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
         PoolInfo {
@@ -35,6 +39,8 @@ fn modify_admin_fee() {
             shares_total_supply: to_yocto("1").into(),
         }
     );
+
+    // for a new pool, there is no lp token for the exchange
     assert_eq!(
         view!(pool.mft_balance_of(":0".to_string(), pool.valid_account_id()))
             .unwrap_json::<U128>()
@@ -46,6 +52,7 @@ fn modify_admin_fee() {
     let mut prev_eth = to_yocto("60");
     let mut prev_usdt = to_yocto("95");
 
+    // swap in 1 dai to get eth
     call!(
         root,
         pool.swap(
@@ -67,6 +74,7 @@ fn modify_admin_fee() {
     assert_eq!(balances.get(&eth()).unwrap().0, prev_eth + 1814048647419868151852693);
     prev_dai -= to_yocto("1");
     prev_eth += 1814048647419868151852693;
+    // the exchange got some lp tokens as 4 bps in 25 bps.
     assert_eq!(
         view!(pool.mft_balance_of(":0".to_string(), pool.valid_account_id()))
             .unwrap_json::<U128>()
@@ -74,7 +82,9 @@ fn modify_admin_fee() {
         45457128392697592
     );
 
-    // here, we modify admin_fee to more reasonable rate
+    // here, we modify admin_fee to more reasonable rate, 1600 bps in 25 bps
+    // which is 4 bps (exchange fee) in total, 
+    // and 1 bps (referal fee) in total.
     let out_come = call!(
         owner,
         pool.modify_admin_fee(1600, 400)
@@ -82,12 +92,14 @@ fn modify_admin_fee() {
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
 
+    // make sure the modification succeed
     let metadata = get_metadata(&pool);
     assert_eq!(metadata.exchange_fee, 1600);
     assert_eq!(metadata.referral_fee, 400);
     let pool_fee = view!(pool.get_pool_fee(0)).unwrap_json::<u32>();
     assert_eq!(pool_fee, 25);
 
+    // swap in 1 usdt to get eth
     call!(
         root,
         pool.swap(
@@ -105,9 +117,12 @@ fn modify_admin_fee() {
     .assert_success();
     let balances = view!(pool.get_deposits(root.valid_account_id()))
         .unwrap_json::<HashMap<AccountId, U128>>();
+    
     assert_eq!(balances.get(&usdt()).unwrap().0, prev_usdt - to_yocto("1"));
     assert_eq!(balances.get(&eth()).unwrap().0, prev_eth + 1870604781997187060478199);
     prev_usdt -= to_yocto("1");
+    // Warning!!! Should be identical but ......
+    // prev_eth += 1814048647419868151852693;
     prev_eth += 1870604781997187060478199;
     assert_eq!(
         view!(pool.mft_balance_of(":1".to_string(), pool.valid_account_id()))
@@ -123,6 +138,7 @@ fn modify_admin_fee() {
     assert_eq!(balances.get(&eth()).unwrap_or(&U128(0)).0, 0);
     assert_eq!(balances.get(&dai()).unwrap_or(&U128(0)).0, 0);
     
+    // only owner can call, and withdraw liquidity to owner's inner account
     let out_come = call!(
         owner,
         pool.remove_exchange_fee_liquidity(0, U128(45457128392697592), vec![U128(1), U128(1)]),
