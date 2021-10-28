@@ -609,7 +609,7 @@ impl StableSwapPool {
 mod tests {
     use near_sdk::test_utils::{accounts, VMContextBuilder};
     use near_sdk::{testing_env, MockedBlockchain};
-    use near_sdk_sim::to_yocto;
+    // use near_sdk_sim::to_yocto;
 
     use super::*;
 
@@ -723,25 +723,6 @@ mod tests {
         assert_eq!(pool.amounts, vec![199999000000, 1556832587]);
     }
 
-    // #[test]
-    // fn test_stable_julia_08() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let fees = SwapFees::zero();
-    //     let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1000, 0);
-    //     assert_eq!(
-    //         pool.tokens(),
-    //         vec![accounts(1).to_string(), accounts(2).to_string()]
-    //     );
-
-    //     let mut amounts = vec![100000000000, 100000000000];
-    //     let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
-
-    //     let out = swap(&mut pool, 1, 100000000000000000, 2);
-    //     assert_eq!(out, 99999999999);
-    //     assert_eq!(pool.amounts, vec![100000100000000000, 1]);
-    // }
-
     #[test]
     fn test_stable_basics() {
         let mut context = VMContextBuilder::new();
@@ -853,7 +834,7 @@ mod tests {
 
         // Remove all liquidity.
         testing_env!(context.predecessor_account_id(accounts(3)).build());
-        let out_amounts = pool.remove_liquidity_by_shares(
+        pool.remove_liquidity_by_shares(
             accounts(3).as_ref(), 
             num_shares,
             vec![1, 1], 

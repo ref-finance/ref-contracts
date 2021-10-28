@@ -334,8 +334,10 @@ impl Contract {
     /// only global whitelisted token can be stored in lost-found
     pub(crate) fn internal_lostfound(&mut self, token_id: &AccountId, amount: u128) {
         if self.whitelisted_tokens.contains(token_id) {
+            // TODO: consider change owner_id to env::current_account_id
             let mut lostfound = self.internal_unwrap_or_default_account(&self.owner_id);
             lostfound.deposit(token_id, amount);
+            // TODO: consider change owner_id to env::current_account_id
             self.accounts.insert(&self.owner_id, &lostfound.into());
         } else {
             env::panic("ERR: non-whitelisted token can NOT deposit into lost-found.".as_bytes());

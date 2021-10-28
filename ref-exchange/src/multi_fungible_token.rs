@@ -240,6 +240,7 @@ impl Contract {
                 let refund_to = if self.accounts.get(&sender_id).is_some() {
                     sender_id
                 } else {
+                    // TODO: consider change owner_id to env::current_account_id
                     self.owner_id.clone()
                 };
                 self.internal_mft_transfer(token_id, &receiver_id, &refund_to, refund_amount, None);

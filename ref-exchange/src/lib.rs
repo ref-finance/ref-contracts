@@ -214,7 +214,7 @@ impl Contract {
             &mut amounts,
             SwapFees {
                 exchange_fee: self.exchange_fee,
-                exchange_id: self.owner_id.clone(),
+                exchange_id: env::current_account_id(),
                 referral_fee: 0,
                 referral_id: None,
             },
@@ -283,7 +283,7 @@ impl Contract {
             max_burn_shares.into(),
             SwapFees {
                 exchange_fee: self.exchange_fee,
-                exchange_id: self.owner_id.clone(),
+                exchange_id: env::current_account_id(),
                 referral_fee: 0,
                 referral_id: None,
             },
@@ -336,9 +336,11 @@ impl Contract {
     /// Adds given pool to the list and returns it's id.
     /// If there is not enough attached balance to cover storage, fails.
     /// If too much attached - refunds it back.
-    fn internal_add_pool(&mut self, pool: Pool) -> u64 {
+    fn internal_add_pool(&mut self, mut pool: Pool) -> u64 {
         let prev_storage = env::storage_usage();
         let id = self.pools.len() as u64;
+        // exchange share was registered at creation time
+        pool.share_register(&env::current_account_id());
         self.pools.push(&pool);
         self.internal_check_storage(prev_storage);
         id
@@ -409,7 +411,7 @@ impl Contract {
             min_amount_out,
             SwapFees {
                 exchange_fee: self.exchange_fee,
-                exchange_id: self.owner_id.clone(),
+                exchange_id: env::current_account_id(),
                 referral_fee: self.referral_fee,
                 referral_id: referral_id.clone(),
             },
