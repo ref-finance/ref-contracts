@@ -1,7 +1,7 @@
 use near_sdk::{env, AccountId};
 
 /// Maintain information about fees.
-pub struct SwapFees {
+pub struct AdminFees {
     /// Basis points of the fee for exchange.
     pub exchange_fee: u32,
     /// Basis points of the fee for referrer.
@@ -10,9 +10,9 @@ pub struct SwapFees {
     pub referral_id: Option<AccountId>,
 }
 
-impl SwapFees {
+impl AdminFees {
     pub fn new(exchange_fee: u32) -> Self {
-        SwapFees {
+        AdminFees {
             exchange_fee,
             exchange_id: env::current_account_id(),
             referral_fee: 0,

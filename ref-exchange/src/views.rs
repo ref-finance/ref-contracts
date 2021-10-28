@@ -18,6 +18,8 @@ pub struct ContractMetadata {
     pub guardians: Vec<AccountId>,
     pub pool_count: u64,
     pub state: RunningState,
+    pub exchange_fee: u32,
+    pub referral_fee: u32,
 }
 
 #[derive(Serialize, Deserialize, PartialEq)]
@@ -77,6 +79,8 @@ impl Contract {
             guardians: self.guardians.to_vec(),
             pool_count: self.pools.len(),
             state: self.state.clone(),
+            exchange_fee: self.exchange_fee,
+            referral_fee: self.referral_fee,
         }
     }
 

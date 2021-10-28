@@ -20,7 +20,7 @@ pub struct Fees {
 
 /// details of admin_fee,
 /// admin_fee = exchange_fee + referral_fee
-pub struct SwapFees {
+pub struct AdminFees {
     /// Basis points of the fee for exchange.
     pub exchange_fee: u32,
     /// Basis points of the fee for referrer.

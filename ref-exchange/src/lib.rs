@@ -17,7 +17,7 @@ use crate::account_deposit::{Account, VAccount};
 pub use crate::action::SwapAction;
 use crate::action::{Action, ActionResult};
 use crate::errors::*;
-use crate::fees::SwapFees;
+use crate::admin_fee::AdminFees;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
@@ -27,7 +27,7 @@ pub use crate::views::{PoolInfo, ContractMetadata};
 mod account_deposit;
 mod action;
 mod errors;
-mod fees;
+mod admin_fee;
 mod legacy;
 mod multi_fungible_token;
 mod owner;
@@ -113,9 +113,9 @@ impl Contract {
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
             tokens,
-            fee + self.exchange_fee + self.referral_fee,
-            self.exchange_fee,
-            self.referral_fee,
+            fee,
+            0,
+            0,
         )))
     }
 
@@ -212,12 +212,7 @@ impl Contract {
         pool.add_liquidity(
             &sender_id,
             &mut amounts,
-            SwapFees {
-                exchange_fee: self.exchange_fee,
-                exchange_id: env::current_account_id(),
-                referral_fee: 0,
-                referral_id: None,
-            },
+            AdminFees::new(self.exchange_fee),
         );
         if let Some(min_amounts) = min_amounts {
             // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
@@ -251,6 +246,8 @@ impl Contract {
                 .into_iter()
                 .map(|amount| amount.into())
                 .collect(),
+            AdminFees::new(self.exchange_fee),
+            
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
@@ -281,12 +278,7 @@ impl Contract {
                 .map(|amount| amount.into())
                 .collect(),
             max_burn_shares.into(),
-            SwapFees {
-                exchange_fee: self.exchange_fee,
-                exchange_id: env::current_account_id(),
-                referral_fee: 0,
-                referral_id: None,
-            },
+            AdminFees::new(self.exchange_fee),
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
@@ -409,7 +401,7 @@ impl Contract {
             amount_in,
             token_out,
             min_amount_out,
-            SwapFees {
+            AdminFees {
                 exchange_fee: self.exchange_fee,
                 exchange_id: env::current_account_id(),
                 referral_fee: self.referral_fee,
@@ -488,7 +480,7 @@ mod tests {
             .predecessor_account_id(account_id.clone())
             .attached_deposit(env::storage_byte_cost() * 300)
             .build());
-        let pool_id = contract.add_simple_pool(tokens, 25);
+        let pool_id = contract.add_simple_pool(tokens, 30);
         testing_env!(context
             .predecessor_account_id(account_id.clone())
             .attached_deposit(to_yocto("0.03"))
@@ -607,7 +599,7 @@ mod tests {
         // Exchange fees left in the pool as liquidity + 1m from transfer.
         assert_eq!(
             contract.get_pool_total_shares(0).0,
-            33337501041992301475 + 1_000_000
+            100012503125976904 + 1_000_000
         );
 
         contract.withdraw(

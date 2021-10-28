@@ -2,7 +2,7 @@
 ///! Large part of the code was taken from https://github.com/saber-hq/stable-swap/blob/master/stable-swap-math/src/curve.rs
 use near_sdk::{Balance, Timestamp};
 
-use crate::fees::SwapFees;
+use crate::admin_fee::AdminFees;
 use crate::utils::{FEE_DIVISOR, U256};
 
 /// Minimum ramp duration.
@@ -21,7 +21,7 @@ pub struct Fees {
 }
 
 impl Fees {
-    pub fn new(total_fee: u32, fees: &SwapFees) -> Self {
+    pub fn new(total_fee: u32, fees: &AdminFees) -> Self {
         Self {
             trade_fee: total_fee,
             admin_fee: fees.exchange_fee + fees.referral_fee,

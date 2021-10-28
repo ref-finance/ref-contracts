@@ -1,7 +1,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, Balance};
 
-use crate::fees::SwapFees;
+use crate::admin_fee::AdminFees;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
 use crate::utils::SwapVolume;
@@ -37,7 +37,7 @@ impl Pool {
         &mut self,
         sender_id: &AccountId,
         amounts: &mut Vec<Balance>,
-        fees: SwapFees,
+        fees: AdminFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts),
@@ -46,11 +46,13 @@ impl Pool {
     }
 
     /// Removes liquidity from underlying pool.
+    #[allow(unused_variables)]
     pub fn remove_liquidity(
         &mut self,
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
+        fees: AdminFees,
     ) -> Vec<Balance> {
         match self {
             Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts),
@@ -66,7 +68,7 @@ impl Pool {
         sender_id: &AccountId,
         amounts: Vec<Balance>,
         max_burn_shares: Balance,
-        fees: SwapFees,
+        fees: AdminFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
@@ -121,11 +123,11 @@ impl Pool {
         amount_in: Balance,
         token_out: &AccountId,
         min_amount_out: Balance,
-        fees: SwapFees,
+        fees: AdminFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => {
-                pool.swap(token_in, amount_in, token_out, min_amount_out, fees)
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &fees)
             }
             Pool::StableSwapPool(pool) => {
                 pool.swap(token_in, amount_in, token_out, min_amount_out, &fees)
