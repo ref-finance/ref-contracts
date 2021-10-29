@@ -676,6 +676,7 @@ impl StableSwapPool {
 mod tests {
     use near_sdk::test_utils::{accounts, VMContextBuilder};
     use near_sdk::{testing_env, MockedBlockchain};
+    use std::convert::TryInto;
     // use near_sdk_sim::to_yocto;
 
     use super::*;
@@ -788,6 +789,71 @@ mod tests {
         let out = swap(&mut pool, 1, 99999000000, 2);
         assert_eq!(out, 98443167413);
         assert_eq!(pool.amounts, vec![199999000000, 1556832587]);
+    }
+
+    #[test]
+    fn test_stable_max() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let fees = AdminFees::zero();
+        let mut pool = StableSwapPool::new(
+            0, 
+            vec![
+                "aone.near".try_into().unwrap(),
+                "atwo.near".try_into().unwrap(),
+                "athree.near".try_into().unwrap(),
+                "afour.near".try_into().unwrap(),
+                "afive.near".try_into().unwrap(),
+                "asix.near".try_into().unwrap(),
+                "aseven.near".try_into().unwrap(),
+                "aeight.near".try_into().unwrap(),
+                "anine.near".try_into().unwrap(), 
+            ], 
+            vec![
+                6, 
+                6, 
+                6, 
+                6, 
+                6, 
+                6, 
+                6, 
+                6, 
+                6,
+            ], 
+            1000, 
+            0
+        );
+        assert_eq!(
+            pool.tokens(),
+            vec![
+                "aone.near".to_string(),
+                "atwo.near".to_string(),
+                "athree.near".to_string(),
+                "afour.near".to_string(),
+                "afive.near".to_string(),
+                "asix.near".to_string(),
+                "aseven.near".to_string(),
+                "aeight.near".to_string(),
+                "anine.near".to_string(), 
+            ]
+        );
+
+        let mut amounts = vec![
+            100000000000_000000, 
+            100000000000_000000, 
+            100000000000_000000, 
+            100000000000_000000, 
+            100000000000_000000,
+            100000000000_000000, 
+            100000000000_000000, 
+            100000000000_000000, 
+            100000000000_000000,
+        ];
+        let share = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
+        assert_eq!(share, 900000000000_000000000000000000);
+        // let out = swap(&mut pool, 1, 99999000000, 2);
+        // assert_eq!(out, 98443167413);
+        // assert_eq!(pool.amounts, vec![199999000000, 1556832587]);
     }
 
     #[test]

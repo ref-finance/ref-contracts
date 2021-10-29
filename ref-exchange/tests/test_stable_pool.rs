@@ -311,49 +311,49 @@ fn sim_stable_lp() {
     println!("share_price: {}", last_share_price);
 }
 
-// #[test]
-// fn sim_stable_max_liquidity() {
-//     let (root, _owner, pool, tokens) = 
-//         setup_stable_pool_with_liquidity(
-//             vec![dai(), usdt(), usdc(), 
-//                 "dai1".to_string(), "usdt1".to_string(), "usdc1".to_string(), 
-//                 "dai2".to_string(), "usdt2".to_string(), "usdc2".to_string(),
-//                 ],
-//             vec![
-//                 100000*ONE_DAI, 100000*ONE_USDT, 100000*ONE_USDC, 
-//                 100000*ONE_DAI, 100000*ONE_USDT, 100000*ONE_USDC, 
-//                 100000*ONE_DAI, 100000*ONE_USDT, 100000*ONE_USDC
-//             ],
-//             vec![18, 6, 6, 18, 6, 6, 18, 6, 6],
-//             25,
-//             10000,
-//         );
-//     let tokens = &tokens;
+#[test]
+fn sim_stable_max_liquidity() {
+    let (root, _owner, pool, tokens) = 
+        setup_stable_pool_with_liquidity(
+            vec![dai(), usdt(), usdc(), 
+                "dai1".to_string(), "usdt1".to_string(), "usdc1".to_string(), 
+                "dai2".to_string(), "usdt2".to_string(), "usdc2".to_string(),
+                ],
+            vec![
+                100000*ONE_DAI, 100000*ONE_USDT, 100000*ONE_USDC, 
+                100000*ONE_DAI, 100000*ONE_USDT, 100000*ONE_USDC, 
+                100000*ONE_DAI, 100000*ONE_USDT, 100000*ONE_USDC
+            ],
+            vec![18, 6, 6, 18, 6, 6, 18, 6, 6],
+            25,
+            10000,
+        );
+    let tokens = &tokens;
 
-//     // add massive liquidity (100 billion)
-//     let user = root.create_user("user".to_string(), to_yocto("100"));
-//     mint_and_deposit_token(&user, &tokens[0], &pool, 100_000_000_000*ONE_DAI);
-//     mint_and_deposit_token(&user, &tokens[1], &pool, 100_000_000_000*ONE_USDT);
-//     mint_and_deposit_token(&user, &tokens[2], &pool, 100_000_000_000*ONE_USDC);
-//     mint_and_deposit_token(&user, &tokens[3], &pool, 100_000_000_000*ONE_DAI);
-//     mint_and_deposit_token(&user, &tokens[4], &pool, 100_000_000_000*ONE_USDT);
-//     mint_and_deposit_token(&user, &tokens[5], &pool, 100_000_000_000*ONE_USDC);
-//     mint_and_deposit_token(&user, &tokens[6], &pool, 100_000_000_000*ONE_DAI);
-//     mint_and_deposit_token(&user, &tokens[7], &pool, 100_000_000_000*ONE_USDT);
-//     mint_and_deposit_token(&user, &tokens[8], &pool, 100_000_000_000*ONE_USDC);
-//     let out_come = call!(
-//         user,
-//         pool.add_liquidity(0, vec![
-//             U128(100_000_000_000*ONE_DAI), U128(100_000_000_000*ONE_USDT), U128(100_000_000_000*ONE_USDC),
-//             U128(100_000_000_000*ONE_DAI), U128(100_000_000_000*ONE_USDT), U128(100_000_000_000*ONE_USDC),
-//             U128(100_000_000_000*ONE_DAI), U128(100_000_000_000*ONE_USDT), U128(100_000_000_000*ONE_USDC)
-//             ], None),
-//         deposit = to_yocto("0.0007") 
-//     );
-//     out_come.assert_success();
-//     println!("{:#?}", get_logs(&out_come));
-//     assert_eq!(mft_balance_of(&pool, ":0", &user.account_id()), 299997852136734902917811274863);
-//     assert_eq!(mft_total_supply(&pool, ":0"), 299998296064761697388281990824);
-//     let last_share_price = pool_share_price(&pool, 0);
-//     println!("share_price: {}", last_share_price);
-// }
+    // add massive liquidity (100 billion)
+    let user = root.create_user("user".to_string(), to_yocto("100"));
+    mint_and_deposit_token(&user, &tokens[0], &pool, 100_000_000_000*ONE_DAI);
+    mint_and_deposit_token(&user, &tokens[1], &pool, 100_000_000_000*ONE_USDT);
+    mint_and_deposit_token(&user, &tokens[2], &pool, 100_000_000_000*ONE_USDC);
+    mint_and_deposit_token(&user, &tokens[3], &pool, 100_000_000_000*ONE_DAI);
+    mint_and_deposit_token(&user, &tokens[4], &pool, 100_000_000_000*ONE_USDT);
+    mint_and_deposit_token(&user, &tokens[5], &pool, 100_000_000_000*ONE_USDC);
+    mint_and_deposit_token(&user, &tokens[6], &pool, 100_000_000_000*ONE_DAI);
+    mint_and_deposit_token(&user, &tokens[7], &pool, 100_000_000_000*ONE_USDT);
+    mint_and_deposit_token(&user, &tokens[8], &pool, 100_000_000_000*ONE_USDC);
+    let out_come = call!(
+        user,
+        pool.add_liquidity(0, vec![
+            U128(100_000_000_000*ONE_DAI), U128(100_000_000_000*ONE_USDT), U128(100_000_000_000*ONE_USDC),
+            U128(100_000_000_000*ONE_DAI), U128(100_000_000_000*ONE_USDT), U128(100_000_000_000*ONE_USDC),
+            U128(100_000_000_000*ONE_DAI), U128(100_000_000_000*ONE_USDT), U128(100_000_000_000*ONE_USDC)
+            ], None),
+        deposit = to_yocto("0.0007") 
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+    assert_eq!(mft_balance_of(&pool, ":0", &user.account_id()), 900000000000000000000000000000);
+    assert_eq!(mft_total_supply(&pool, ":0"), 900000900000000000000000000000);
+    let last_share_price = pool_share_price(&pool, 0);
+    println!("share_price: {}", last_share_price);
+}
