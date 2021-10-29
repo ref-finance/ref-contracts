@@ -37,6 +37,7 @@ pub const ERR41_WRONG_ACTION_RESULT: &str = "E41: wrong action result type";
 pub const ERR51_CONTRACT_PAUSED: &str = "E51: contract paused";
 
 // Swap
+pub const ERR60_DECIMAL_ILLEGAL: &str = "E60: illegal decimal";
 pub const ERR61_AMP_ILLEGAL: &str = "E61: illegal amp";
 pub const ERR62_FEE_ILLEGAL: &str = "E62: illegal fee";
 pub const ERR63_MISSING_TOKEN: &str = "E63: missing token";

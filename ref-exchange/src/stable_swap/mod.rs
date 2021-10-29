@@ -13,6 +13,8 @@ use crate::StorageKey;
 
 mod math;
 
+pub const MIN_DECIMAL: u8 = 1;
+pub const MAX_DECIMAL: u8 = 18;
 pub const TARGET_DECIMAL: u8 = 18;
 pub const MIN_RESERVE: u128 = 1;
 
@@ -50,6 +52,10 @@ impl StableSwapPool {
         amp_factor: u128,
         total_fee: u32,
     ) -> Self {
+        for decimal in token_decimals.clone().into_iter() {
+            assert!(decimal <= MAX_DECIMAL, "{}", ERR60_DECIMAL_ILLEGAL);
+            assert!(decimal >= MIN_DECIMAL, "{}", ERR60_DECIMAL_ILLEGAL);
+        }
         assert!(
             amp_factor >= MIN_AMP && amp_factor <= MAX_AMP,
             "{}",

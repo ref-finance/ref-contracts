@@ -149,8 +149,7 @@ impl StableSwap {
                 let mut d_prod = d;
                 for c_amount in c_amounts {
                     d_prod = d_prod.checked_mul(d)?
-                    .checked_div((c_amount * n_coins).into())?;  // we can ensure non-zero for each token
-                    // .checked_div((c_amount * n_coins + 1).into())?; // +1 to prevent divided by zero
+                    .checked_div((c_amount * n_coins + 1).into())?; // +1 to prevent divided by zero
                 }
                 d_prev = d;
                 // println!("#Debug d_prod: {:?}", d_prod);
