@@ -13,7 +13,7 @@ The most likely first stable pool in REF would be [nDAI, nUSDT, nUSDC].
 ## Interfaces
 ---
 ### Create Stable Swap Pool
-Only owner of the ref-exchange contract can create stable swap pool.
+Only owner or guardians of the ref-exchange contract can create stable swap pool.
 ```Bash
 near call ref-exchange.testnet add_stable_swap_pool '{"tokens": ["ndai.testnet", "nusdt.testnet", "nusdc.testnet"], "decimals": [18, 6, 6], "fee": 25, "amp_factor": 100000}' --account_id=owner.testnet --amount=1
 # it will return pool_id
