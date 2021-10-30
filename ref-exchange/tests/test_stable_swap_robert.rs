@@ -131,7 +131,7 @@ fn setup_stable_pool_with_liquidity() -> (
         )
     );
     call!(
-        root,
+        owner,
         pool.add_stable_swap_pool(
             vec![
                 token1.valid_account_id(), 

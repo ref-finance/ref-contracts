@@ -464,7 +464,7 @@ pub fn setup_stable_pool_with_liquidity(
         )
     );
     call!(
-        root,
+        owner,
         pool.add_stable_swap_pool(
             (&token_contracts).into_iter().map(|x| x.valid_account_id()).collect(), 
             decimals,

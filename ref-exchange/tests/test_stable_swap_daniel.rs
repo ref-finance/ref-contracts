@@ -121,7 +121,7 @@ fn setup_stable_pool_with_liquidity() -> (
         )
     );
     call!(
-        root,
+        owner,
         pool.add_stable_swap_pool(
             vec![
                 token1.valid_account_id(), 
@@ -210,7 +210,7 @@ fn test_stable_e61 () {
 
     // small amp
     let outcome = call!(
-        root,
+        owner,
         pool.add_stable_swap_pool(
             vec![
                 token1.valid_account_id(), 
@@ -227,7 +227,7 @@ fn test_stable_e61 () {
 
     // large amp
     let outcome = call!(
-        root,
+        owner,
         pool.add_stable_swap_pool(
             vec![
                 token1.valid_account_id(), 
@@ -270,7 +270,7 @@ fn test_stable_e62() {
 
     // invalid fee
     let outcome = call!(
-        root,
+        owner,
         pool.add_stable_swap_pool(
             vec![
                 token1.valid_account_id(), 
@@ -356,7 +356,7 @@ fn test_stable_e64() {
         )
     );
     call!(
-        root,
+        owner,
         pool.add_stable_swap_pool(
             vec![
                 token1.valid_account_id(), 
@@ -458,7 +458,7 @@ fn test_stable_e65() {
         )
     );
     call!(
-        root,
+        owner,
         pool.add_stable_swap_pool(
             vec![
                 token1.valid_account_id(), 
