@@ -131,7 +131,8 @@ impl StableSwapPool {
     pub fn add_liquidity(
         &mut self,
         sender_id: &AccountId,
-        amounts: &mut Vec<Balance>,
+        amounts: &Vec<Balance>,
+        min_shares: Balance,
         fees: &AdminFees,
     ) -> Balance {
         let n_coins = self.token_account_ids.len();
@@ -175,8 +176,8 @@ impl StableSwapPool {
                 .expect(ERR67_LPSHARE_CALC_ERR)
         };
 
-        // TODO: add slippage check on the LP tokens.
-        // assert!(new_shares > min_shares, "ERR_SLIPPAGE");
+        //slippage check on the LP tokens.
+        assert!(new_shares >= min_shares, "{}", ERR68_SLIPPAGE);
 
         for i in 0..n_coins {
             self.amounts[i] = self.amounts[i].checked_add(amounts[i]).unwrap();
@@ -714,7 +715,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000, 100000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
 
         let out = swap(&mut pool, 1, 10000000000, 2);
         assert_eq!(out, 9999495232);
@@ -733,7 +734,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000, 100000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
 
         let out = swap(&mut pool, 1, 0, 2);
         assert_eq!(out, 0);
@@ -752,7 +753,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000, 100000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
 
         let out = swap(&mut pool, 1, 1, 2);
         assert_eq!(out, 1);
@@ -771,7 +772,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000, 100000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
 
         let out = swap(&mut pool, 1, 100000000000, 2);
         assert_eq!(out, 98443663539);
@@ -790,7 +791,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000, 100000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
 
         let out = swap(&mut pool, 1, 99999000000, 2);
         assert_eq!(out, 98443167413);
@@ -855,7 +856,7 @@ mod tests {
             100000000000_000000, 
             100000000000_000000,
         ];
-        let share = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
+        let share = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
         assert_eq!(share, 900000000000_000000000000000000);
         // let out = swap(&mut pool, 1, 99999000000, 2);
         // assert_eq!(out, 98443167413);
@@ -874,7 +875,7 @@ mod tests {
         );
 
         let mut amounts = vec![5000000, 10000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
 
         let out = swap(&mut pool, 1, 1000000, 2);
         assert_eq!(out, 1000031);
@@ -885,7 +886,7 @@ mod tests {
 
         // Add only one side of the capital.
         let mut amounts2 = vec![5000000, 0];
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, &fees);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, 1, &fees);
 
         // Withdraw on same side of the capital.
         let shares_burned = pool.remove_liquidity_by_tokens(
@@ -898,7 +899,7 @@ mod tests {
 
         // Add only one side of the capital, and withdraw by share
         let mut amounts2 = vec![5000000, 0];
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, &fees);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, 1, &fees);
 
         let tokens = pool.remove_liquidity_by_shares(accounts(0).as_ref(), num_shares, vec![1, 1]);
         assert_eq!(tokens[0], 2500023);
@@ -906,7 +907,7 @@ mod tests {
 
         // Add only one side of the capital, and withdraw from another side
         let mut amounts2 = vec![5000000, 0];
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, &fees);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, 1, &fees);
         let shares_burned = pool.remove_liquidity_by_tokens(
             accounts(0).as_ref(),
             vec![0, 5000000 - 1200],
@@ -927,7 +928,7 @@ mod tests {
         let mut amounts = vec![5000000, 10000000];
         let fees = AdminFees::new(1000); // 10% exchange fee
         println!("before add_liquidity");
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
         println!("end of add_liquidity");
         let amount_out = pool.swap(
             accounts(1).as_ref(),
@@ -951,7 +952,7 @@ mod tests {
         let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0);
         let mut amounts = vec![5000000, 10000000];
         let fees = AdminFees::zero();
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, &fees);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
         assert_eq!(amounts, vec![5000000, 10000000]);
         assert!(num_shares > 1);
         assert_eq!(num_shares, pool.share_balance_of(accounts(0).as_ref()));

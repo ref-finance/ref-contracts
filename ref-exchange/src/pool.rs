@@ -37,22 +37,32 @@ impl Pool {
         &mut self,
         sender_id: &AccountId,
         amounts: &mut Vec<Balance>,
-        fees: AdminFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts),
-            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, &fees),
+            Pool::StableSwapPool(_) => unimplemented!(),
+        }
+    }
+
+    pub fn add_stable_liquidity(
+        &mut self,
+        sender_id: &AccountId,
+        amounts: &Vec<Balance>,
+        min_shares: Balance,
+        fees: AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &fees),
         }
     }
 
     /// Removes liquidity from underlying pool.
-    #[allow(unused_variables)]
     pub fn remove_liquidity(
         &mut self,
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
-        fees: AdminFees,
     ) -> Vec<Balance> {
         match self {
             Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts),

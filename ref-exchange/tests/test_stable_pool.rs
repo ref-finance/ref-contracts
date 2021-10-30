@@ -137,7 +137,7 @@ fn sim_stable_lp() {
     mint_and_deposit_token(&user1, &tokens[2], &pool, 500*ONE_USDC);
     let out_come = call!(
         user1,
-        pool.add_liquidity(0, vec![U128(500*ONE_DAI), U128(500*ONE_USDT), U128(500*ONE_USDC)], None),
+        pool.add_stable_liquidity(0, vec![U128(500*ONE_DAI), U128(500*ONE_USDT), U128(500*ONE_USDC)], U128(1)),
         deposit = to_yocto("0.0007")
     );
     out_come.assert_success();
@@ -171,7 +171,7 @@ fn sim_stable_lp() {
     mint_and_deposit_token(&user2, &tokens[2], &pool, 400*ONE_USDC);
     let out_come = call!(
         user2,
-        pool.add_liquidity(0, vec![U128(100*ONE_DAI), U128(200*ONE_USDT), U128(400*ONE_USDC)], None),
+        pool.add_stable_liquidity(0, vec![U128(100*ONE_DAI), U128(200*ONE_USDT), U128(400*ONE_USDC)], U128(1)),
         deposit = to_yocto("0.0014")  // 0.0007 for one lp and double it for admin fee
     );
     out_come.assert_success();
@@ -300,7 +300,7 @@ fn sim_stable_lp() {
     mint_and_deposit_token(&user3, &tokens[2], &pool, 100_000_000_000*ONE_USDC);
     let out_come = call!(
         user3,
-        pool.add_liquidity(0, vec![U128(100_000_000_000*ONE_DAI), U128(100_000_000_000*ONE_USDT), U128(100_000_000_000*ONE_USDC)], None),
+        pool.add_stable_liquidity(0, vec![U128(100_000_000_000*ONE_DAI), U128(100_000_000_000*ONE_USDT), U128(100_000_000_000*ONE_USDC)], U128(1)),
         deposit = to_yocto("0.0007") 
     );
     out_come.assert_success();
@@ -343,11 +343,11 @@ fn sim_stable_max_liquidity() {
     mint_and_deposit_token(&user, &tokens[8], &pool, 100_000_000_000*ONE_USDC);
     let out_come = call!(
         user,
-        pool.add_liquidity(0, vec![
+        pool.add_stable_liquidity(0, vec![
             U128(100_000_000_000*ONE_DAI), U128(100_000_000_000*ONE_USDT), U128(100_000_000_000*ONE_USDC),
             U128(100_000_000_000*ONE_DAI), U128(100_000_000_000*ONE_USDT), U128(100_000_000_000*ONE_USDC),
             U128(100_000_000_000*ONE_DAI), U128(100_000_000_000*ONE_USDT), U128(100_000_000_000*ONE_USDC)
-            ], None),
+            ], U128(1)),
         deposit = to_yocto("0.0007") 
     );
     out_come.assert_success();

@@ -20,17 +20,19 @@ near call ref-exchange.testnet add_stable_swap_pool '{"tokens": ["ndai.testnet",
 ```
 
 ### Add Initial Liquidity
-Anyone can supply initial liquidity, but all tokens should be filled.
+This interface is only for stable swap pools. Anyone can supply initial liquidity, but all tokens should be filled.
 ```Bash
-# add 1 dai, 1 usdt and 1 usdc as initial liquidity
-near call ref-exchange.testnet add_liquidity '{"pool_id": 100, "amounts": ["1000000000000000000", "1000000", "1000000"], "min_amounts": ["1", "1", "1"]}' --account_id=owner.testnet --amount=1
+# add 1 dai, 1 usdt and 1 usdc as initial liquidity with minimum 3 lpt shares
+near call ref-exchange.testnet add_stable_liquidity '{"pool_id": 100, "amounts": ["1000000000000000000", "1000000", "1000000"], "min_shares": "3000000000000000000"}' --account_id=owner.testnet --amount=1
+# will return actually minted lpt shares
 ```
 
 ### Add Subsequent Liquidity
-Anyone can supply subsequent liquidity with subset of tokens.
+This interface is only for stable swap pools. Anyone can supply subsequent liquidity with subset of tokens.
 ```Bash
-# add 100 dai, 10 usdt and 0 usdc
-near call ref-exchange.testnet add_liquidity '{"pool_id": 100, "amounts": ["100000000000000000000", "10000000", "0"], "min_amounts": ["1", "1", "1"]}' --account_id=user.testnet --amount=1
+# add 100 dai, 10 usdt and 0 usdc with minimum 103 lpt shares
+near call ref-exchange.testnet add_stable_liquidity '{"pool_id": 100, "amounts": ["100000000000000000000", "10000000", "0"], "min_shares": "103000000000000000000"}' --account_id=user.testnet --amount=1
+# will return actually minted lpt shares
 ```
 
 ### Withdraw Liquidity by Share
@@ -45,6 +47,7 @@ This interface is only for stable swap pools. Anyone can withdraw liquidity by t
 ```Bash
 # withdraw 50 nUSDT with max_burn_shares 60 balance
 near call ref-exchange.testnet remove_liquidity_by_tokens '{"pool_id": 100, "max_burn_shares": "60000000000000000000", "amounts": ["0", "50000000", "0"]}' --account_id=user.testnet --amount=0.000000000000000001
+# will return actually burned lpt shares
 ```
 
 ### Swap in Stable Swap Pool

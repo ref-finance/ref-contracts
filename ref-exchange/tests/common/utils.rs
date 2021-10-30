@@ -505,7 +505,7 @@ pub fn setup_stable_pool_with_liquidity(
 
     call!(
         root,
-        pool.add_liquidity(0, amounts.into_iter().map(|x| U128(x)).collect(), None),
+        pool.add_stable_liquidity(0, amounts.into_iter().map(|x| U128(x)).collect(), U128(1)),
         deposit = to_yocto("0.0007")
     )
     .assert_success();

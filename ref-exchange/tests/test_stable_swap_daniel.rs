@@ -169,7 +169,7 @@ fn setup_stable_pool_with_liquidity() -> (
     .assert_success();
     call!(
         root,
-        pool.add_liquidity(0, vec![U128(100000*ONE_DAI), U128(100000*ONE_USDT), U128(100000*ONE_USDC)], None),
+        pool.add_stable_liquidity(0, vec![U128(100000*ONE_DAI), U128(100000*ONE_USDT), U128(100000*ONE_USDC)], U128(1)),
         deposit = to_yocto("0.0007")
     )
     .assert_success();
@@ -406,14 +406,14 @@ fn test_stable_e64() {
     // invalid amount list length
     let mut outcome = call!(
         root,
-        pool.add_liquidity(0, vec![U128(100000), U128(100000), U128(100000), U128(100000)], None),
+        pool.add_stable_liquidity(0, vec![U128(100000), U128(100000), U128(100000), U128(100000)], U128(1)),
         deposit = to_yocto("0.0007")
     );
     assert_failure(outcome, "E64: illegal tokens count");
 
     call!(
         root,
-        pool.add_liquidity(0, vec![U128(100000), U128(100000), U128(100000)], None),
+        pool.add_stable_liquidity(0, vec![U128(100000), U128(100000), U128(100000)], U128(1)),
         deposit = to_yocto("0.0007")
     )
     .assert_success();
@@ -508,7 +508,7 @@ fn test_stable_e65() {
     // invalid amount list length
     let outcome = call!(
         root,
-        pool.add_liquidity(0, vec![U128(0), U128(100000), U128(100000)], None),
+        pool.add_stable_liquidity(0, vec![U128(0), U128(100000), U128(100000)], U128(1)),
         deposit = to_yocto("0.0007")
     );
     assert_failure(outcome, "E65: init token balance should be non-zero");

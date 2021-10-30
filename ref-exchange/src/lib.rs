@@ -212,7 +212,6 @@ impl Contract {
         pool.add_liquidity(
             &sender_id,
             &mut amounts,
-            AdminFees::new(self.exchange_fee),
         );
         if let Some(min_amounts) = min_amounts {
             // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
@@ -231,6 +230,42 @@ impl Contract {
         self.internal_check_storage(prev_storage);
     }
 
+    #[payable]
+    pub fn add_stable_liquidity(
+        &mut self,
+        pool_id: u64,
+        amounts: Vec<U128>,
+        min_shares: U128,
+    ) -> U128 {
+        self.assert_contract_running();
+        assert!(
+            env::attached_deposit() > 0,
+            "Requires attached deposit of at least 1 yoctoNEAR"
+        );
+        let prev_storage = env::storage_usage();
+        let sender_id = env::predecessor_account_id();
+        let amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
+        let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        // Add amounts given to liquidity first. It will return the balanced amounts.
+        let mint_shares = pool.add_stable_liquidity(
+            &sender_id,
+            &amounts,
+            min_shares.into(),
+            AdminFees::new(self.exchange_fee),
+        );
+        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
+        let tokens = pool.tokens();
+        // Subtract amounts from deposits. This will fail if there is not enough funds for any of the tokens.
+        for i in 0..tokens.len() {
+            deposits.withdraw(&tokens[i], amounts[i]);
+        }
+        self.internal_save_account(&sender_id, deposits);
+        self.pools.replace(pool_id, &pool);
+        self.internal_check_storage(prev_storage);
+
+        mint_shares.into()
+    }
+
     /// Remove liquidity from the pool into general pool of liquidity.
     #[payable]
     pub fn remove_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
@@ -246,8 +281,6 @@ impl Contract {
                 .into_iter()
                 .map(|amount| amount.into())
                 .collect(),
-            AdminFees::new(self.exchange_fee),
-            
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
@@ -264,13 +297,17 @@ impl Contract {
     }
 
     #[payable]
-    pub fn remove_liquidity_by_tokens(&mut self, pool_id: u64, amounts: Vec<U128>, max_burn_shares: U128) {
+    pub fn remove_liquidity_by_tokens(
+        &mut self, pool_id: u64, 
+        amounts: Vec<U128>, 
+        max_burn_shares: U128
+    ) -> U128 {
         assert_one_yocto();
         self.assert_contract_running();
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
-        pool.remove_liquidity_by_tokens(
+        let burn_shares = pool.remove_liquidity_by_tokens(
             &sender_id,
             amounts
                 .clone()
@@ -292,6 +329,8 @@ impl Contract {
                 (prev_storage - env::storage_usage()) as Balance * env::storage_byte_cost();
         }
         self.internal_save_account(&sender_id, deposits);
+
+        burn_shares.into()
     }
 }
 

@@ -149,7 +149,7 @@ fn storage_scenario_02() {
     println!("Storage Case 0201: appending balanced liqudity need deposit storage");
     call!(
         new_user,
-        pool.add_liquidity(0, vec![U128(10*ONE_DAI), U128(10*ONE_USDT), U128(10*ONE_USDC)], None),
+        pool.add_stable_liquidity(0, vec![U128(10*ONE_DAI), U128(10*ONE_USDT), U128(10*ONE_USDC)], U128(1)),
         deposit = to_yocto("0.00074")
     )
     .assert_success();
@@ -160,7 +160,7 @@ fn storage_scenario_02() {
     println!("Storage Case 0202: appending imba liqudity need deposit storage");
     let out_come = call!(
         new_user,
-        pool.add_liquidity(0, vec![U128(5*ONE_DAI), U128(10*ONE_USDT), U128(15*ONE_USDC)], None),
+        pool.add_stable_liquidity(0, vec![U128(5*ONE_DAI), U128(10*ONE_USDT), U128(15*ONE_USDC)], U128(1)),
         deposit = to_yocto("0.00074")
     );
     out_come.assert_success();
