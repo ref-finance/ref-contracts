@@ -1,3 +1,18 @@
+/// The storage in REF consists of inner-account storage (A storage) and LP-token storage (T storage).
+/// For A storage:
+///   Basic cost is 0.00102 Near (102 bytes),
+///   Each token cost is 0.00148 Near (148 bytes),
+///   Following actions will examine A storage:
+///     ft::ft_transfer_call to deposit token into,
+///     [withdraw], [register_tokens], [unregister_tokens],
+/// For T storage:
+///   Each pool has its own LP token, 
+///   Each lp as a token holder would do storage_register, in REF, that is,
+///     lp can call explicitly [mft_register], suggested deposit amount is 0.005, unused part would refund,
+///     lp can call [add_liquidity], suggested deposit amount is 0.005, unused part would refund,
+///   The contract self would be registered by pool creator 
+///     when [add_simple_pool] and [add_stable_swap_pool], 
+///     suggested deposit amount is 0.01, unused part would refund
 use near_sdk::json_types::{U128};
 use near_sdk_sim::{call, to_yocto};
 
