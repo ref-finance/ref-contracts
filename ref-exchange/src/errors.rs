@@ -55,3 +55,6 @@ pub const ERR81_AMP_IN_LOCK: &str = "E81: amp is currently in lock";
 pub const ERR82_INSUFFICIENT_RAMP_TIME: &str = "E82: insufficient ramp time";
 pub const ERR83_INVALID_AMP_FACTOR: &str = "E83: invalid amp factor";
 pub const ERR84_AMP_LARGE_CHANGE: &str = "E84: amp factor change is too large";
+
+// Permissions
+pub const ERR100_NOT_ALLOWED: &str = "E100: no permission to invoke this";

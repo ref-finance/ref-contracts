@@ -541,3 +541,56 @@ pub fn mint_and_deposit_token(
     )
     .assert_success();
 }
+
+pub fn setup_exchange(root: &UserAccount, exchange_fee: u32, referral_fee: u32) -> (
+    UserAccount,
+    ContractAccount<Exchange>,
+) {
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let pool = deploy!(
+        contract: Exchange,
+        contract_id: swap(),
+        bytes: &EXCHANGE_WASM_BYTES,
+        signer_account: root,
+        init_method: new(to_va("owner".to_string()), exchange_fee, referral_fee)
+    );
+    (owner, pool)
+}
+
+pub fn whitelist_token(
+    owner: &UserAccount, 
+    ex: &ContractAccount<Exchange>,
+    tokens: Vec<ValidAccountId>,
+) {
+    call!(
+        owner,
+        ex.extend_whitelisted_tokens(tokens)
+    ).assert_success();
+}
+
+pub fn deposit_token(
+    user: &UserAccount, 
+    ex: &ContractAccount<Exchange>,
+    tokens: Vec<&ContractAccount<TestToken>>,
+    amounts: Vec<u128>,
+) {
+    for (idx, token) in tokens.into_iter().enumerate() {
+        call!(
+            user,
+            ex.storage_deposit(None, None),
+            deposit = to_yocto("0.1")
+        )
+        .assert_success();
+        call!(
+            user,
+            token.ft_transfer_call(
+                ex.valid_account_id(), 
+                U128(amounts[idx]), 
+                None, 
+                "".to_string()
+            ),
+            deposit = 1
+        )
+        .assert_success();
+    }
+}

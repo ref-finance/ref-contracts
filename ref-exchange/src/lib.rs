@@ -127,7 +127,7 @@ impl Contract {
         fee: u32,
         amp_factor: u64,
     ) -> u64 {
-        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::StableSwapPool(StableSwapPool::new(
             self.pools.len() as u32,
