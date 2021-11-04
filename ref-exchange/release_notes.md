@@ -1,5 +1,8 @@
 # Release Notes
 
+### Version 1.3.1
+1. Apply HOTFIX in v1.0.3;
+
 ### Version 1.3.0
 ---
 1. feature instant swap;  
@@ -42,6 +45,10 @@ Example usage:
     * owner can resume the contract;
     * guardians and owner can manager global whitelist;
     * a new view method metadata to show overall info includes version, owner, guardians, state, pool counts.
+
+### Version 1.0.3
+---
+1. HOTFIX -- increase ft_transfer GAS from 10T to 20T;
 
 ### Version 1.0.2
 ---
