@@ -142,6 +142,8 @@ impl Contract {
                     );
                 }
             }
+        } else {
+            account.near_amount += env::attached_deposit();
         }
         let referral_id = referral_id.map(|r| r.into());
         let result =
