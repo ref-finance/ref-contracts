@@ -93,7 +93,7 @@ fn account_upgrade_enough_storage() {
     )
     .assert_success();
 
-    assert_eq!(get_version(&pool), String::from("1.3.1"));
+    assert_eq!(get_version(&pool), String::from("1.3.2"));
 
     let ss = get_storage_state(&pool, user.valid_account_id()).unwrap();
     assert_eq!(ss.deposit.0, to_yocto("0.00350"));
@@ -154,11 +154,11 @@ fn account_upgrade_enough_storage() {
     assert_eq!(get_error_count(&out_come), 0);
 
     let ss = get_storage_state(&pool, user.valid_account_id()).unwrap();
-    assert_eq!(ss.deposit.0, to_yocto("0.00482"));
+    assert_eq!(ss.deposit.0, to_yocto("0.00482")+1);
     assert_eq!(ss.usage.0, to_yocto("0.00482"));
     let sb = get_storage_balance(&pool, user.valid_account_id()).unwrap();
-    assert_eq!(sb.total.0, to_yocto("0.00482"));
-    assert_eq!(sb.available.0, 0);
+    assert_eq!(sb.total.0, to_yocto("0.00482")+1);
+    assert_eq!(sb.available.0, 1);
 
     assert_eq!(get_deposits(&pool, 
         user.valid_account_id())
@@ -183,11 +183,11 @@ fn account_upgrade_enough_storage() {
     assert_eq!(get_error_count(&out_come), 0);
 
     let ss = get_storage_state(&pool, user.valid_account_id()).unwrap();
-    assert_eq!(ss.deposit.0, to_yocto("0.00546"));
+    assert_eq!(ss.deposit.0, to_yocto("0.00546")+1);
     assert_eq!(ss.usage.0, to_yocto("0.00546"));
     let sb = get_storage_balance(&pool, user.valid_account_id()).unwrap();
-    assert_eq!(sb.total.0, to_yocto("0.00546"));
-    assert_eq!(sb.available.0, 0);
+    assert_eq!(sb.total.0, to_yocto("0.00546")+1);
+    assert_eq!(sb.available.0, 1);
 
     assert_eq!(get_deposits(&pool, 
         user.valid_account_id())
@@ -208,7 +208,7 @@ fn account_upgrade_not_enough_storage() {
         0,
     )
     .assert_success();
-    assert_eq!(get_version(&pool), String::from("1.3.1"));
+    assert_eq!(get_version(&pool), String::from("1.3.2"));
 
     // deposit would fail
     let out_come = call!(
