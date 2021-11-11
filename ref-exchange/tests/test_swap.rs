@@ -12,6 +12,9 @@ use near_sdk_sim::{
 use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
 use test_token::ContractContract as TestToken;
 
+use crate::common::utils::get_storage_state;
+pub mod common;
+
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange_release.wasm",
@@ -228,6 +231,45 @@ fn test_swap() {
         .unwrap_json::<U128>()
         .0;
     assert_eq!(balance2, to_yocto("991"));
+}
+
+#[test]
+fn test_swap_with_deposit() {
+    let (root, _owner, pool, _token1, _token2) = setup_pool_with_liquidity();
+    assert_eq!(
+        view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
+        PoolInfo {
+            pool_kind: "SIMPLE_POOL".to_string(),
+            token_account_ids: vec![dai(), eth()],
+            amounts: vec![to_yocto("5").into(), to_yocto("10").into()],
+            total_fee: 30,
+            shares_total_supply: to_yocto("1").into(),
+        }
+    );
+
+    assert_eq!(get_storage_state(&pool, root.valid_account_id()).unwrap().deposit.0, to_yocto("1"));
+    assert_eq!(root.account().unwrap().amount / 10_u128.pow(22), 999999748_98);
+
+    call!(
+        root,
+        pool.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in: dai(),
+                amount_in: Some(U128(to_yocto("1"))),
+                token_out: eth(),
+                min_amount_out: U128(1)
+            }],
+            None
+        ),
+        deposit = to_yocto("100")
+    )
+    .assert_success();
+
+    // deposit near should plus 100
+    assert_eq!(get_storage_state(&pool, root.valid_account_id()).unwrap().deposit.0, to_yocto("101"));
+    // account amount should decrease a little more than 100
+    assert_eq!(root.account().unwrap().amount / 10_u128.pow(22), 999999648_97);
 }
 
 #[test]
