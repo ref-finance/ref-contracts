@@ -10,6 +10,7 @@ Cargo.lock
 **/*.rs.bk
 
 .idea
+.DS_Store
 
 neardev
 

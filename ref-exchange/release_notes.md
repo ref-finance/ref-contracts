@@ -1,16 +1,19 @@
 # Release Notes
 
-### Version 0.2.1
+### Version 1.3.1
+1. Apply HOTFIX in v1.0.3;
+
+### Version 1.3.0
 ---
-1. Support for direct swap  
-Allows to swap with a single transaction without needing to deposit / withdraw. Not even storage deposits are required for the pool, if force=1 is passed (but FE must make sure that receiver is registered in the outgoing token).  
+1. feature instant swap;  
+Allows to swap with a single transaction without needing to deposit / withdraw. Not even storage deposits are required for the pool (inner account not touched). But FE must make sure that receiver is registered in the outgoing token, or they would go to inner account or lost-found account.  
 Example usage: 
     ```bash
     contract.ft_transfer_call(
         to_va(swap()),
         to_yocto("1").into(),
         None,
-        "{{\"force\": 0, \"actions\": [{{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"eth\", \"min_amount_out\": \"1\"}}]}}".to_string()
+        "{{\"actions\": [{{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"eth\", \"min_amount_out\": \"1\"}}]}}".to_string()
     ),
     ```  
     Specifically for TokenReceiverMessage message parameters are:  
@@ -19,9 +22,6 @@ Example usage:
         /// Alternative to deposit + execute actions call.
         Execute {
             referral_id: Option<ValidAccountId>,
-            /// If force != 0, doesn't require user to even have account. In case of failure to deposit to the user's outgoing balance, tokens will be returned to the exchange and can be "saved" via governance.
-            /// If force == 0, the account for this user still have been registered. If deposit of outgoing tokens will fail, it will deposit it back into the account.
-            force: u8,
             /// List of sequential actions.
             actions: Vec<Action>,
         },
@@ -29,9 +29,27 @@ Example usage:
     ```
     where Action is either SwapAction or any future action added there.
 
-2. Allow function access key to trade if all tokens are whitelisted  
-There are two changes:  
-    * register / unregister tokens for the user requires a 1 yocto Near deposit to prevent access keys whitelisted tokens.  
-    * `swap` function supports 0 attached deposit, but all tokens must be already registered or globally whitelisted.  
 
+### Version 1.2.0
+---
+1. upgrade inner account;
+    * inner account upgrade to use `UnorderedMap`;
+    * keep exist deposits in `legacy_tokens` in `HashMap`; 
+    * move it to `tokens` in `UnorderedMap` when deposit or withdraw token;
+    
+### Version 1.1.0
+---
+1. feature Guardians;
+    * guardians are managed by owner;
+    * guardians and owner can switch contract state to Paused;
+    * owner can resume the contract;
+    * guardians and owner can manager global whitelist;
+    * a new view method metadata to show overall info includes version, owner, guardians, state, pool counts.
 
+### Version 1.0.3
+---
+1. HOTFIX -- increase ft_transfer GAS from 10T to 20T;
+
+### Version 1.0.2
+---
+1. fixed storage_withdraw bug;
