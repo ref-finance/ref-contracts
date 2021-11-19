@@ -52,8 +52,8 @@ impl Farmer {
     pub(crate) fn sub_reward(&mut self, token: &AccountId, amount: Balance) -> Balance {
         let value = *self.rewards.get(token).expect(ERR21_TOKEN_NOT_REG);
         assert!(value >= amount, "{}", ERR22_NOT_ENOUGH_TOKENS);
-        if amount == 0 {
-            self.rewards.remove(&token.clone());
+        if amount == 0 || amount == value {
+            self.rewards.remove(token);
             value
         } else {
             self.rewards.insert(token.clone(), value - amount);
