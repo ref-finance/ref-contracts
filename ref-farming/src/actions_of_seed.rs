@@ -74,7 +74,7 @@ impl Contract {
         seed_id: SeedId,
         sender_id: AccountId,
         amount: U128,
-    ) {
+    ) -> U128 {
         assert_eq!(
             env::promise_results_count(),
             1,
@@ -102,6 +102,7 @@ impl Contract {
                 farmer.get_ref_mut().add_seed(&seed_id, amount);
                 self.data_mut().seeds.insert(&seed_id, &farm_seed);
                 self.data_mut().farmers.insert(&sender_id, &farmer);
+                0.into()
             },
             PromiseResult::Successful(_) => {
                 env::log(
@@ -111,8 +112,9 @@ impl Contract {
                     )
                     .as_bytes(),
                 );
+                amount.into()
             }
-        };
+        }
     }
 
     #[private]
@@ -121,7 +123,7 @@ impl Contract {
         seed_id: SeedId,
         sender_id: AccountId,
         amount: U128,
-    ) {
+    ) -> U128 {
         assert_eq!(
             env::promise_results_count(),
             1,
@@ -149,6 +151,7 @@ impl Contract {
                 farmer.get_ref_mut().add_seed(&seed_id, amount);
                 self.data_mut().seeds.insert(&seed_id, &farm_seed);
                 self.data_mut().farmers.insert(&sender_id, &farmer);
+                0.into()
             },
             PromiseResult::Successful(_) => {
                 env::log(
@@ -158,8 +161,9 @@ impl Contract {
                     )
                     .as_bytes(),
                 );
+                amount.into()
             }
-        };
+        }
     }
 }
 

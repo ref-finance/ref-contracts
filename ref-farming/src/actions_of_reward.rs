@@ -83,7 +83,7 @@ impl Contract {
         token_id: AccountId,
         sender_id: AccountId,
         amount: U128,
-    ) {
+    ) -> U128 {
         assert_eq!(
             env::promise_results_count(),
             1,
@@ -100,6 +100,7 @@ impl Contract {
                     )
                     .as_bytes(),
                 );
+                amount.into()
             }
             PromiseResult::Failed => {
                 env::log(
@@ -113,8 +114,9 @@ impl Contract {
                 let mut farmer = self.get_farmer(&sender_id);
                 farmer.get_ref_mut().add_reward(&token_id, amount.0);
                 self.data_mut().farmers.insert(&sender_id, &farmer);
+                0.into()
             }
-        };
+        }
     }
 }
 
