@@ -1,6 +1,7 @@
 use near_sdk_sim::{
     call, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
+use test_token::ContractContract as TestToken;
 use near_sdk::json_types::U128;
 use ref_exchange::{ContractContract as Exchange, PoolInfo};
 use rand::Rng;
@@ -160,4 +161,42 @@ pub fn do_add_liquidity(ctx: &mut OperationContext, rng: &mut Pcg32, root: &User
         }
         println!("add_liquidity scenario : {:?} end!", scenario);
     }
+}
+
+pub fn do_stable_add_liquidity(token_contracts: &Vec<ContractAccount<TestToken>>, rng: &mut Pcg32, root: &UserAccount, operator: &StableOperator, pool :&ContractAccount<Exchange>, specified: Option<u64>){
+    let add_amounts = vec![rng.gen_range(1..ADD_LIQUIDITY_LIMIT as u128) * ONE_DAI,
+            rng.gen_range(1..ADD_LIQUIDITY_LIMIT as u128) * ONE_USDT,
+            rng.gen_range(1..ADD_LIQUIDITY_LIMIT as u128) * ONE_USDC];
+
+    println!("do_stable_add_liquidity add_amounts : {:?}", add_amounts);
+    for (idx, amount) in add_amounts.clone().into_iter().enumerate() {
+        let c = token_contracts.get(idx).unwrap();
+
+        println!("mint token to  {}", operator.user.account_id);
+        call!(
+            root,
+            c.mint(to_va(operator.user.account_id.clone()), U128(amount))
+        )
+        .assert_success();
+
+        println!("{} deposit token to contract", operator.user.account_id);
+        call!(
+            operator.user,
+            c.ft_transfer_call(
+                pool.valid_account_id(), 
+                U128(amount), 
+                None, 
+                "".to_string()
+            ),
+            deposit = 1
+        )
+        .assert_success();
+    }
+
+    call!(
+        operator.user,
+        pool.add_stable_liquidity(0, add_amounts.into_iter().map(|x| U128(x)).collect(), U128(1)),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
 }

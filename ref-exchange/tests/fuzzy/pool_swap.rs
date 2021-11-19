@@ -13,6 +13,7 @@ use crate::fuzzy::{
     liquidity_manage::*,
     constants::*
 };
+use test_token::ContractContract as TestToken;
 
 pub fn swap_action(pool :&ContractAccount<Exchange>, operator: &Operator, token_in: AccountId, token_out: AccountId, amount_in: u128, simple_pool_id: u64) -> ExecutionResult{
     call!(
@@ -172,4 +173,41 @@ pub fn do_pool_swap(ctx: &mut OperationContext, rng: &mut Pcg32, root: &UserAcco
         println!("pool_swap scenario : {:?} end!", scenario);
     }
     
+}
+
+pub fn get_swap_info(rng: &mut Pcg32) -> (AccountId, AccountId, Option<U128>){
+    let tokens = vec![dai(), usdt(), usdc()];
+    let amount_ins = vec![ONE_DAI, ONE_USDT, ONE_USDC];
+    loop {
+        let token1_index = rng.gen_range(0..tokens.len());
+        let token2_index = rng.gen_range(0..tokens.len());
+        if token1_index == token2_index {
+            continue;
+        }
+        return (tokens[token1_index].clone(), tokens[token2_index].clone(), Some(U128(amount_ins[token1_index])))
+    }
+}
+
+pub fn do_stable_pool_swap(token_contracts: &Vec<ContractAccount<TestToken>>, rng: &mut Pcg32, root: &UserAccount, operator: &StableOperator, pool :&ContractAccount<Exchange>){
+    let balances = view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>();
+    println!("current balance: {:?}", balances);
+
+    let (token_in, token_out, amount_in) = get_swap_info(rng);
+
+    
+    let out_come = call!(
+        root,
+        pool.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in,
+                amount_in,
+                token_out,
+                min_amount_out: U128(1)
+            }],
+            None
+        ),
+        deposit = 1
+    );
+    out_come.assert_success();
 }

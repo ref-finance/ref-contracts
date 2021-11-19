@@ -50,3 +50,30 @@ pub struct RefStorageState {
     pub deposit: U128,
     pub usage: U128,
 }
+
+/**
+ * Related to stable swap
+ */
+
+#[derive(Debug)]
+pub enum StablePreference {
+    RemoveLiquidity,
+    PoolSwap,
+    AddLiquidity
+}
+
+#[derive(Debug)]
+pub struct StableOperator {
+    pub user: UserAccount,
+    pub preference: StablePreference
+}
+
+#[derive(Debug)]
+pub enum StableScenario {
+    Normal,
+    Token1NotRegistered, 
+    Token2NotRegistered, 
+    Token1NoAccount,
+    Token2NoAccount,
+    NoStorageDeposit,
+}
