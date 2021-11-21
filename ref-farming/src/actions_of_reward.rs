@@ -81,7 +81,25 @@ impl Contract {
         self.data_mut().farmers.insert(&sender_id, &farmer);
 
         self.internal_send_tokens(&sender_id, &token_id, amount)
+    }
 
+    /// Withdraws given reward tokens of given user.
+    #[payable]
+    pub fn withdraw_rewards(&mut self, token_ids: Vec<ValidAccountId>) {
+        assert_one_yocto();
+
+        let tokens = token_ids.iter().map(|x| x.clone().into()).collect::<Vec<String>>();
+
+        let sender_id = env::predecessor_account_id();
+        let mut farmer = self.get_farmer(&sender_id);
+        let withdraw_amounts: Vec<_> = tokens.iter().map(|token_id| farmer.get_ref_mut().sub_reward(&token_id, 0)).collect();
+        self.data_mut().farmers.insert(&sender_id, &farmer);
+        
+        for (token_id, amount) in tokens.into_iter().zip(withdraw_amounts) {
+            if amount > 0 {
+                self.internal_send_tokens(&sender_id, &token_id, amount);
+            }
+        }
     }
 
     #[private]
