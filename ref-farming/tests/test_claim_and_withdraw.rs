@@ -273,7 +273,7 @@ fn claim_and_withdraw_0() {
     assert_eq!(balance, to_yocto("1.5"));
 
     // normal withdraw
-    println!("Case0306 normal withdraw.");
+    println!("Case0306 batch withdraw and normal withdraw.");
     assert!(root.borrow_runtime_mut().produce_blocks(60).is_ok());
     let farm_info = show_farminfo(&farming, farm1_id.clone(), false);
     assert_farming(&farm_info, "Running".to_string(), to_yocto("10"), 7, 6, to_yocto("5"), to_yocto("2"), 0);
@@ -299,6 +299,28 @@ fn claim_and_withdraw_0() {
     assert_eq!(reward.0, to_yocto("1.5"));
     let reward = show_reward(&farming, farmer2.account_id(), token2.account_id(), false);
     assert_eq!(reward.0, to_yocto("2"));
+
+    let balance = balance_of(&token1, farmer1.account_id());
+    assert_eq!(balance, to_yocto("1.5"));
+    let balance = balance_of(&token2, farmer1.account_id());
+    assert_eq!(balance, to_yocto("1.5"));
+    let out_come = call!(
+        farmer1,
+        farming.withdraw_rewards(vec![token1.valid_account_id(), token2.valid_account_id()]),
+        deposit = 1
+    );
+    out_come.assert_success();
+    assert_eq!(out_come.promise_errors().len(), 0);
+    let reward = show_reward(&farming, farmer1.account_id(), token1.account_id(), false);
+    assert_eq!(reward.0, to_yocto("0"));
+    let reward = show_reward(&farming, farmer1.account_id(), token2.account_id(), false);
+    assert_eq!(reward.0, to_yocto("0"));
+    let balance = balance_of(&token1, farmer1.account_id());
+    assert_eq!(balance, to_yocto("2"));
+    let balance = balance_of(&token2, farmer1.account_id());
+    assert_eq!(balance, to_yocto("2"));
+
+
     let out_come = call!(
         farmer2,
         farming.withdraw_reward(token1.valid_account_id(), None),
