@@ -71,9 +71,6 @@ pub struct StableOperator {
 #[derive(Debug)]
 pub enum StableScenario {
     Normal,
-    Token1NotRegistered, 
-    Token2NotRegistered, 
-    Token1NoAccount,
-    Token2NoAccount,
-    NoStorageDeposit,
+    Slippage,
+    InsufficientLpShares
 }

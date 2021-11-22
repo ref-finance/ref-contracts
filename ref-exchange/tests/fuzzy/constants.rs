@@ -12,6 +12,8 @@ pub const OPERATION_NUM: i32 = 10;
 pub const AMOUNT_IN_LIMIT: u128 = 10;
 pub const TRANSFER_AMOUNT_LIMIT: u128 = 20;
 
+pub const LP_LIMIT: u128 = 10;
+pub const STABLE_TOKENS: [&str; 3] = ["dai001", "usdt", "usdc"];
 
 pub const ONE_LPT: u128 = 1000000000000000000;
 pub const ONE_DAI: u128 = 1000000000000000000;

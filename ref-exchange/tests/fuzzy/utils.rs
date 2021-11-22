@@ -2,6 +2,7 @@ use near_sdk_sim::{
     call, deploy, init_simulator, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
 use std::collections::HashMap;
+use std::os::unix::thread;
 use near_sdk::serde_json::{Value, from_value};
 use std::convert::TryFrom;
 use rand::Rng;
@@ -316,8 +317,47 @@ pub fn setup_stable_pool_with_liquidity_and_operators(
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(owner.valid_account_id(), 1600, 400)
+        init_method: new(owner.valid_account_id(), 1600, 0)
     );
+
+    let mut users = Vec::new();
+    for user_id in 0..EVERY_PREFERENCE_NUM{
+        let user = root.create_user(format!("user_remove_stable_liquidity_{}", user_id), to_yocto("100"));
+        call!(
+            user,
+            pool.storage_deposit(None, None),
+            deposit = to_yocto("1")
+        )
+        .assert_success();
+        users.push(StableOperator{
+            user,
+            preference: StablePreference::RemoveLiquidity
+        });
+
+        let user = root.create_user(format!("user_pool_stable_swap_{}", user_id), to_yocto("100"));
+        call!(
+            user,
+            pool.storage_deposit(None, None),
+            deposit = to_yocto("1")
+        )
+        .assert_success();
+        users.push(StableOperator{
+            user,
+            preference: StablePreference::PoolSwap
+        });
+        
+        let user = root.create_user(format!("user_add_stable_liquidity_{}", user_id), to_yocto("100"));
+        call!(
+            user,
+            pool.storage_deposit(None, None),
+            deposit = to_yocto("1")
+        )
+        .assert_success();
+        users.push(StableOperator{
+            user,
+            preference: StablePreference::AddLiquidity
+        });
+    }
 
     let mut token_contracts: Vec<ContractAccount<TestToken>> = vec![];
     for token_name in &tokens {
@@ -370,45 +410,6 @@ pub fn setup_stable_pool_with_liquidity_and_operators(
         .assert_success();
     }
 
-    let mut users = Vec::new();
-    for user_id in 0..EVERY_PREFERENCE_NUM{
-        let user = root.create_user(format!("user_remove_stable_liquidity_{}", user_id), to_yocto("100"));
-        call!(
-            user,
-            pool.storage_deposit(None, None),
-            deposit = to_yocto("1")
-        )
-        .assert_success();
-        users.push(StableOperator{
-            user,
-            preference: StablePreference::RemoveLiquidity
-        });
-
-        let user = root.create_user(format!("user_pool_stable_swap_{}", user_id), to_yocto("100"));
-        call!(
-            user,
-            pool.storage_deposit(None, None),
-            deposit = to_yocto("1")
-        )
-        .assert_success();
-        users.push(StableOperator{
-            user,
-            preference: StablePreference::PoolSwap
-        });
-        
-        let user = root.create_user(format!("user_add_stable_liquidity_{}", user_id), to_yocto("100"));
-        call!(
-            user,
-            pool.storage_deposit(None, None),
-            deposit = to_yocto("1")
-        )
-        .assert_success();
-        users.push(StableOperator{
-            user,
-            preference: StablePreference::AddLiquidity
-        });
-    }
-
     call!(
         root,
         pool.add_stable_liquidity(0, amounts.into_iter().map(|x| U128(x)).collect(), U128(1)),
@@ -419,13 +420,85 @@ pub fn setup_stable_pool_with_liquidity_and_operators(
 }
 
 pub fn dai() -> AccountId {
-    "dai001".to_string()
+    STABLE_TOKENS[0].to_string()
 }
 
 pub fn usdt() -> AccountId {
-    "usdt".to_string()
+    STABLE_TOKENS[1].to_string()
 }
 
 pub fn usdc() -> AccountId {
-    "usdc".to_string()
+    STABLE_TOKENS[2].to_string()
+}
+pub fn add_and_deposit_token(
+    root: &UserAccount,
+    user: &UserAccount,
+    token: &ContractAccount<TestToken>,
+    ex: &ContractAccount<Exchange>,
+    amount: u128,
+) {
+    if 0 == view!(token.ft_balance_of(user.valid_account_id())).unwrap_json::<U128>().0{
+        call!(
+            user,
+            token.mint(user.valid_account_id(), U128(10))
+        )
+        .assert_success();
+    }
+    
+    call!(
+        root,
+        token.ft_transfer(user.valid_account_id(), U128(amount), None),
+        deposit = 1
+    )
+    .assert_success();
+
+    call!(
+        user,
+        ex.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    println!("root token: {}", view!(token.ft_balance_of(root.valid_account_id())).unwrap_json::<U128>().0);
+    println!("user token: {}", view!(token.ft_balance_of(user.valid_account_id())).unwrap_json::<U128>().0);
+
+    call!(
+        user,
+        token.ft_transfer_call(
+            ex.valid_account_id(), 
+            U128(amount), 
+            None,
+            "".to_string()
+        ),
+        deposit = 1
+    )
+    .assert_success();   
+}
+
+pub fn mft_balance_of(
+    pool: &ContractAccount<Exchange>,
+    token_or_pool: &str,
+    account_id: &AccountId,
+) -> u128 {
+    view!(pool.mft_balance_of(token_or_pool.to_string(), to_va(account_id.clone())))
+        .unwrap_json::<U128>()
+        .0
+}
+
+pub fn mft_total_supply(
+    pool: &ContractAccount<Exchange>,
+    token_or_pool: &str,
+) -> u128 {
+    view!(pool.mft_total_supply(token_or_pool.to_string()))
+        .unwrap_json::<U128>()
+        .0
+}
+
+pub fn pool_share_price(
+    pool: &ContractAccount<Exchange>,
+    pool_id: u64,
+) -> u128 {
+    view!(pool.get_pool_share_price(pool_id))
+        .unwrap_json::<U128>()
+        .0
 }

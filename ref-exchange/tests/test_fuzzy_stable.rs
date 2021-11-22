@@ -20,11 +20,15 @@ use fuzzy::{constants::*,
     constants::*
 };
 
+use near_sdk::test_utils::{accounts, VMContextBuilder};
+use near_sdk::{testing_env, MockedBlockchain};
+use std::convert::TryInto;
 
 fn do_operation(rng: &mut Pcg32, root: &UserAccount, operator: &StableOperator, pool :&ContractAccount<Exchange>, token_contracts: &Vec<ContractAccount<TestToken>>){
     println!("current stable pool info: {:?}", view!(pool.get_pool(0)).unwrap_json::<PoolInfo>());
-    do_stable_add_liquidity(token_contracts, rng, root, operator, pool, None);
+    do_stable_add_liquidity(token_contracts, rng, root, operator, pool);
     do_stable_pool_swap(token_contracts, rng, root, operator, pool);
+    do_stable_remove_liquidity_by_shares(token_contracts, rng, root, operator, pool);
     // match operator.preference{
     //     StablePreference::RemoveLiquidity => {
     //         // do_direct_swap(ctx, rng, root, operator, pool, simple_pool_count);
@@ -51,8 +55,11 @@ fn generate_fuzzy_seed() -> Vec<u64>{
 
 #[test]
 fn test_fuzzy_stable() {
+    let mut context = VMContextBuilder::new();
+    testing_env!(context.predecessor_account_id(accounts(0)).build());
 
     let seeds = generate_fuzzy_seed();
+    let seeds = vec![11238187614227527796_u64];
 
     for seed in seeds {
 
@@ -63,7 +70,7 @@ fn test_fuzzy_stable() {
         let mut rng = Pcg32::seed_from_u64(seed as u64);
         let (root, _owner, pool, token_contracts, operators) = 
         setup_stable_pool_with_liquidity_and_operators(
-            vec![dai(), usdt(), usdc()],
+            STABLE_TOKENS.iter().map(|&v| v.to_string()).collect(),
             vec![100000*ONE_DAI, 100000*ONE_USDT, 100000*ONE_USDC],
             vec![18, 6, 6],
             25,
