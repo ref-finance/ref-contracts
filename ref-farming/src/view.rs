@@ -29,6 +29,14 @@ pub struct Metadata {
     pub reward_count: U64,
 }
 
+#[derive(Serialize, Deserialize, PartialEq)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub struct StorageState {
+    pub deposit: U128,
+    pub usage: U128,
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct FarmInfo {
@@ -285,6 +293,19 @@ impl Contract {
             format!("{}", U256::from_little_endian(&rps))
         } else {
             String::from("0")
+        }
+    }
+
+    /// Get farmer's storage deposit and needed in the account of current version
+    pub fn get_user_storage_state(&self, account_id: ValidAccountId) -> Option<StorageState> {
+        let (locked, deposited) = self.internal_farmer_storage(account_id.as_ref()); 
+        if locked > 0 {
+            Some(StorageState {
+                deposit: U128(deposited),
+                usage: U128(locked),
+            })
+        } else {
+           None
         }
     }
 }
