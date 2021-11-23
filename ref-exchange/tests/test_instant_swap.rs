@@ -390,7 +390,7 @@ fn instant_swap_scenario_03() {
             > to_yocto("0.27")
     );
     // println!("token3 {}", balance_of(&token3, &new_user.account_id));
-    assert!(balance_of(&token3, &new_user.account_id) > to_yocto("6.6"));
+    assert!(balance_of(&token3, &new_user.account_id) > to_yocto("6.598"));
 
     println!("Case 0304: two actions with two output token and send back token#3 fail");
     call!(
@@ -420,7 +420,7 @@ fn instant_swap_scenario_03() {
             .get(&token3.account_id())
             .unwrap()
             .0
-            > to_yocto("5.38")
+            > to_yocto("5.33")
     );
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("1"));
     assert!(balance_of(&token2, &new_user.account_id) > to_yocto("10.09"));

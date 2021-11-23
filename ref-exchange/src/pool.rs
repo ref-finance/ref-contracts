@@ -1,6 +1,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, Balance};
 
+use crate::admin_fee::AdminFees;
 use crate::simple_pool::SimplePool;
 use crate::utils::SwapVolume;
 
@@ -28,18 +29,26 @@ impl Pool {
 
     /// Adds liquidity into underlying pool.
     /// Updates amounts to amount kept in the pool.
-    pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>) -> Balance {
+    #[allow(unused_variables)]
+    pub fn add_liquidity(
+        &mut self, 
+        sender_id: &AccountId, 
+        amounts: &mut Vec<Balance>, 
+        fees: AdminFees,
+    ) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts),
         }
     }
 
     /// Removes liquidity from underlying pool.
+    #[allow(unused_variables)]
     pub fn remove_liquidity(
         &mut self,
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
+        fees: AdminFees,
     ) -> Vec<Balance> {
         match self {
             Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts),
@@ -79,18 +88,12 @@ impl Pool {
         amount_in: Balance,
         token_out: &AccountId,
         min_amount_out: Balance,
-        exchange_id: &AccountId,
-        referral_id: &Option<AccountId>,
+        admin_fee: AdminFees,
     ) -> Balance {
         match self {
-            Pool::SimplePool(pool) => pool.swap(
-                token_in,
-                amount_in,
-                token_out,
-                min_amount_out,
-                exchange_id,
-                referral_id,
-            ),
+            Pool::SimplePool(pool) => {
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
+            }
         }
     }
 

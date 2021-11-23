@@ -1,7 +1,8 @@
 //! Implement all the relevant logic for owner of this contract.
 
 use crate::*;
-use crate::legacy::ContractV1;
+use crate::utils::FEE_DIVISOR;
+
 
 #[near_bindgen]
 impl Contract {
@@ -72,23 +73,52 @@ impl Contract {
         }
     }
 
+    pub fn modify_admin_fee(&mut self, exchange_fee: u32, referral_fee: u32) {
+        self.assert_owner();
+        assert!(exchange_fee + referral_fee <= FEE_DIVISOR, "ERR_ILLEGAL_FEE");
+        self.exchange_fee = exchange_fee;
+        self.referral_fee = referral_fee;
+    }
+
+    /// Remove exchange fee liqudity to owner's inner account.
+    /// without any storage and fee.
+    #[payable]
+    pub fn remove_exchange_fee_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
+        assert_one_yocto();
+        self.assert_owner();
+        self.assert_contract_running();
+        let ex_id = env::current_account_id();
+        let owner_id = self.owner_id.clone();
+        let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        let amounts = pool.remove_liquidity(
+            &ex_id,
+            shares.into(),
+            min_amounts
+                .into_iter()
+                .map(|amount| amount.into())
+                .collect(),
+            AdminFees::zero(),
+            
+        );
+        self.pools.replace(pool_id, &pool);
+        let tokens = pool.tokens();
+        let mut deposits = self.internal_unwrap_or_default_account(&owner_id);
+        for i in 0..tokens.len() {
+            deposits.deposit(&tokens[i], amounts[i]);
+        }
+        self.internal_save_account(&owner_id, deposits);
+    }
+
     /// Migration function from v2 to v2.
     /// For next version upgrades, change this function.
     #[init(ignore_state)]
     // [AUDIT_09]
     #[private]
     pub fn migrate() -> Self {
-        let prev: ContractV1 = env::state_read().expect("ERR_NOT_INITIALIZED");
-        Contract {
-            owner_id: prev.owner_id,
-            exchange_fee: prev.exchange_fee,
-            referral_fee: prev.referral_fee,
-            pools: prev.pools,
-            accounts: prev.accounts,
-            whitelisted_tokens: prev.whitelisted_tokens,
-            guardians: UnorderedSet::new(StorageKey::Guardian),
-            state: RunningState::Running,
-        }
+        let mut prev: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
+        prev.exchange_fee = 1600;
+        prev.referral_fee = 400;
+        prev
     }
 
     pub(crate) fn assert_owner(&self) {

@@ -5,6 +5,7 @@ use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance};
 use crate::StorageKey;
+use crate::admin_fee::AdminFees;
 
 use crate::errors::{
     ERR13_LP_NOT_REGISTERED, ERR14_LP_ALREADY_REGISTERED, ERR31_ZERO_AMOUNT, ERR32_ZERO_SHARES,
@@ -28,9 +29,9 @@ pub struct SimplePool {
     pub volumes: Vec<SwapVolume>,
     /// Fee charged for swap (gets divided by FEE_DIVISOR).
     pub total_fee: u32,
-    /// Portion of the fee going to exchange.
+    /// Obsolete, reserve to simplify upgrade.
     pub exchange_fee: u32,
-    /// Portion of the fee going to referral.
+    /// Obsolete, reserve to simplify upgrade.
     pub referral_fee: u32,
     /// Shares of the pool by liquidity providers.
     pub shares: LookupMap<AccountId, Balance>,
@@ -47,7 +48,7 @@ impl SimplePool {
         referral_fee: u32,
     ) -> Self {
         assert!(
-            total_fee < FEE_DIVISOR && (exchange_fee + referral_fee) <= total_fee,
+            total_fee < FEE_DIVISOR,
             "ERR_FEE_TOO_LARGE"
         );
         // [AUDIT_10]
@@ -267,8 +268,7 @@ impl SimplePool {
         amount_in: Balance,
         token_out: &AccountId,
         min_amount_out: Balance,
-        exchange_id: &AccountId,
-        referral_id: &Option<AccountId>,
+        admin_fee: &AdminFees,
     ) -> Balance {
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
@@ -297,19 +297,19 @@ impl SimplePool {
         let numerator = (new_invariant - prev_invariant) * U256::from(self.shares_total_supply);
 
         // Allocate exchange fee as fraction of total fee by issuing LP shares proportionally.
-        if self.exchange_fee > 0 && numerator > U256::zero() {
-            let denominator = new_invariant * self.total_fee / self.exchange_fee;
-            self.mint_shares(&exchange_id, (numerator / denominator).as_u128());
+        if admin_fee.exchange_fee > 0 && numerator > U256::zero() {
+            let denominator = new_invariant * FEE_DIVISOR / admin_fee.exchange_fee;
+            self.mint_shares(&admin_fee.exchange_id, (numerator / denominator).as_u128());
         }
 
         // If there is referral provided and the account already registered LP, allocate it % of LP rewards.
-        if let Some(referral_id) = referral_id {
-            if self.referral_fee > 0
+        if let Some(referral_id) = &admin_fee.referral_id {
+            if admin_fee.referral_fee > 0
                 && numerator > U256::zero()
                 && self.shares.contains_key(referral_id)
             {
-                let denominator = new_invariant * self.total_fee / self.referral_fee;
-                self.mint_shares(&referral_id, (numerator / denominator).as_u128());
+                let denominator = new_invariant * FEE_DIVISOR / admin_fee.referral_fee;
+                self.mint_shares(referral_id, (numerator / denominator).as_u128());
             }
         }
 
@@ -349,8 +349,12 @@ mod tests {
             one_near,
             accounts(2).as_ref(),
             1,
-            accounts(3).as_ref(),
-            &None,
+            &AdminFees {
+                exchange_fee: 0,
+                exchange_id: accounts(3).as_ref().clone(),
+                referral_fee: 0,
+                referral_id: None,
+            },
         );
         assert_eq!(
             pool.share_balance_of(accounts(0).as_ref()),
@@ -395,8 +399,12 @@ mod tests {
             one_near,
             accounts(2).as_ref(),
             1,
-            accounts(3).as_ref(),
-            &None,
+            &AdminFees {
+                exchange_fee: 100,
+                exchange_id: accounts(3).as_ref().clone(),
+                referral_fee: 0,
+                referral_id: None,
+            },
         );
         assert_eq!(
             pool.share_balance_of(accounts(0).as_ref()),

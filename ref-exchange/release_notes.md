@@ -1,5 +1,9 @@
 # Release Notes
 
+### Version 1.4.0
+1. Make exchange fee and referal fee inclusive in total fee;
+2. Make exchange fee (in the form of lp shares) belongs to contract itself;
+
 ### Version 1.3.1
 1. Apply HOTFIX in v1.0.3;
 

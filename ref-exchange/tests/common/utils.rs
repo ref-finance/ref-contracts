@@ -14,7 +14,7 @@ use test_token::ContractContract as TestToken;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
-    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_102.wasm",
+    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_131.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange_release.wasm",
 }
 
@@ -305,7 +305,7 @@ pub fn setup_pool_with_liquidity() -> (
     .assert_success();
     call!(
         root,
-        pool.add_liquidity(1, vec![U128(to_yocto("10")), U128(to_yocto("10"))], None),
+        pool.add_liquidity(2, vec![U128(to_yocto("10")), U128(to_yocto("10"))], None),
         deposit = to_yocto("0.0007")
     )
     .assert_success();
