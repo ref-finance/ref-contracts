@@ -57,7 +57,8 @@ pub struct RefStorageState {
 
 #[derive(Debug)]
 pub enum StablePreference {
-    RemoveLiquidity,
+    RemoveLiquidityByToken,
+    RemoveLiquidityByShare,
     PoolSwap,
     AddLiquidity
 }
@@ -68,7 +69,7 @@ pub struct StableOperator {
     pub preference: StablePreference
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum StableScenario {
     Normal,
     Slippage,

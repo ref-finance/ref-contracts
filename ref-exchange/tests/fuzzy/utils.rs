@@ -322,7 +322,7 @@ pub fn setup_stable_pool_with_liquidity_and_operators(
 
     let mut users = Vec::new();
     for user_id in 0..EVERY_PREFERENCE_NUM{
-        let user = root.create_user(format!("user_remove_stable_liquidity_{}", user_id), to_yocto("100"));
+        let user = root.create_user(format!("user_remove_stable_liquidity_by_share_{}", user_id), to_yocto("100"));
         call!(
             user,
             pool.storage_deposit(None, None),
@@ -331,7 +331,19 @@ pub fn setup_stable_pool_with_liquidity_and_operators(
         .assert_success();
         users.push(StableOperator{
             user,
-            preference: StablePreference::RemoveLiquidity
+            preference: StablePreference::RemoveLiquidityByShare
+        });
+
+        let user = root.create_user(format!("user_remove_stable_liquidity_by_token_{}", user_id), to_yocto("100"));
+        call!(
+            user,
+            pool.storage_deposit(None, None),
+            deposit = to_yocto("1")
+        )
+        .assert_success();
+        users.push(StableOperator{
+            user,
+            preference: StablePreference::RemoveLiquidityByToken
         });
 
         let user = root.create_user(format!("user_pool_stable_swap_{}", user_id), to_yocto("100"));
@@ -458,9 +470,6 @@ pub fn add_and_deposit_token(
         deposit = to_yocto("1")
     )
     .assert_success();
-
-    println!("root token: {}", view!(token.ft_balance_of(root.valid_account_id())).unwrap_json::<U128>().0);
-    println!("user token: {}", view!(token.ft_balance_of(user.valid_account_id())).unwrap_json::<U128>().0);
 
     call!(
         user,

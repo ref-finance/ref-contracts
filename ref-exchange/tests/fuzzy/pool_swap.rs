@@ -220,7 +220,6 @@ pub fn do_stable_pool_swap(token_contracts: &Vec<ContractAccount<TestToken>>, rn
 
     println!("swap  {} => {} : {}", token_in, token_out, amount_in);
     add_and_deposit_token(root, &operator.user, token_contract, pool, amount_in);
-    // std::thread::sleep(std::time::Duration::from_millis(4000));
     let balances = view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>();
     println!("current user balance: {:?}", balances);
     let token_in_amount = balances.get(&token_in).unwrap().0;
@@ -229,7 +228,7 @@ pub fn do_stable_pool_swap(token_contracts: &Vec<ContractAccount<TestToken>>, rn
 
     let swap_out = calculate_swap_out(pool, &token_in, &token_out, amount_in);
     if swap_out > view!(pool.get_pool(0)).unwrap_json::<PoolInfo>().amounts[token_out_index].0{
-
+        scenario = StableScenario::Slippage;
     }
 
     let out_come = call!(
@@ -246,6 +245,7 @@ pub fn do_stable_pool_swap(token_contracts: &Vec<ContractAccount<TestToken>>, rn
         ),
         deposit = 1
     );
+    println!("do_stable_pool_swap scenario : {:?} begin!", scenario);
     match scenario {
         StableScenario::Normal => {
             out_come.assert_success();
@@ -256,10 +256,19 @@ pub fn do_stable_pool_swap(token_contracts: &Vec<ContractAccount<TestToken>>, rn
                             token_out_amount + swap_out
             );
         },
+        StableScenario::Slippage => {
+            assert_eq!(get_error_count(&out_come), 1);
+            assert!(get_error_status(&out_come).contains("E34: insufficient lp shares"));
+            assert_eq!(view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>().get(&token_in).unwrap().0,
+                            token_in_amount
+            );
+            assert_eq!(view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>().get(&token_out).unwrap().0,
+                            token_out_amount
+            );
+        }
         _ => {
             panic!("do_stable_pool_swap find new StableScenario {:?}", scenario);
         }
     }
-    
-    out_come.assert_success();
+    println!("do_stable_pool_swap scenario : {:?} end!", scenario);
 }

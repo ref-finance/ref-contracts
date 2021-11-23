@@ -11,7 +11,7 @@ use crate::stable_swap::math::{
 use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR, U256};
 use crate::StorageKey;
 
-mod math;
+pub mod math;
 
 pub const MIN_DECIMAL: u8 = 1;
 pub const MAX_DECIMAL: u8 = 18;
