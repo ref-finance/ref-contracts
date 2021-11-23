@@ -370,7 +370,7 @@ mod tests {
     fn setup_contract() -> (VMContextBuilder, Contract) {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let contract = Contract::new(accounts(0), 4, 1);
+        let contract = Contract::new(accounts(0), 1600, 400);
         (context, contract)
     }
 
@@ -422,7 +422,7 @@ mod tests {
             .predecessor_account_id(account_id.clone())
             .attached_deposit(env::storage_byte_cost() * 300)
             .build());
-        let pool_id = contract.add_simple_pool(tokens, 30);
+        let pool_id = contract.add_simple_pool(tokens, 25);
         testing_env!(context
             .predecessor_account_id(account_id.clone())
             .attached_deposit(to_yocto("0.03"))
@@ -499,7 +499,7 @@ mod tests {
 
         // Get price from pool :0 1 -> 2 tokens.
         let expected_out = contract.get_return(0, accounts(1), one_near.into(), accounts(2));
-        assert_eq!(expected_out.0, 1662497915624478906119726);
+        assert_eq!(expected_out.0, 1663192997082117548978741);
 
         testing_env!(context
             .predecessor_account_id(accounts(3))
@@ -541,7 +541,7 @@ mod tests {
         // Exchange fees left in the pool as liquidity + 1m from transfer.
         assert_eq!(
             contract.get_pool_total_shares(0).0,
-            100012503125976904 + 1_000_000
+            33336806279123620258 + 1_000_000
         );
 
         contract.withdraw(
@@ -785,8 +785,8 @@ mod tests {
             ],
             None,
         );
-        // Roundtrip returns almost everything except 0.3% fee.
-        assert_eq!(contract.get_deposit(acc, accounts(1)).0, 1_000_000 - 7);
+        // Roundtrip returns almost everything except 0.25% fee.
+        assert_eq!(contract.get_deposit(acc, accounts(1)).0, 1_000_000 - 6);
     }
 
     #[test]

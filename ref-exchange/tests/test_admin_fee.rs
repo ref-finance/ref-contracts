@@ -2,11 +2,10 @@ use near_sdk::json_types::U128;
 use near_sdk::AccountId;
 use std::collections::HashMap;
 use near_sdk_sim::{
-    call, view, to_yocto, ContractAccount, ExecutionResult, UserAccount,
+    call, view, to_yocto,
 };
 
-use test_token::ContractContract as TestToken;
-use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
+use ref_exchange::{PoolInfo, SwapAction};
 
 use crate::common::utils::*;
 pub mod common;
@@ -16,8 +15,8 @@ pub mod common;
 
 #[test]
 fn modify_admin_fee() {
-    let (root, owner, pool, token1, token2, _) = setup_pool_with_liquidity();
-    let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
+    let (root, owner, pool, _, _, _) = setup_pool_with_liquidity();
+    // let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
 
     // pool 0, 10 dai -> 20 eth; pool 1, 20 eth -> 10 usdt
 
@@ -174,4 +173,8 @@ fn modify_admin_fee() {
     assert_eq!(balances.get(&usdt()).unwrap_or(&U128(0)).0, 200007728217076967880);
     assert_eq!(balances.get(&eth()).unwrap_or(&U128(0)).0, 331493118860347246997);
     assert_eq!(balances.get(&dai()).unwrap_or(&U128(0)).0, 500028389589818806);
+
+    assert_eq!(prev_dai, to_yocto("84"));
+    assert_eq!(prev_eth, 73628097294839736303705386);
+    assert_eq!(prev_usdt, to_yocto("89"));
 }
