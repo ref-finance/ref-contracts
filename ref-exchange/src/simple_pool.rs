@@ -52,11 +52,7 @@ impl SimplePool {
             "ERR_FEE_TOO_LARGE"
         );
         // [AUDIT_10]
-        assert_eq!(
-            token_account_ids.len(),
-            NUM_TOKENS,
-            "ERR_SHOULD_HAVE_2_TOKENS"
-        );
+        assert_eq!(token_account_ids.len(), NUM_TOKENS, "ERR_SHOULD_HAVE_2_TOKENS");
         Self {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
             amounts: vec![0u128; token_account_ids.len()],
@@ -65,7 +61,9 @@ impl SimplePool {
             exchange_fee,
             referral_fee,
             // [AUDIT_11]
-            shares: LookupMap::new(StorageKey::Shares { pool_id: id }),
+            shares: LookupMap::new(StorageKey::Shares { 
+                pool_id: id, 
+            }),
             shares_total_supply: 0,
         }
     }
