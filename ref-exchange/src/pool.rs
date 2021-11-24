@@ -49,11 +49,11 @@ impl Pool {
         sender_id: &AccountId,
         amounts: &Vec<Balance>,
         min_shares: Balance,
-        fees: AdminFees,
+        admin_fee: AdminFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &fees),
+            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee),
         }
     }
 
@@ -78,12 +78,12 @@ impl Pool {
         sender_id: &AccountId,
         amounts: Vec<Balance>,
         max_burn_shares: Balance,
-        fees: AdminFees,
+        admin_fee: AdminFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => {
-                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &fees)
+                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee)
             }
         }
     }
@@ -133,14 +133,14 @@ impl Pool {
         amount_in: Balance,
         token_out: &AccountId,
         min_amount_out: Balance,
-        fees: AdminFees,
+        admin_fee: AdminFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => {
-                pool.swap(token_in, amount_in, token_out, min_amount_out, &fees)
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
             }
             Pool::StableSwapPool(pool) => {
-                pool.swap(token_in, amount_in, token_out, min_amount_out, &fees)
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
             }
         }
     }

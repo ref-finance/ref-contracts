@@ -4,7 +4,6 @@ use near_sdk::json_types::WrappedTimestamp;
 
 use crate::*;
 use crate::utils::FEE_DIVISOR;
-use crate::legacy::ContractV1;
 
 #[near_bindgen]
 impl Contract {
@@ -115,17 +114,10 @@ impl Contract {
     // [AUDIT_09]
     #[private]
     pub fn migrate() -> Self {
-        let prev: ContractV1 = env::state_read().expect("ERR_NOT_INITIALIZED");
-        Contract {
-            owner_id: prev.owner_id,
-            exchange_fee: prev.exchange_fee,
-            referral_fee: prev.referral_fee,
-            pools: prev.pools,
-            accounts: prev.accounts,
-            whitelisted_tokens: prev.whitelisted_tokens,
-            guardians: UnorderedSet::new(StorageKey::Guardian),
-            state: RunningState::Running,
-        }
+        let mut prev: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
+        prev.exchange_fee = 1600;
+        prev.referral_fee = 400;
+        prev
     }
 
     pub(crate) fn assert_owner(&self) {

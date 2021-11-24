@@ -1,8 +1,11 @@
 # Release Notes
 
-### Version 1.4.0
+### Version 1.4.1
 1. Introduce Stable-Swap-Pool;
-2. Make exchange fee and referral fee inclusive;
+
+### Version 1.4.0
+1. Make exchange fee and referal fee inclusive in total fee;
+2. Make exchange fee (in the form of lp shares) belongs to contract itself;
 
 ### Version 1.3.1
 1. Apply HOTFIX in v1.0.3;

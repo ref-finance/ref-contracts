@@ -5,7 +5,7 @@ use near_sdk::{AccountId, Balance, PromiseResult};
 
 use crate::utils::{
     assert_one_yocto, ext_multi_fungible_token, ext_fungible_token, 
-    ext_self, wrap_mft_token_id, parse_seed_id, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER
+    ext_self, wrap_mft_token_id, parse_seed_id, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_WITHDRAW_SEED
 };
 use crate::errors::*;
 use crate::farm_seed::SeedType;
@@ -41,7 +41,7 @@ impl Contract {
                     amount.into(),
                     &env::current_account_id(),
                     0,
-                    GAS_FOR_RESOLVE_TRANSFER,
+                    GAS_FOR_RESOLVE_WITHDRAW_SEED,
                 ));
             }
             SeedType::MFT => {
@@ -61,7 +61,7 @@ impl Contract {
                     amount.into(),
                     &env::current_account_id(),
                     0,
-                    GAS_FOR_RESOLVE_TRANSFER,
+                    GAS_FOR_RESOLVE_WITHDRAW_SEED,
                 ));
             }
         }
@@ -74,7 +74,7 @@ impl Contract {
         seed_id: SeedId,
         sender_id: AccountId,
         amount: U128,
-    ) {
+    ) -> U128 {
         assert_eq!(
             env::promise_results_count(),
             1,
@@ -102,6 +102,7 @@ impl Contract {
                 farmer.get_ref_mut().add_seed(&seed_id, amount);
                 self.data_mut().seeds.insert(&seed_id, &farm_seed);
                 self.data_mut().farmers.insert(&sender_id, &farmer);
+                0.into()
             },
             PromiseResult::Successful(_) => {
                 env::log(
@@ -111,8 +112,9 @@ impl Contract {
                     )
                     .as_bytes(),
                 );
+                amount.into()
             }
-        };
+        }
     }
 
     #[private]
@@ -121,7 +123,7 @@ impl Contract {
         seed_id: SeedId,
         sender_id: AccountId,
         amount: U128,
-    ) {
+    ) -> U128 {
         assert_eq!(
             env::promise_results_count(),
             1,
@@ -149,6 +151,7 @@ impl Contract {
                 farmer.get_ref_mut().add_seed(&seed_id, amount);
                 self.data_mut().seeds.insert(&seed_id, &farm_seed);
                 self.data_mut().farmers.insert(&sender_id, &farmer);
+                0.into()
             },
             PromiseResult::Successful(_) => {
                 env::log(
@@ -158,8 +161,9 @@ impl Contract {
                     )
                     .as_bytes(),
                 );
+                amount.into()
             }
-        };
+        }
     }
 }
 
