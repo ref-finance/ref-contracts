@@ -191,7 +191,7 @@ impl SimplePool {
             result.push(amount);
         }
         if prev_shares_amount == shares {
-            // [AUDIT_13] Never unregister an LP when liquidity is removed.
+            // [AUDIT_13] Never unregister a LP when he removed all his liquidity.
             self.shares.insert(&sender_id, &0);
         } else {
             self.shares
@@ -314,7 +314,7 @@ impl SimplePool {
         if let Some(referral_id) = &admin_fee.referral_id {
             if admin_fee.referral_fee > 0
                 && numerator > U256::zero()
-                && self.shares.contains_key(&referral_id)
+                && self.shares.contains_key(referral_id)
             {
                 let denominator = new_invariant * FEE_DIVISOR / admin_fee.referral_fee;
                 self.mint_shares(referral_id, (numerator / denominator).as_u128());
