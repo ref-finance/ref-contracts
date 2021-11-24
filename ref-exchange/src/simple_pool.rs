@@ -1,10 +1,10 @@
 use std::cmp::min;
 
-use crate::StorageKey;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance};
+use crate::StorageKey;
 use crate::admin_fee::AdminFees;
 
 use crate::errors::{
@@ -61,8 +61,8 @@ impl SimplePool {
             exchange_fee,
             referral_fee,
             // [AUDIT_11]
-            shares: LookupMap::new(StorageKey::Shares { 
-                pool_id: id, 
+            shares: LookupMap::new(StorageKey::Shares {
+                pool_id: id,
             }),
             shares_total_supply: 0,
         }
@@ -435,7 +435,9 @@ mod tests {
             exchange_fee: 5,
             referral_fee: 1,
             shares_total_supply: 35967818779820559673547466,
-            shares: LookupMap::new(StorageKey::Shares { pool_id: 0 }),
+            shares: LookupMap::new(StorageKey::Shares {
+                pool_id: 0,
+            }),
         };
         let mut amounts = vec![145782, 1];
         let _ = pool.add_liquidity(&accounts(2).to_string(), &mut amounts);
