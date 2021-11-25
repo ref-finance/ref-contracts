@@ -57,6 +57,13 @@ impl From<Pool> for PoolInfo {
                 total_fee: pool.total_fee,
                 shares_total_supply: U128(pool.shares_total_supply),
             },
+            Pool::StableSwapPool(pool) => Self {
+                pool_kind,
+                token_account_ids: pool.token_account_ids,
+                amounts: pool.amounts.into_iter().map(|a| U128(a)).collect(),
+                total_fee: pool.total_fee,
+                shares_total_supply: U128(pool.shares_total_supply),
+            },
         }
     }
 }
@@ -112,6 +119,10 @@ impl Contract {
     /// Return volumes of the given pool.
     pub fn get_pool_volumes(&self, pool_id: u64) -> Vec<SwapVolume> {
         self.pools.get(pool_id).expect("ERR_NO_POOL").get_volumes()
+    }
+
+    pub fn get_pool_share_price(&self, pool_id: u64) -> U128 {
+        self.pools.get(pool_id).expect("ERR_NO_POOL").get_share_price().into()
     }
 
     /// Returns number of shares given account has in given pool.
