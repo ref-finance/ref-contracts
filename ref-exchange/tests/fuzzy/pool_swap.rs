@@ -1,10 +1,10 @@
 use near_sdk_sim::{
     call, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto};
 use near_sdk::AccountId;
 use near_sdk::json_types::U128;
-use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
+use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction, stable_swap::StableSwapPool, admin_fee::AdminFees};
 use rand::Rng;
 use rand_pcg::Pcg32;
 use crate::fuzzy::{
@@ -13,6 +13,7 @@ use crate::fuzzy::{
     liquidity_manage::*,
     constants::*
 };
+use test_token::ContractContract as TestToken;
 
 pub fn swap_action(pool :&ContractAccount<Exchange>, operator: &Operator, token_in: AccountId, token_out: AccountId, amount_in: u128, simple_pool_id: u64) -> ExecutionResult{
     call!(
@@ -172,4 +173,102 @@ pub fn do_pool_swap(ctx: &mut OperationContext, rng: &mut Pcg32, root: &UserAcco
         println!("pool_swap scenario : {:?} end!", scenario);
     }
     
+}
+
+pub fn get_swap_info(rng: &mut Pcg32) -> (AccountId, AccountId, u128, usize, usize){
+    let amount_in_unit = vec![ONE_DAI, ONE_USDT, ONE_USDC];
+    let amount_in = rng.gen_range(1..AMOUNT_IN_LIMIT);
+    loop {
+        let token_in_index = rng.gen_range(0..STABLE_TOKENS.len());
+        let token_out_index = rng.gen_range(0..STABLE_TOKENS.len());
+        if token_in_index == token_out_index {
+            continue;
+        }
+        return (STABLE_TOKENS[token_in_index].to_string(), STABLE_TOKENS[token_out_index].to_string(), amount_in_unit[token_in_index] * amount_in,
+        token_in_index, token_out_index)
+    }
+}
+
+pub fn calculate_swap_out(real_pool :&ContractAccount<Exchange>, token_in: &String, token_out: &String, amount_in: u128) -> u128 {
+    let current_pool_info = view!(real_pool.get_pool(0)).unwrap_json::<PoolInfo>();
+    let mut pool =
+            StableSwapPool::new(0, STABLE_TOKENS.iter().map(|&v| v.clone().to_string().try_into().unwrap()).collect(), vec![18, 6, 6], 10000, 25);
+    pool.amounts = current_pool_info.amounts.iter().map(|&v| v.0).collect();
+    pool.token_account_ids = current_pool_info.token_account_ids;
+    pool.total_fee = current_pool_info.total_fee;
+    pool.shares_total_supply = current_pool_info.shares_total_supply.0;
+
+    pool.swap(
+        token_in.into(),
+        amount_in,
+        token_out.into(),
+        1,
+        &AdminFees::new(1600),
+    )
+}
+
+pub fn do_stable_pool_swap(token_contracts: &Vec<ContractAccount<TestToken>>, rng: &mut Pcg32, root: &UserAccount, operator: &StableOperator, pool :&ContractAccount<Exchange>){
+
+    let mut scenario = StableScenario::Normal;
+
+    let balances = view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>();
+    println!("current user balance: {:?}", balances);
+    
+    let (token_in, token_out, amount_in, token_in_index, token_out_index) = get_swap_info(rng);
+
+    let token_contract = token_contracts.get(token_in_index).unwrap();
+
+    println!("swap  {} => {} : {}", token_in, token_out, amount_in);
+    add_and_deposit_token(root, &operator.user, token_contract, pool, amount_in);
+    let balances = view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>();
+    println!("current user balance: {:?}", balances);
+    let token_in_amount = balances.get(&token_in).unwrap().0;
+    let token_out_amount = balances.get(&token_out).unwrap_or(&U128(0_u128)).0;
+
+
+    let swap_out = calculate_swap_out(pool, &token_in, &token_out, amount_in);
+    if swap_out > view!(pool.get_pool(0)).unwrap_json::<PoolInfo>().amounts[token_out_index].0{
+        scenario = StableScenario::Slippage;
+    }
+
+    let out_come = call!(
+        operator.user,
+        pool.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in: token_in.clone(),
+                amount_in: Some(U128(amount_in)),
+                token_out: token_out.clone(),
+                min_amount_out: U128(1)
+            }],
+            None
+        ),
+        deposit = 1
+    );
+    println!("do_stable_pool_swap scenario : {:?} begin!", scenario);
+    match scenario {
+        StableScenario::Normal => {
+            out_come.assert_success();
+            assert_eq!(view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>().get(&token_in).unwrap().0,
+                            token_in_amount - amount_in
+            );
+            assert_eq!(view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>().get(&token_out).unwrap().0,
+                            token_out_amount + swap_out
+            );
+        },
+        StableScenario::Slippage => {
+            assert_eq!(get_error_count(&out_come), 1);
+            assert!(get_error_status(&out_come).contains("E34: insufficient lp shares"));
+            assert_eq!(view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>().get(&token_in).unwrap().0,
+                            token_in_amount
+            );
+            assert_eq!(view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>().get(&token_out).unwrap().0,
+                            token_out_amount
+            );
+        }
+        _ => {
+            panic!("do_stable_pool_swap find new StableScenario {:?}", scenario);
+        }
+    }
+    println!("do_stable_pool_swap scenario : {:?} end!", scenario);
 }
