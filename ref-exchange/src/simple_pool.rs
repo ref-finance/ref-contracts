@@ -42,7 +42,7 @@ pub struct SimplePool {
 impl SimplePool {
     pub fn new(
         id: u32,
-        token_account_ids: Vec<ValidAccountId>,
+        token_account_ids: Vec<AccountId>,
         total_fee: u32,
         exchange_fee: u32,
         referral_fee: u32,
@@ -54,7 +54,7 @@ impl SimplePool {
         // [AUDIT_10]
         assert_eq!(token_account_ids.len(), NUM_TOKENS, "ERR_SHOULD_HAVE_2_TOKENS");
         Self {
-            token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
+            token_account_ids: token_account_ids.clone(),
             amounts: vec![0u128; token_account_ids.len()],
             volumes: vec![SwapVolume::default(); token_account_ids.len()],
             total_fee,
@@ -336,7 +336,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
-        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 30, 0, 0);
+        let mut pool = SimplePool::new(0, vec![accounts(1).into(), accounts(2).into()], 30, 0, 0);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
@@ -386,7 +386,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
-        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 100, 100, 0);
+        let mut pool = SimplePool::new(0, vec![accounts(1).into(), accounts(2).into()], 100, 100, 0);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);

@@ -7,6 +7,9 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{ext_contract, AccountId, Balance, Gas};
 use uint::construct_uint;
 
+/// used to store all inner MFT when they act as any pool's backend assets 
+pub const MFT_ASSETS_PREFIX: &str = "_MFT_LOCKER@";
+
 /// Attach no deposit.
 pub const NO_DEPOSIT: u128 = 0;
 /// hotfix_insuffient_gas_for_mft_resolve_transfer.
@@ -65,6 +68,36 @@ pub fn add_to_collection(c: &mut LookupMap<AccountId, Balance>, key: &String, va
 pub fn check_token_duplicates(tokens: &[ValidAccountId]) {
     let token_set: HashSet<_> = tokens.iter().map(|a| a.as_ref()).collect();
     assert_eq!(token_set.len(), tokens.len(), "ERR_TOKEN_DUPLICATES");
+}
+
+/// return all inner mft's pool id
+pub fn get_inner_mfts(tokens: &[AccountId], ex_id: &String) -> Vec<String> {
+    tokens
+    .iter()
+    .map(|a| {
+        let parts: Vec<&str> = a.split(":").collect();
+        if parts.len() == 2 && (parts[0] == "" || parts[0] == ex_id) {
+            parts[1].to_string()
+        } else { 
+            "".to_string() 
+        }
+    })
+    .filter(|a| a.len() > 0 )
+    .collect()
+}
+
+/// parse an token into mft format 
+pub fn to_mft_format(token: &AccountId) -> Option<(String, Option<u64>)> {
+    let parts: Vec<&str> = token.split(":").collect();
+    if parts.len() == 2 {
+        if let Ok(pool_id) = str::parse::<u64>(parts[1]) {
+            Some((parts[0].to_string(), Some(pool_id)))
+        } else {
+            None
+        }
+    } else { 
+        Some((parts[0].to_string(), None))
+    }
 }
 
 /// Newton's method of integer square root.

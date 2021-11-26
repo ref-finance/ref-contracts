@@ -58,7 +58,7 @@ fn parse_token_id(token_id: String) -> TokenOrPool {
 
 #[near_bindgen]
 impl Contract {
-    fn internal_mft_transfer(
+    pub(crate) fn internal_mft_transfer(
         &mut self,
         token_id: String,
         sender_id: &AccountId,

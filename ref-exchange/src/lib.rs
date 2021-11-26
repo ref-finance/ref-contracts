@@ -20,7 +20,7 @@ use crate::errors::*;
 use crate::admin_fee::AdminFees;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
-use crate::utils::{check_token_duplicates};
+use crate::utils::{check_token_duplicates, get_inner_mfts, to_mft_format, MFT_ASSETS_PREFIX};
 pub use crate::views::{PoolInfo, ContractMetadata};
 
 mod account_deposit;
@@ -108,9 +108,23 @@ impl Contract {
     pub fn add_simple_pool(&mut self, tokens: Vec<ValidAccountId>, fee: u32) -> u64 {
         self.assert_contract_running();
         check_token_duplicates(&tokens);
+        let token_ids: Vec<AccountId> = tokens.iter().map(|a| a.clone().into()).collect();
+        let mfts = get_inner_mfts(&token_ids, &env::current_account_id());
+        if mfts.len() > 0 {
+            // high-order pool only can be created by owner or guardians
+            assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
+            // ensure each pool id is valid
+            let illegals: Vec<&String> = mfts.iter()
+            .filter(
+                |a| 
+                str::parse::<u64>(a).unwrap_or(self.pools.len()) >= self.pools.len()
+            )
+            .collect();
+            assert_eq!(illegals.len(), 0, "ERR_MFT_TOKEN_ILLEGAL");
+        }
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
-            tokens,
+            token_ids,
             fee,
             0,
             0,
@@ -204,7 +218,24 @@ impl Contract {
         let tokens = pool.tokens();
         // Subtract updated amounts from deposits. This will fail if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
-            deposits.withdraw(&tokens[i], amounts[i]);
+            if let Some(mft) = to_mft_format(&tokens[i]) {
+                if let Some(inner_id) = mft.1 {
+                    if mft.0 == env::current_account_id() {
+                        // inner mft, withdraw from user's balance
+                        let token_id = format!(":{}", inner_id);
+                        let mft_locker_id = format!("{}{}", MFT_ASSETS_PREFIX, env::current_account_id());
+                        self.internal_mft_transfer(token_id, &sender_id, &mft_locker_id, amounts[i], None);
+                    } else {
+                        // outer mft, withdraw from deposits
+                        deposits.withdraw(&tokens[i], amounts[i]);
+                    }
+                } else {
+                    // for nep 141 token, withdraw from deposits
+                    deposits.withdraw(&tokens[i], amounts[i]);
+                }
+            } else {
+                env::panic("ERR_TOKEN_INVALID".as_bytes())
+            }
         }
         self.internal_save_account(&sender_id, deposits);
         self.pools.replace(pool_id, &pool);
@@ -233,7 +264,24 @@ impl Contract {
         let tokens = pool.tokens();
         let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
         for i in 0..tokens.len() {
-            deposits.deposit(&tokens[i], amounts[i]);
+            if let Some(mft) = to_mft_format(&tokens[i]) {
+                if let Some(inner_id) = mft.1 {
+                    if mft.0 == env::current_account_id() {
+                        // inner mft, deposit to user's balance
+                        let token_id = format!(":{}", inner_id);
+                        let mft_locker_id = format!("{}{}", MFT_ASSETS_PREFIX, env::current_account_id());
+                        self.internal_mft_transfer(token_id, &mft_locker_id, &sender_id, amounts[i], None);
+                    } else {
+                        // outer mft, deposit to deposits
+                        deposits.deposit(&tokens[i], amounts[i]);
+                    }
+                } else {
+                    // for nep 141 token, deposit to deposits
+                    deposits.deposit(&tokens[i], amounts[i]);
+                }
+            } else {
+                env::panic("ERR_TOKEN_INVALID".as_bytes())
+            }
         }
         // Freed up storage balance from LP tokens will be returned to near_balance.
         if prev_storage > env::storage_usage() {
