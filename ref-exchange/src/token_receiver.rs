@@ -1,59 +1,8 @@
 
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
-use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{serde_json, PromiseOrValue};
-
 use crate::*;
 
-pub const VIRTUAL_ACC: &str = "@";
-
-/// Message parameters to receive via token function call.
-#[derive(Serialize, Deserialize)]
-#[serde(crate = "near_sdk::serde")]
-#[serde(untagged)]
-enum TokenReceiverMessage {
-    /// Alternative to deposit + execute actions call.
-    Execute {
-        referral_id: Option<ValidAccountId>,
-        /// List of sequential actions.
-        actions: Vec<Action>,
-    },
-}
-
-impl Contract {
-    /// Executes set of actions on virtual account.
-    /// Returns amounts to send to the sender directly.
-    fn internal_direct_actions(
-        &mut self,
-        token_in: AccountId,
-        amount_in: Balance,
-        referral_id: Option<AccountId>,
-        actions: &[Action],
-    ) -> Vec<(AccountId, Balance)> {
-
-        // let @ be the virtual account
-        let mut account: Account = Account::new(&String::from(VIRTUAL_ACC));
-
-        account.deposit(&token_in, amount_in);
-        let _ = self.internal_execute_actions(
-            &mut account,
-            &referral_id,
-            &actions,
-            ActionResult::Amount(U128(amount_in)),
-        );
-
-        let mut result = vec![];
-        for (token, amount) in account.tokens.to_vec() {
-            if amount > 0 {
-                result.push((token.clone(), amount));
-            }
-        }
-        account.tokens.clear();
-
-        result
-    }
-
-}
 
 #[near_bindgen]
 impl FungibleTokenReceiver for Contract {
@@ -87,6 +36,7 @@ impl FungibleTokenReceiver for Contract {
                         amount.0,
                         referral_id,
                         &actions,
+                        sender_id.as_ref(),
                     );
                     for (token_out, amount_out) in out_amounts.into_iter() {
                         self.internal_send_tokens(sender_id.as_ref(), &token_out, amount_out);

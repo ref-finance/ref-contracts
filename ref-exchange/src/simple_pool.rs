@@ -2,7 +2,6 @@ use std::cmp::min;
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
-use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance};
 use crate::StorageKey;
 use crate::admin_fee::AdminFees;

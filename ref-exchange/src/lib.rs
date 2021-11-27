@@ -65,6 +65,21 @@ impl fmt::Display for RunningState {
     }
 }
 
+pub const VIRTUAL_ACC: &str = "@";
+
+/// Message parameters to receive via token function call.
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+#[serde(untagged)]
+enum TokenReceiverMessage {
+    /// Alternative to deposit + execute actions call.
+    Execute {
+        referral_id: Option<ValidAccountId>,
+        /// List of sequential actions.
+        actions: Vec<Action>,
+    },
+}
+
 #[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 pub struct Contract {
@@ -161,7 +176,7 @@ impl Contract {
         }
         let referral_id = referral_id.map(|r| r.into());
         let result =
-            self.internal_execute_actions(&mut account, &referral_id, &actions, ActionResult::None);
+            self.internal_execute_actions(&mut account, &referral_id, &actions, ActionResult::None, &sender_id);
         self.internal_save_account(&sender_id, account);
         result
     }
@@ -336,10 +351,11 @@ impl Contract {
         referral_id: &Option<AccountId>,
         actions: &[Action],
         prev_result: ActionResult,
+        user_id: &AccountId,
     ) -> ActionResult {
         let mut result = prev_result;
         for action in actions {
-            result = self.internal_execute_action(account, referral_id, action, result);
+            result = self.internal_execute_action(account, referral_id, action, result, user_id);
         }
         result
     }
@@ -351,6 +367,7 @@ impl Contract {
         referral_id: &Option<AccountId>,
         action: &Action,
         prev_result: ActionResult,
+        user_id: &AccountId,
     ) -> ActionResult {
         match action {
             Action::Swap(swap_action) => {
@@ -358,7 +375,26 @@ impl Contract {
                     .amount_in
                     .map(|value| value.0)
                     .unwrap_or_else(|| prev_result.to_amount());
-                account.withdraw(&swap_action.token_in, amount_in);
+                // handle token_in
+                if let Some(mft) = to_mft_format(&swap_action.token_in) {
+                    if let Some(inner_id) = mft.1 {
+                        if mft.0 == env::current_account_id() {
+                            // inner mft, withdraw from user's balance
+                            let token_id = format!(":{}", inner_id);
+                            let mft_locker_id = format!("{}{}", MFT_ASSETS_PREFIX, env::current_account_id());
+                            self.internal_mft_transfer(token_id, user_id, &mft_locker_id, amount_in, None);
+                        } else {
+                            // outer mft, withdraw from deposits
+                            account.withdraw(&swap_action.token_in, amount_in);
+                        }
+                    } else {
+                        // for nep 141 token, withdraw from deposits
+                        account.withdraw(&swap_action.token_in, amount_in);
+                    }
+                } else {
+                    env::panic("ERR_TOKEN_INVALID".as_bytes())
+                }
+                // do action
                 let amount_out = self.internal_pool_swap(
                     swap_action.pool_id,
                     &swap_action.token_in,
@@ -367,7 +403,25 @@ impl Contract {
                     swap_action.min_amount_out.0,
                     referral_id,
                 );
-                account.deposit(&swap_action.token_out, amount_out);
+                // handle token_out
+                if let Some(mft) = to_mft_format(&swap_action.token_out) {
+                    if let Some(inner_id) = mft.1 {
+                        if mft.0 == env::current_account_id() {
+                            // inner mft, deposit to user's balance
+                            let token_id = format!(":{}", inner_id);
+                            let mft_locker_id = format!("{}{}", MFT_ASSETS_PREFIX, env::current_account_id());
+                            self.internal_mft_transfer(token_id, &mft_locker_id, user_id, amount_out, None);
+                        } else {
+                            // outer mft, deposit to deposits
+                            account.deposit(&swap_action.token_out, amount_out);
+                        }
+                    } else {
+                        // for nep 141 token, deposit to deposits
+                        account.deposit(&swap_action.token_out, amount_out);
+                    }
+                } else {
+                    env::panic("ERR_TOKEN_INVALID".as_bytes())
+                }
                 // [AUDIT_02]
                 ActionResult::Amount(U128(amount_out))
             }
@@ -400,6 +454,40 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         amount_out
+    }
+
+    /// Executes set of actions on virtual account.
+    /// Returns amounts to send to the sender directly.
+    fn internal_direct_actions(
+        &mut self,
+        token_in: AccountId,
+        amount_in: Balance,
+        referral_id: Option<AccountId>,
+        actions: &[Action],
+        user_id: &AccountId,
+    ) -> Vec<(AccountId, Balance)> {
+
+        // let @ be the virtual account
+        let mut account: Account = Account::new(&String::from(VIRTUAL_ACC));
+
+        account.deposit(&token_in, amount_in);
+        let _ = self.internal_execute_actions(
+            &mut account,
+            &referral_id,
+            &actions,
+            ActionResult::Amount(U128(amount_in)),
+            user_id,
+        );
+
+        let mut result = vec![];
+        for (token, amount) in account.tokens.to_vec() {
+            if amount > 0 {
+                result.push((token.clone(), amount));
+            }
+        }
+        account.tokens.clear();
+
+        result
     }
 }
 
