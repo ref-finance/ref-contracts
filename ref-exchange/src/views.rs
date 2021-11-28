@@ -202,4 +202,45 @@ impl Contract {
             None
         }
     }
+
+    pub fn predict_add_stable_liqudity(
+        &self,
+        pool_id: u64,
+        amounts: &Vec<U128>,
+    ) -> U128 {
+        let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        pool.predict_add_stable_liqudity(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
+            .into()
+    }
+
+    pub fn predict_stable_swap(
+        &self,
+        pool_id: u64,
+        token_in: ValidAccountId,
+        amount_in: U128,
+        token_out: ValidAccountId,
+    ) -> U128 {
+        let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        pool.predict_stable_swap(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &AdminFees::new(self.exchange_fee))
+            .into() 
+    }
+
+    pub fn predict_remove_liqudity(
+        &self,
+        pool_id: u64,
+        shares: U128,
+    ) -> Vec<U128> {
+        let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        pool.predict_remove_liqudity(shares.into()).into_iter().map(|x| U128(x)).collect()
+    }
+
+    pub fn predict_remove_liqudity_by_tokens(
+        &self,
+        pool_id: u64,
+        amounts: &Vec<U128>,
+    ) -> U128 {
+        let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        pool.predict_remove_liqudity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
+            .into()
+    }
 }

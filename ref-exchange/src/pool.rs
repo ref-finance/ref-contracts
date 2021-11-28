@@ -172,4 +172,49 @@ impl Pool {
             Pool::StableSwapPool(pool) => pool.share_register(account_id),
         }
     }
+
+    pub fn predict_add_stable_liqudity(
+        &self,
+        amounts: &Vec<Balance>,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(pool) => pool.predict_add_stable_liqudity(amounts, fees),
+        }
+    }
+
+    pub fn predict_stable_swap(
+        &self,
+        token_in: &AccountId,
+        amount_in: Balance,
+        token_out: &AccountId,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(pool) => pool.predict_stable_swap(token_in, amount_in, token_out, &fees),
+        }
+    }
+
+    pub fn predict_remove_liqudity(
+        &self,
+        shares: Balance,
+    ) -> Vec<Balance> {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(pool) => pool.predict_remove_liqudity(shares),
+        }
+    }
+
+    pub fn predict_remove_liqudity_by_tokens(
+        &self,
+        amounts: &Vec<Balance>,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(pool) => pool.predict_remove_liqudity_by_tokens(amounts, fees),
+        }
+    }
 }
