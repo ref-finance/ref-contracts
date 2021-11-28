@@ -4,7 +4,7 @@ use near_sdk_sim::{
 use std::{collections::HashMap, convert::TryInto};
 use near_sdk::AccountId;
 use near_sdk::json_types::U128;
-use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction, stable_swap::StableSwapPool, admin_fee::AdminFees};
+use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
 use rand::Rng;
 use rand_pcg::Pcg32;
 use crate::fuzzy::{
@@ -189,24 +189,6 @@ pub fn get_swap_info(rng: &mut Pcg32) -> (AccountId, AccountId, u128, usize, usi
     }
 }
 
-pub fn calculate_swap_out(real_pool :&ContractAccount<Exchange>, token_in: &String, token_out: &String, amount_in: u128) -> u128 {
-    let current_pool_info = view!(real_pool.get_pool(0)).unwrap_json::<PoolInfo>();
-    let mut pool =
-            StableSwapPool::new(0, STABLE_TOKENS.iter().map(|&v| v.clone().to_string().try_into().unwrap()).collect(), vec![18, 6, 6], 10000, 25);
-    pool.amounts = current_pool_info.amounts.iter().map(|&v| v.0).collect();
-    pool.token_account_ids = current_pool_info.token_account_ids;
-    pool.total_fee = current_pool_info.total_fee;
-    pool.shares_total_supply = current_pool_info.shares_total_supply.0;
-
-    pool.swap(
-        token_in.into(),
-        amount_in,
-        token_out.into(),
-        1,
-        &AdminFees::new(1600),
-    )
-}
-
 pub fn do_stable_pool_swap(token_contracts: &Vec<ContractAccount<TestToken>>, rng: &mut Pcg32, root: &UserAccount, operator: &StableOperator, pool :&ContractAccount<Exchange>){
 
     let mut scenario = StableScenario::Normal;
@@ -225,8 +207,7 @@ pub fn do_stable_pool_swap(token_contracts: &Vec<ContractAccount<TestToken>>, rn
     let token_in_amount = balances.get(&token_in).unwrap().0;
     let token_out_amount = balances.get(&token_out).unwrap_or(&U128(0_u128)).0;
 
-
-    let swap_out = calculate_swap_out(pool, &token_in, &token_out, amount_in);
+    let swap_out =  view!(pool.predict_stable_swap(0, to_va(token_in.clone()), U128(amount_in), to_va(token_out.clone()))).unwrap_json::<U128>().0;
     if swap_out > view!(pool.get_pool(0)).unwrap_json::<PoolInfo>().amounts[token_out_index].0{
         scenario = StableScenario::Slippage;
     }

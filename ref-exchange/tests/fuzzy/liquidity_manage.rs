@@ -5,7 +5,7 @@ use test_token::ContractContract as TestToken;
 use near_sdk::json_types::U128;
 use near_sdk::AccountId;
 use std::{collections::HashMap, convert::TryInto, process::id};
-use ref_exchange::{ContractContract as Exchange, PoolInfo, stable_swap::{StableSwapPool, math::StableSwap, math::Fees}, admin_fee::AdminFees};
+use ref_exchange::{ContractContract as Exchange, PoolInfo};
 use rand::Rng;
 use rand_pcg::Pcg32;
 use crate::fuzzy::{
@@ -166,25 +166,12 @@ pub fn do_add_liquidity(ctx: &mut OperationContext, rng: &mut Pcg32, root: &User
     }
 }
 
-pub fn calculate_add_liquidity_out(real_pool :&ContractAccount<Exchange>, amounts: Vec<u128>) -> u128 {
-    let current_pool_info = view!(real_pool.get_pool(0)).unwrap_json::<PoolInfo>();
-    let mut pool =
-            StableSwapPool::new(0, STABLE_TOKENS.iter().map(|&v| v.clone().to_string().try_into().unwrap()).collect(), vec![18, 6, 6], 10000, 25);
-    pool.amounts = current_pool_info.amounts.iter().map(|&v| v.0).collect();
-    pool.token_account_ids = current_pool_info.token_account_ids;
-    pool.total_fee = current_pool_info.total_fee;
-    pool.shares_total_supply = current_pool_info.shares_total_supply.0;
-
-    let mut amounts = amounts;
-    pool.add_liquidity(&"root".to_string().into(), &mut amounts, 1, &AdminFees::new(1600))
-}
-
 pub fn do_stable_add_liquidity(token_contracts: &Vec<ContractAccount<TestToken>>, rng: &mut Pcg32, root: &UserAccount, operator: &StableOperator, pool :&ContractAccount<Exchange>) -> u128{
     let mut scenario = StableScenario::Normal;
     
-    let add_amounts = vec![rng.gen_range(1..ADD_LIQUIDITY_LIMIT as u128) * ONE_DAI,
-            rng.gen_range(1..ADD_LIQUIDITY_LIMIT as u128) * ONE_USDT,
-            rng.gen_range(1..ADD_LIQUIDITY_LIMIT as u128) * ONE_USDC];
+    let add_amounts = vec![U128(rng.gen_range(1..ADD_LIQUIDITY_LIMIT as u128) * ONE_DAI),
+                                    U128(rng.gen_range(1..ADD_LIQUIDITY_LIMIT as u128) * ONE_USDT),
+                                    U128(rng.gen_range(1..ADD_LIQUIDITY_LIMIT as u128) * ONE_USDC)];
 
     let min_shares = rng.gen_range(1..ADD_LIQUIDITY_LIMIT) as u128;
 
@@ -193,10 +180,10 @@ pub fn do_stable_add_liquidity(token_contracts: &Vec<ContractAccount<TestToken>>
     println!("do_stable_add_liquidity add_amounts : {:?}", add_amounts);
     for (idx, amount) in add_amounts.clone().into_iter().enumerate() {
         let token_contract = token_contracts.get(idx).unwrap();
-        add_and_deposit_token(root, &operator.user, token_contract, pool, amount);
+        add_and_deposit_token(root, &operator.user, token_contract, pool, amount.0);
     }
 
-    let cal_share = calculate_add_liquidity_out(pool, add_amounts.clone());
+    let cal_share = view!(pool.predict_add_stable_liqudity(0, &add_amounts)).unwrap_json::<U128>().0;
 
     if min_shares > cal_share {
         scenario = StableScenario::Slippage;
@@ -204,7 +191,7 @@ pub fn do_stable_add_liquidity(token_contracts: &Vec<ContractAccount<TestToken>>
 
     let out_come = call!(
         operator.user,
-        pool.add_stable_liquidity(0, add_amounts.into_iter().map(|x| U128(x)).collect(), U128(min_shares)),
+        pool.add_stable_liquidity(0, add_amounts, U128(min_shares)),
         deposit = to_yocto("0.01")
     );
 
@@ -223,18 +210,6 @@ pub fn do_stable_add_liquidity(token_contracts: &Vec<ContractAccount<TestToken>>
         }
     }
     share
-}
-
-pub fn calculate_remove_liquidity_by_shares_out(real_pool :&ContractAccount<Exchange>, shares: u128) -> Vec<u128> {
-    let current_pool_info = view!(real_pool.get_pool(0)).unwrap_json::<PoolInfo>();
-    let mut pool =
-            StableSwapPool::new(0, STABLE_TOKENS.iter().map(|&v| v.clone().to_string().try_into().unwrap()).collect(), vec![18, 6, 6], 10000, 25);
-    pool.amounts = current_pool_info.amounts.iter().map(|&v| v.0).collect();
-    pool.token_account_ids = current_pool_info.token_account_ids;
-    pool.total_fee = current_pool_info.total_fee;
-    pool.shares_total_supply = current_pool_info.shares_total_supply.0;
-
-    pool.remove_liquidity_by_shares(&"root".to_string().into(), shares, vec![1_u128, 1, 1])
 }
 
 pub fn do_stable_remove_liquidity_by_shares(token_contracts: &Vec<ContractAccount<TestToken>>, rng: &mut Pcg32, root: &UserAccount, operator: &StableOperator, pool :&ContractAccount<Exchange>){
@@ -274,7 +249,7 @@ pub fn do_stable_remove_liquidity_by_shares(token_contracts: &Vec<ContractAccoun
     
     let mut increase_amounts = vec![];
     if scenario == StableScenario::Normal {
-        increase_amounts = calculate_remove_liquidity_by_shares_out(pool, remove_lp_num);
+        increase_amounts = view!(pool.predict_remove_liqudity(0, U128(remove_lp_num))).unwrap_json::<Vec<U128>>();
     }
 
     println!("user has lpt : {}, remove : {}", user_lpt, remove_lp_num);
@@ -294,7 +269,7 @@ pub fn do_stable_remove_liquidity_by_shares(token_contracts: &Vec<ContractAccoun
             assert_eq!(user_share, old_share - remove_lp_num);
             for (idx, item) in increase_amounts.iter().enumerate() {
                 assert_eq!(balances.get(STABLE_TOKENS[idx]).unwrap().0, 
-                old_balances.get(STABLE_TOKENS[idx]).unwrap().0 + item);
+                old_balances.get(STABLE_TOKENS[idx]).unwrap().0 + item.0);
             }
         },
         StableScenario::Slippage => {
@@ -309,43 +284,13 @@ pub fn do_stable_remove_liquidity_by_shares(token_contracts: &Vec<ContractAccoun
     println!("do_stable_remove_liquidity_by_shares scenario : {:?} end!", scenario);
 }
 
-pub fn calculate_remove_liquidity_by_token_out(real_pool :&ContractAccount<Exchange>, remove_amounts: Vec<u128>, max_burn_shares: u128) -> u128{
-    let current_pool_info = view!(real_pool.get_pool(0)).unwrap_json::<PoolInfo>();
-
-    let mut c_amounts = remove_amounts.clone();
-    let mut c_current_amounts:Vec<u128> = current_pool_info.amounts.clone().iter().map(|&v| v.0).collect();
-    for (index, value) in DECIMALS.iter().enumerate() {
-        let factor = 10_u128
-            .checked_pow((TARGET_DECIMAL - value) as u32)
-            .unwrap();
-        c_amounts[index] *= factor;
-        c_current_amounts[index] *= factor;
-    }
-
-    let invariant = StableSwap::new(
-        10000,
-        10000,
-        0,
-        0,
-        0,
-    );
-    if let Some((remove_lpt, free)) = invariant.compute_lp_amount_for_withdraw(
-    &c_amounts,
-    &c_current_amounts,
-    current_pool_info.shares_total_supply.0, 
-    &Fees::new(current_pool_info.total_fee, &AdminFees::new(1600))){
-        return remove_lpt;
-    }
-    panic!("check invariant.compute_lp_amount_for_withdraw error!"); 
-}
-
 pub fn do_stable_remove_liquidity_by_token(token_contracts: &Vec<ContractAccount<TestToken>>, rng: &mut Pcg32, root: &UserAccount, operator: &StableOperator, pool :&ContractAccount<Exchange>){
 
     let mut scenario = StableScenario::Normal;
 
-    let remove_amounts = vec![rng.gen_range(1..REMOVE_LIQUIDITY_LIMIT as u128) * ONE_DAI,
-            rng.gen_range(1..REMOVE_LIQUIDITY_LIMIT as u128) * ONE_USDT,
-            rng.gen_range(1..REMOVE_LIQUIDITY_LIMIT as u128) * ONE_USDC];
+    let remove_amounts = vec![ U128(rng.gen_range(1..REMOVE_LIQUIDITY_LIMIT as u128) * ONE_DAI),
+                                        U128(rng.gen_range(1..REMOVE_LIQUIDITY_LIMIT as u128) * ONE_USDT),
+                                        U128(rng.gen_range(1..REMOVE_LIQUIDITY_LIMIT as u128) * ONE_USDC)];
     let max_burn_shares = rng.gen_range(1..LP_LIMIT as u128) * ONE_LPT;
     let mut user_lpt =  mft_balance_of(&pool, ":0", &operator.user.account_id());
 
@@ -355,7 +300,7 @@ pub fn do_stable_remove_liquidity_by_token(token_contracts: &Vec<ContractAccount
 
     let old_balances = view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>();
 
-    let remove_lpt = calculate_remove_liquidity_by_token_out(pool, remove_amounts.clone(), max_burn_shares);
+    let remove_lpt = view!(pool.predict_remove_liqudity_by_tokens(0, &remove_amounts)).unwrap_json::<U128>().0;
 
     if remove_lpt > user_lpt{
         scenario = StableScenario::InsufficientLpShares;
@@ -368,7 +313,7 @@ pub fn do_stable_remove_liquidity_by_token(token_contracts: &Vec<ContractAccount
 
     let out_come = call!(
         operator.user,
-        pool.remove_liquidity_by_tokens(0, remove_amounts.iter().map(|&v| U128(v)).collect(), U128(max_burn_shares)),
+        pool.remove_liquidity_by_tokens(0, remove_amounts.clone(), U128(max_burn_shares)),
         deposit = 1 
     );
 
@@ -381,7 +326,7 @@ pub fn do_stable_remove_liquidity_by_token(token_contracts: &Vec<ContractAccount
             let balances = view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>();
             for (idx, item) in remove_amounts.iter().enumerate() {
                 assert_eq!(balances.get(STABLE_TOKENS[idx]).unwrap().0, 
-                old_balances.get(STABLE_TOKENS[idx]).unwrap().0 + item);
+                old_balances.get(STABLE_TOKENS[idx]).unwrap().0 + item.0);
             }
         },
         StableScenario::Slippage => {

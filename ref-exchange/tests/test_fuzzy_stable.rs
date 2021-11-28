@@ -3,7 +3,7 @@ use near_sdk_sim::{
 };
 
 use test_token::ContractContract as TestToken;
-use ref_exchange::{PoolInfo, SwapAction};
+use ref_exchange::PoolInfo;
 use ref_exchange::{ContractContract as Exchange};
 
 use rand::{Rng, SeedableRng};
@@ -11,18 +11,11 @@ use rand_pcg::Pcg32;
 
 mod fuzzy;
 use fuzzy::{constants::*,
-    create_simple_pool::*,
-    direct_swap::*,
     liquidity_manage::*,
     pool_swap::*,
     types::*,
     utils::*,
-    constants::*
 };
-
-use near_sdk::test_utils::{accounts, VMContextBuilder};
-use near_sdk::{testing_env, MockedBlockchain};
-use std::convert::TryInto;
 
 fn do_operation(rng: &mut Pcg32, root: &UserAccount, operator: &StableOperator, pool :&ContractAccount<Exchange>, token_contracts: &Vec<ContractAccount<TestToken>>){
     println!("current stable pool info: {:?}", view!(pool.get_pool(0)).unwrap_json::<PoolInfo>());
@@ -55,9 +48,6 @@ fn generate_fuzzy_seed() -> Vec<u64>{
 
 #[test]
 fn test_fuzzy_stable() {
-    let mut context = VMContextBuilder::new();
-    testing_env!(context.predecessor_account_id(accounts(0)).build());
-
     let seeds = generate_fuzzy_seed();
 
     for seed in seeds {

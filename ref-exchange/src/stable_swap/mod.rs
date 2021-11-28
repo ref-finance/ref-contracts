@@ -11,7 +11,7 @@ use crate::stable_swap::math::{
 use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR, U256};
 use crate::StorageKey;
 
-pub mod math;
+mod math;
 
 pub const MIN_DECIMAL: u8 = 1;
 pub const MAX_DECIMAL: u8 = 18;
@@ -125,6 +125,51 @@ impl StableSwapPool {
             .as_u128()
     }
 
+    pub fn predict_add_stable_liqudity(
+        &self,
+        amounts: &Vec<Balance>,
+        fees: &AdminFees,
+    ) -> Balance {
+        let invariant = self.get_invariant();
+
+        // make amounts into comparable-amounts
+        let mut c_amounts = amounts.clone();
+        let mut c_current_amounts = self.amounts.clone();
+        for (index, value) in self.token_decimals.iter().enumerate() {
+            let factor = 10_u128
+                .checked_pow((TARGET_DECIMAL - value) as u32)
+                .unwrap();
+            c_amounts[index] *= factor;
+            c_current_amounts[index] *= factor;
+        }
+
+        let (new_shares, _) = if self.shares_total_supply == 0 {
+            // Bootstrapping the pool, request providing all non-zero balances,
+            // and all fee free.
+            for c_amount in &c_amounts {
+                assert!(*c_amount > 0, "{}", ERR65_INIT_TOKEN_BALANCE);
+            }
+            (
+                invariant
+                    .compute_d(&c_amounts)
+                    .expect(ERR66_INVARIANT_CALC_ERR)
+                    .as_u128(),
+                0,
+            )
+        } else {
+            // Subsequent add liquidity will charge fee according to difference with ideal balance portions
+            invariant
+                .compute_lp_amount_for_deposit(
+                    &c_amounts,
+                    &c_current_amounts,
+                    self.shares_total_supply,
+                    &Fees::new(self.total_fee, &fees),
+                )
+                .expect(ERR67_LPSHARE_CALC_ERR)
+        };
+        new_shares
+    }
+
     /// Add liquidity into the pool.
     /// Allows to add liquidity of a subset of tokens,
     /// by set other tokens balance into 0.
@@ -213,6 +258,23 @@ impl StableSwapPool {
         new_shares
     }
 
+    pub fn predict_remove_liqudity(
+        &self,
+        shares: Balance,
+    ) -> Vec<Balance> {
+        let n_coins = self.token_account_ids.len();
+        let mut result = vec![0u128; n_coins];
+        for i in 0..n_coins {
+            result[i] = U256::from(self.amounts[i])
+                .checked_mul(shares.into())
+                .unwrap()
+                .checked_div(self.shares_total_supply.into())
+                .unwrap()
+                .as_u128();
+        }
+        result
+    }
+
     /// balanced removal of liquidity would be free of charge.
     pub fn remove_liquidity_by_shares(
         &mut self,
@@ -268,6 +330,36 @@ impl StableSwapPool {
         );
 
         result
+    }
+
+    pub fn predict_remove_liqudity_by_tokens(
+        &self,
+        amounts: &Vec<Balance>,
+        fees: &AdminFees,
+    ) -> Balance {
+        let mut c_amounts = amounts.clone();
+        let mut c_current_amounts = self.amounts.clone();
+        for (index, value) in self.token_decimals.iter().enumerate() {
+            let factor = 10_u128
+                .checked_pow((TARGET_DECIMAL - value) as u32)
+                .unwrap();
+            c_amounts[index] *= factor;
+            c_current_amounts[index] *= factor;
+        }
+
+        let invariant = self.get_invariant();
+        let trade_fee = Fees::new(self.total_fee, &fees);
+
+        let (burn_shares, _) = invariant
+            .compute_lp_amount_for_withdraw(
+                &c_amounts,
+                &c_current_amounts,
+                self.shares_total_supply,
+                &trade_fee,
+            )
+            .expect(ERR67_LPSHARE_CALC_ERR);
+
+        burn_shares
     }
 
     /// Remove liquidity from the pool by fixed tokens-out,
@@ -413,7 +505,7 @@ impl StableSwapPool {
     }
 
     /// Returns how much token you will receive if swap `token_amount_in` of `token_in` for `token_out`.
-    pub fn get_return(
+    pub fn predict_stable_swap(
         &self,
         token_in: &AccountId,
         amount_in: Balance,

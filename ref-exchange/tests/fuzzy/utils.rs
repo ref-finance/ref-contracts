@@ -21,23 +21,6 @@ near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     EXCHANGE_WASM_BYTES => "../res/ref_exchange_release.wasm",
 }
 
-// pub fn show_promises(r: &ExecutionResult) {
-//     for promise in r.promise_results() {
-//         println!("{:?}", promise);
-//     }
-// }
-
-// pub fn get_logs(r: &ExecutionResult) -> Vec<String> {
-//     let mut logs: Vec<String> = vec![];
-//     r.promise_results().iter().map(
-//         |ex| ex.as_ref().unwrap().logs().iter().map(
-//             |x| logs.push(x.clone())
-//         ).for_each(drop)
-//     ).for_each(drop);
-//     logs
-// }
-
-
 /**
  * Related to common
  */
