@@ -217,6 +217,12 @@ impl Contract {
                                     &sender_id,
                                 );
                                 for (token_out, amount_out) in out_amounts.into_iter() {
+                                    log!(
+                                        "Send to {}: with {} token of amount {}",
+                                        &sender_id,
+                                        &token_out,
+                                        amount_out
+                                    );
                                     self.internal_send_tokens(&sender_id, &token_out, amount_out);
                                 }
                                 // Even if send tokens fails, we don't return funds back to sender.

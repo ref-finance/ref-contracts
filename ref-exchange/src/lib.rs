@@ -495,8 +495,23 @@ impl Contract {
 
         // let @ be the virtual account
         let mut account: Account = Account::new(&String::from(VIRTUAL_ACC));
+        
+        if let Some(mft) = to_mft_format(&token_in) {
+            if let Some(_) = mft.1 {
+                if mft.0 == env::current_account_id() || mft.0 == "" {
+                    // inner mft, already deposit, no action needed
+                } else {
+                    // outer mft, deposit to deposits
+                    account.deposit(&token_in, amount_in);
+                }
+            } else {
+                // for nep 141 token, deposit to deposits
+                account.deposit(&token_in, amount_in);
+            }
+        } else {
+            env::panic("ERR_TOKEN_INVALID".as_bytes())
+        }
 
-        account.deposit(&token_in, amount_in);
         let _ = self.internal_execute_actions(
             &mut account,
             &referral_id,

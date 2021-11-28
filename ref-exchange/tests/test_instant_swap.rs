@@ -1,48 +1,9 @@
 use near_sdk::json_types::U128;
-use near_sdk_sim::{
-    call, to_yocto, ContractAccount, ExecutionResult, UserAccount,
-};
-
-use test_token::ContractContract as TestToken;
+use near_sdk_sim::{call, to_yocto};
 
 use crate::common::utils::*;
 pub mod common;
 
-fn pack_action(
-    pool_id: u32,
-    token_in: &str,
-    token_out: &str,
-    amount_in: Option<u128>,
-    min_amount_out: u128,
-) -> String {
-    if let Some(amount_in) = amount_in {
-        format!(
-            "{{\"pool_id\": {}, \"token_in\": \"{}\", \"amount_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
-            pool_id, token_in, amount_in, token_out, min_amount_out
-        )
-    } else {
-        format!(
-            "{{\"pool_id\": {}, \"token_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
-            pool_id, token_in, token_out, min_amount_out
-        )
-    }
-}
-
-fn direct_swap(
-    user: &UserAccount,
-    contract: &ContractAccount<TestToken>,
-    actions: Vec<String>,
-) -> ExecutionResult {
-    // {{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"eth\", \"min_amount_out\": \"1\"}}
-    let actions_str = actions.join(", ");
-    let msg_str = format!("{{\"actions\": [{}]}}", actions_str);
-    // println!("{}", msg_str);
-    call!(
-        user,
-        contract.ft_transfer_call(to_va(swap()), to_yocto("1").into(), None, msg_str),
-        deposit = 1
-    )
-}
 
 #[test]
 fn instant_swap_scenario_01() {
