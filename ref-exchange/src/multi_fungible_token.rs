@@ -74,7 +74,7 @@ impl Contract {
                 pool.share_transfer(sender_id, receiver_id, amount);
                 self.pools.replace(pool_id, &pool);
                 log!(
-                    "Transfer shares {} pool: {} from {} to {}",
+                    "Transfer shares pool#{}: {} from {} to {}",
                     pool_id,
                     amount,
                     sender_id,
@@ -144,6 +144,16 @@ impl Contract {
                 pool.share_register(account_id.as_ref());
                 self.pools.replace(pool_id, &pool);
                 self.internal_check_storage(prev_storage);
+            }
+        }
+    }
+
+    pub fn mft_is_registered(&self, token_id: String, account_id: ValidAccountId) -> bool {
+        match parse_token_id(token_id) {
+            TokenOrPool::Token(_) => env::panic(b"ERR_INVALID_TOKEN"),
+            TokenOrPool::Pool(pool_id) => {
+                let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+                pool.share_is_registered(account_id.as_ref())
             }
         }
     }

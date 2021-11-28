@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::collections::HashSet;
 use std::fmt;
 
 use near_contract_standards::storage_management::{
@@ -20,7 +21,7 @@ use crate::errors::*;
 use crate::admin_fee::AdminFees;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
-use crate::utils::{check_token_duplicates, get_inner_mfts, to_mft_format, MFT_ASSETS_PREFIX};
+use crate::utils::{check_token_duplicates, to_mft_format};
 pub use crate::views::{PoolInfo, ContractMetadata};
 
 mod account_deposit;
@@ -66,6 +67,8 @@ impl fmt::Display for RunningState {
 }
 
 pub const VIRTUAL_ACC: &str = "@";
+/// used to store all inner MFT when they act as any pool's backend assets 
+pub const MFT_LOCKER: &str = "_MFT_LOCKER@";
 
 /// Message parameters to receive via token function call.
 #[derive(Serialize, Deserialize)]
@@ -124,22 +127,45 @@ impl Contract {
         self.assert_contract_running();
         check_token_duplicates(&tokens);
         let token_ids: Vec<AccountId> = tokens.iter().map(|a| a.clone().into()).collect();
-        let mfts = get_inner_mfts(&token_ids, &env::current_account_id());
-        if mfts.len() > 0 {
-            // high-order pool only can be created by owner or guardians
-            assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
-            // ensure each pool id is valid
-            let illegals: Vec<&String> = mfts.iter()
-            .filter(
-                |a| 
-                str::parse::<u64>(a).unwrap_or(self.pools.len()) >= self.pools.len()
-            )
-            .collect();
-            assert_eq!(illegals.len(), 0, "ERR_MFT_TOKEN_ILLEGAL");
-        }
         self.internal_add_pool(Pool::SimplePool(SimplePool::new(
             self.pools.len() as u32,
             token_ids,
+            fee,
+            0,
+            0,
+        )))
+    }
+
+    #[payable]
+    pub fn add_high_order_simple_pool(&mut self, tokens: Vec<AccountId>, fee: u32) -> u64 {
+        self.assert_contract_running();
+        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
+        // check_token_duplicates(&tokens);
+        let mut token_set = HashSet::<&String>::new();
+        for token in &tokens {
+            token_set.insert(token);
+            if let Some(mft) = to_mft_format(token) {
+                if let Some(inner_id) = mft.1 {
+                    if mft.0 == env::current_account_id() || mft.0 == "" {
+                        // inner mft, verify pool id is valid
+                        if inner_id >= self.pools.len() {
+                            env::panic("ERR_MFT_TOKEN_INNERID_INVALID".as_bytes());
+                        }
+                    } else {
+                        // outer mft, illegal here
+                        env::panic("ERR_MFT_TOKEN_INVALID".as_bytes());
+                    }
+                } else {
+                    // for nep 141 token, nothing need to verify
+                }
+            } else {
+                env::panic("ERR_TOKEN_INVALID".as_bytes());
+            }
+        }
+
+        self.internal_add_pool(Pool::SimplePool(SimplePool::new(
+            self.pools.len() as u32,
+            tokens,
             fee,
             0,
             0,
@@ -235,11 +261,10 @@ impl Contract {
         for i in 0..tokens.len() {
             if let Some(mft) = to_mft_format(&tokens[i]) {
                 if let Some(inner_id) = mft.1 {
-                    if mft.0 == env::current_account_id() {
+                    if mft.0 == env::current_account_id() || mft.0 == "" {
                         // inner mft, withdraw from user's balance
                         let token_id = format!(":{}", inner_id);
-                        let mft_locker_id = format!("{}{}", MFT_ASSETS_PREFIX, env::current_account_id());
-                        self.internal_mft_transfer(token_id, &sender_id, &mft_locker_id, amounts[i], None);
+                        self.internal_mft_transfer(token_id, &sender_id, &String::from(MFT_LOCKER), amounts[i], None);
                     } else {
                         // outer mft, withdraw from deposits
                         deposits.withdraw(&tokens[i], amounts[i]);
@@ -281,11 +306,10 @@ impl Contract {
         for i in 0..tokens.len() {
             if let Some(mft) = to_mft_format(&tokens[i]) {
                 if let Some(inner_id) = mft.1 {
-                    if mft.0 == env::current_account_id() {
+                    if mft.0 == env::current_account_id() || mft.0 == "" {
                         // inner mft, deposit to user's balance
                         let token_id = format!(":{}", inner_id);
-                        let mft_locker_id = format!("{}{}", MFT_ASSETS_PREFIX, env::current_account_id());
-                        self.internal_mft_transfer(token_id, &mft_locker_id, &sender_id, amounts[i], None);
+                        self.internal_mft_transfer(token_id, &String::from(MFT_LOCKER), &sender_id, amounts[i], None);
                     } else {
                         // outer mft, deposit to deposits
                         deposits.deposit(&tokens[i], amounts[i]);
@@ -326,7 +350,11 @@ impl Contract {
         // println!("need: {}, attached: {}", storage_cost, env::attached_deposit());
         let refund = env::attached_deposit()
             .checked_sub(storage_cost)
-            .expect("ERR_STORAGE_DEPOSIT");
+            .expect(format!(
+                "ERR_STORAGE_DEPOSIT need {}, attatched {}", 
+                storage_cost, env::attached_deposit()
+            ).as_str()
+        );
         if refund > 0 {
             Promise::new(env::predecessor_account_id()).transfer(refund);
         }
@@ -378,11 +406,10 @@ impl Contract {
                 // handle token_in
                 if let Some(mft) = to_mft_format(&swap_action.token_in) {
                     if let Some(inner_id) = mft.1 {
-                        if mft.0 == env::current_account_id() {
+                        if mft.0 == env::current_account_id() || mft.0 == "" {
                             // inner mft, withdraw from user's balance
                             let token_id = format!(":{}", inner_id);
-                            let mft_locker_id = format!("{}{}", MFT_ASSETS_PREFIX, env::current_account_id());
-                            self.internal_mft_transfer(token_id, user_id, &mft_locker_id, amount_in, None);
+                            self.internal_mft_transfer(token_id, user_id, &String::from(MFT_LOCKER), amount_in, None);
                         } else {
                             // outer mft, withdraw from deposits
                             account.withdraw(&swap_action.token_in, amount_in);
@@ -406,11 +433,10 @@ impl Contract {
                 // handle token_out
                 if let Some(mft) = to_mft_format(&swap_action.token_out) {
                     if let Some(inner_id) = mft.1 {
-                        if mft.0 == env::current_account_id() {
+                        if mft.0 == env::current_account_id() || mft.0 == "" {
                             // inner mft, deposit to user's balance
                             let token_id = format!(":{}", inner_id);
-                            let mft_locker_id = format!("{}{}", MFT_ASSETS_PREFIX, env::current_account_id());
-                            self.internal_mft_transfer(token_id, &mft_locker_id, user_id, amount_out, None);
+                            self.internal_mft_transfer(token_id, &String::from(MFT_LOCKER), user_id, amount_out, None);
                         } else {
                             // outer mft, deposit to deposits
                             account.deposit(&swap_action.token_out, amount_out);

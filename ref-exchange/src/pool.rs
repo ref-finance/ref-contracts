@@ -120,4 +120,10 @@ impl Pool {
             Pool::SimplePool(pool) => pool.share_register(account_id),
         }
     }
+
+    pub fn share_is_registered(&mut self, account_id: &AccountId) -> bool {
+        match self {
+            Pool::SimplePool(pool) => pool.share_is_registered(account_id),
+        }
+    }
 }
