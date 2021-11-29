@@ -94,11 +94,11 @@ impl Pool {
         token_in: &AccountId,
         amount_in: Balance,
         token_out: &AccountId,
+        fees: &AdminFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.get_return(token_in, amount_in, token_out),
-            _ => 0
-            // Pool::StableSwapPool(pool) => pool.get_return(token_in, amount_in, token_out),
+            Pool::StableSwapPool(pool) => pool.get_return(token_in, amount_in, token_out, fees),
         }
     }
 
@@ -181,19 +181,6 @@ impl Pool {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => pool.predict_add_stable_liqudity(amounts, fees),
-        }
-    }
-
-    pub fn predict_stable_swap(
-        &self,
-        token_in: &AccountId,
-        amount_in: Balance,
-        token_out: &AccountId,
-        fees: &AdminFees,
-    ) -> Balance {
-        match self {
-            Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(pool) => pool.predict_stable_swap(token_in, amount_in, token_out, &fees),
         }
     }
 

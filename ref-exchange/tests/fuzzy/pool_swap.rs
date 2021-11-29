@@ -207,7 +207,7 @@ pub fn do_stable_pool_swap(token_contracts: &Vec<ContractAccount<TestToken>>, rn
     let token_in_amount = balances.get(&token_in).unwrap().0;
     let token_out_amount = balances.get(&token_out).unwrap_or(&U128(0_u128)).0;
 
-    let swap_out =  view!(pool.predict_stable_swap(0, to_va(token_in.clone()), U128(amount_in), to_va(token_out.clone()))).unwrap_json::<U128>().0;
+    let swap_out =  view!(pool.get_return(0, to_va(token_in.clone()), U128(amount_in), to_va(token_out.clone()))).unwrap_json::<U128>().0;
     if swap_out > view!(pool.get_pool(0)).unwrap_json::<PoolInfo>().amounts[token_out_index].0{
         scenario = StableScenario::Slippage;
     }
