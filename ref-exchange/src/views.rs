@@ -172,7 +172,7 @@ impl Contract {
         token_out: ValidAccountId,
     ) -> U128 {
         let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
-        pool.get_return(token_in.as_ref(), amount_in.into(), token_out.as_ref())
+        pool.get_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &AdminFees::new(self.exchange_fee))
             .into()
     }
 
@@ -211,18 +211,6 @@ impl Contract {
         let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         pool.predict_add_stable_liqudity(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
             .into()
-    }
-
-    pub fn predict_stable_swap(
-        &self,
-        pool_id: u64,
-        token_in: ValidAccountId,
-        amount_in: U128,
-        token_out: ValidAccountId,
-    ) -> U128 {
-        let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
-        pool.predict_stable_swap(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &AdminFees::new(self.exchange_fee))
-            .into() 
     }
 
     pub fn predict_remove_liqudity(

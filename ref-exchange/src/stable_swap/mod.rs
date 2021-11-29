@@ -505,7 +505,7 @@ impl StableSwapPool {
     }
 
     /// Returns how much token you will receive if swap `token_amount_in` of `token_in` for `token_out`.
-    pub fn predict_stable_swap(
+    pub fn get_return(
         &self,
         token_in: &AccountId,
         amount_in: Balance,
