@@ -119,6 +119,12 @@ impl Contract {
         )))
     }
 
+    /// Adds new "Stable Pool" with given tokens, decimals, fee and amp.
+    /// It is limited to owner or guardians, cause a complex and correct config is needed.
+    /// tokens: pool tokens in this stable swap.
+    /// decimals: each pool tokens decimal, needed to make them comparable.
+    /// fee: total fee of the pool, admin fee is inclusive.
+    /// amp_factor: algorithm parameter, decide how stable the pool will be.
     #[payable]
     pub fn add_stable_swap_pool(
         &mut self,
@@ -231,6 +237,11 @@ impl Contract {
         self.internal_check_storage(prev_storage);
     }
 
+    /// For stable swap pool, user can add liquidity with token's combination as his will.
+    /// But there is a little fee according to the bias of token's combination with the one in the pool.
+    /// pool_id: stable pool id. If simple pool is given, panic with unimplement.
+    /// amounts: token's combination (in pool tokens sequence) user want to add into the pool, a 0 means absent of that token.
+    /// min_shares: Slippage, if shares mint is less than it (cause of fee for too much bias), panic with  ERR68_SLIPPAGE
     #[payable]
     pub fn add_stable_liquidity(
         &mut self,
@@ -297,6 +308,10 @@ impl Contract {
         self.internal_save_account(&sender_id, deposits);
     }
 
+    /// For stable swap pool, LP can use it to remove liquidity with given token amount and distribution.
+    /// pool_id: the stable swap pool id. If simple pool is given, panic with Unimplement.
+    /// amounts: Each tokens (in pool tokens sequence) amounts user want get, a 0 means user don't want to get that token back.
+    /// max_burn_shares: This is slippage protection, if user request would burn shares more than it, panic with ERR68_SLIPPAGE
     #[payable]
     pub fn remove_liquidity_by_tokens(
         &mut self, pool_id: u64, 
@@ -351,7 +366,7 @@ impl Contract {
             .checked_sub(prev_storage)
             .unwrap_or_default() as Balance
             * env::storage_byte_cost();
-        // println!("need: {}, attached: {}", storage_cost, env::attached_deposit());
+
         let refund = env::attached_deposit()
             .checked_sub(storage_cost)
             .expect(

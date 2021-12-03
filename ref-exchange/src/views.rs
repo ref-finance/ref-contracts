@@ -44,6 +44,7 @@ pub struct PoolInfo {
     pub total_fee: u32,
     /// Total number of shares.
     pub shares_total_supply: U128,
+    pub amp: u32,
 }
 
 impl From<Pool> for PoolInfo {
@@ -52,6 +53,7 @@ impl From<Pool> for PoolInfo {
         match pool {
             Pool::SimplePool(pool) => Self {
                 pool_kind,
+                amp: 0,
                 token_account_ids: pool.token_account_ids,
                 amounts: pool.amounts.into_iter().map(|a| U128(a)).collect(),
                 total_fee: pool.total_fee,
@@ -59,6 +61,7 @@ impl From<Pool> for PoolInfo {
             },
             Pool::StableSwapPool(pool) => Self {
                 pool_kind,
+                amp: pool.get_amp(),
                 token_account_ids: pool.token_account_ids,
                 amounts: pool.amounts.into_iter().map(|a| U128(a)).collect(),
                 total_fee: pool.total_fee,

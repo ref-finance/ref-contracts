@@ -33,6 +33,7 @@ fn sim_stable_swap() {
         view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
         PoolInfo {
             pool_kind: "STABLE_SWAP".to_string(),
+            amp: 10000,
             token_account_ids: tokens.into_iter().map(|x| x.account_id()).collect(),
             amounts: vec![U128(100000*ONE_DAI), U128(100000*ONE_USDT), U128(100000*ONE_USDC)],
             total_fee: 25,
@@ -108,6 +109,7 @@ fn sim_stable_swap() {
         view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
         PoolInfo {
             pool_kind: "STABLE_SWAP".to_string(),
+            amp: 10000,
             token_account_ids: tokens.into_iter().map(|x| x.account_id()).collect(),
             amounts: vec![U128(100002*ONE_DAI), U128(99999*ONE_USDT+2500), U128(99999*ONE_USDC+2500)],
             total_fee: 25,
@@ -181,6 +183,7 @@ fn sim_stable_lp() {
         view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
         PoolInfo {
             pool_kind: "STABLE_SWAP".to_string(),
+            amp: 10000,
             token_account_ids: tokens.into_iter().map(|x| x.account_id()).collect(),
             amounts: vec![U128(100500*ONE_DAI), U128(100600*ONE_USDT), U128(100800*ONE_USDC)],
             total_fee: 25,
@@ -212,6 +215,7 @@ fn sim_stable_lp() {
         view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
         PoolInfo {
             pool_kind: "STABLE_SWAP".to_string(),
+            amp: 10000,
             token_account_ids: tokens.into_iter().map(|x| x.account_id()).collect(),
             amounts: vec![U128(100499*ONE_DAI), U128(100100*ONE_USDT), U128(100799*ONE_USDC)],
             total_fee: 25,

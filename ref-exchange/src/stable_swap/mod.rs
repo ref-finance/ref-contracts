@@ -77,6 +77,14 @@ impl StableSwapPool {
         }
     }
 
+    pub fn get_amp(&self) -> u32 {
+        if let Some(amp) = self.get_invariant().compute_amp_factor() {
+            amp as u32
+        } else {
+            0
+        }
+    }
+
     fn get_invariant(&self) -> StableSwap {
         StableSwap::new(
             self.init_amp_factor,
@@ -292,10 +300,6 @@ impl StableSwapPool {
         );
         let mut result = vec![0u128; n_coins];
 
-        // println!("[remove_liquidity_by_shares] prev_shares_amount {}", prev_shares_amount);
-        // println!("[remove_liquidity_by_shares] burn_shares_amount {}", shares);
-        // println!("[remove_liquidity_by_shares] total_shares {}", self.shares_total_supply);
-        // println!("[remove_liquidity_by_shares] in-pool tokens {:?}", self.amounts);
         for i in 0..n_coins {
             result[i] = U256::from(self.amounts[i])
                 .checked_mul(shares.into())
@@ -776,7 +780,6 @@ mod tests {
     use near_sdk::test_utils::{accounts, VMContextBuilder};
     use near_sdk::{testing_env, MockedBlockchain};
     use std::convert::TryInto;
-    // use near_sdk_sim::to_yocto;
 
     use super::*;
 
@@ -950,9 +953,14 @@ mod tests {
         ];
         let share = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
         assert_eq!(share, 900000000000_000000000000000000);
-        // let out = swap(&mut pool, 1, 99999000000, 2);
-        // assert_eq!(out, 98443167413);
-        // assert_eq!(pool.amounts, vec![199999000000, 1556832587]);
+        let out = pool.swap(
+            &String::from("aone.near"),
+            99999000000,
+            &String::from("atwo.near"),
+            0,
+            &AdminFees::zero(),
+        );
+        assert_eq!(out, 99998999999);
     }
 
     #[test]
