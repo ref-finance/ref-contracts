@@ -253,10 +253,7 @@ impl Contract {
         match parse_token_id(token_id) {
             TokenOrPool::Pool(pool_id) => {
                 let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
-                let decimals = match pool.kind().as_str() {
-                    "STABLE_SWAP" => 18,
-                    _ => 24,
-                };
+                let decimals = pool.get_share_decimal();
                 FungibleTokenMetadata {
                     // [AUDIT_08]
                     spec: "mft-1.0.0".to_string(),

@@ -102,6 +102,14 @@ impl Pool {
         }
     }
 
+    /// Return share decimal.
+    pub fn get_share_decimal(&self) -> u8 {
+        match self {
+            Pool::SimplePool(_) => 24,
+            Pool::StableSwapPool(_) => 18,
+        }
+    }
+
     /// Returns given pool's total fee.
     pub fn get_fee(&self) -> u32 {
         match self {
@@ -118,7 +126,7 @@ impl Pool {
         }
     }
 
-    /// Returns given pool's share price.
+    /// Returns given pool's share price in precision 1e8.
     pub fn get_share_price(&self) -> u128 {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
@@ -173,35 +181,35 @@ impl Pool {
         }
     }
 
-    pub fn predict_add_stable_liqudity(
+    pub fn predict_add_stable_liquidity(
         &self,
         amounts: &Vec<Balance>,
         fees: &AdminFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(pool) => pool.predict_add_stable_liqudity(amounts, fees),
+            Pool::StableSwapPool(pool) => pool.predict_add_stable_liquidity(amounts, fees),
         }
     }
 
-    pub fn predict_remove_liqudity(
+    pub fn predict_remove_liquidity(
         &self,
         shares: Balance,
     ) -> Vec<Balance> {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(pool) => pool.predict_remove_liqudity(shares),
+            Pool::StableSwapPool(pool) => pool.predict_remove_liquidity(shares),
         }
     }
 
-    pub fn predict_remove_liqudity_by_tokens(
+    pub fn predict_remove_liquidity_by_tokens(
         &self,
         amounts: &Vec<Balance>,
         fees: &AdminFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(pool) => pool.predict_remove_liqudity_by_tokens(amounts, fees),
+            Pool::StableSwapPool(pool) => pool.predict_remove_liquidity_by_tokens(amounts, fees),
         }
     }
 }

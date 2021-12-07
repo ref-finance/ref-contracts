@@ -183,7 +183,7 @@ pub fn do_stable_add_liquidity(token_contracts: &Vec<ContractAccount<TestToken>>
         add_and_deposit_token(root, &operator.user, token_contract, pool, amount.0);
     }
 
-    let cal_share = view!(pool.predict_add_stable_liqudity(0, &add_amounts)).unwrap_json::<U128>().0;
+    let cal_share = view!(pool.predict_add_stable_liquidity(0, &add_amounts)).unwrap_json::<U128>().0;
 
     if min_shares > cal_share {
         scenario = StableScenario::Slippage;
@@ -249,7 +249,7 @@ pub fn do_stable_remove_liquidity_by_shares(token_contracts: &Vec<ContractAccoun
     
     let mut increase_amounts = vec![];
     if scenario == StableScenario::Normal {
-        increase_amounts = view!(pool.predict_remove_liqudity(0, U128(remove_lp_num))).unwrap_json::<Vec<U128>>();
+        increase_amounts = view!(pool.predict_remove_liquidity(0, U128(remove_lp_num))).unwrap_json::<Vec<U128>>();
     }
 
     println!("user has lpt : {}, remove : {}", user_lpt, remove_lp_num);
@@ -300,7 +300,7 @@ pub fn do_stable_remove_liquidity_by_token(token_contracts: &Vec<ContractAccount
 
     let old_balances = view!(pool.get_deposits(operator.user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>();
 
-    let remove_lpt = view!(pool.predict_remove_liqudity_by_tokens(0, &remove_amounts)).unwrap_json::<U128>().0;
+    let remove_lpt = view!(pool.predict_remove_liquidity_by_tokens(0, &remove_amounts)).unwrap_json::<U128>().0;
 
     if remove_lpt > user_lpt{
         scenario = StableScenario::InsufficientLpShares;

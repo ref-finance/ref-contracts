@@ -998,7 +998,7 @@ mod tests {
         );
 
         // [AUDIT_13]
-        // should panic cause accounts(4) not removed by a full remove liqudity
+        // should panic cause accounts(4) not removed by a full remove liquidity
         testing_env!(context
             .predecessor_account_id(accounts(4))
             .attached_deposit(to_yocto("0.00071"))

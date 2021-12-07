@@ -145,8 +145,8 @@ fn storage_scenario_02() {
     let ss = get_storage_state(&pool, new_user.valid_account_id()).unwrap();
     assert_eq!(ss.usage.0, to_yocto("0.00546"));
 
-    // appending balanced liqudity with basic lp register storage fee
-    println!("Storage Case 0201: appending balanced liqudity need deposit storage");
+    // appending balanced liquidity with basic lp register storage fee
+    println!("Storage Case 0201: appending balanced liquidity need deposit storage");
     call!(
         new_user,
         pool.add_stable_liquidity(0, vec![U128(10*ONE_DAI), U128(10*ONE_USDT), U128(10*ONE_USDC)], U128(1)),
@@ -157,7 +157,7 @@ fn storage_scenario_02() {
     assert_eq!(ss.usage.0, to_yocto("0.00546"));
 
     // appending imba liquidity with extra storage fee for exchange share
-    println!("Storage Case 0202: appending imba liqudity need deposit storage");
+    println!("Storage Case 0202: appending imba liquidity need deposit storage");
     let out_come = call!(
         new_user,
         pool.add_stable_liquidity(0, vec![U128(5*ONE_DAI), U128(10*ONE_USDT), U128(15*ONE_USDC)], U128(1)),
@@ -168,7 +168,7 @@ fn storage_scenario_02() {
     assert_eq!(ss.usage.0, to_yocto("0.00546"));
 
     // remove liquidity by share
-    println!("Storage Case 0203: remove liqudity by share");
+    println!("Storage Case 0203: remove liquidity by share");
     let out_come = call!(
         new_user,
         pool.remove_liquidity(0, U128(10*ONE_LPT), vec![U128(3*ONE_DAI), U128(3*ONE_USDT), U128(3*ONE_USDC)]),
@@ -179,7 +179,7 @@ fn storage_scenario_02() {
     assert_eq!(ss.usage.0, to_yocto("0.00546"));
 
     // remove liquidity by token
-    println!("Storage Case 0204: remove liqudity by token");
+    println!("Storage Case 0204: remove liquidity by token");
     let out_come = call!(
         new_user,
         pool.remove_liquidity_by_tokens(0, vec![U128(10*ONE_DAI), U128(1*ONE_USDT), U128(1*ONE_USDC)], U128(13*ONE_LPT)),

@@ -81,7 +81,7 @@ impl Contract {
         self.referral_fee = referral_fee;
     }
 
-    /// Remove exchange fee liqudity to owner's inner account.
+    /// Remove exchange fee liquidity to owner's inner account.
     /// without any storage and fee.
     #[payable]
     pub fn remove_exchange_fee_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
@@ -128,6 +128,10 @@ impl Contract {
         );
     }
 
+    /// to eventually change a stable pool's amp factor
+    /// pool_id: the target stable pool;
+    /// future_amp_factor: the target amp factor, could be less or more than current one;
+    /// future_amp_time: the endtime of the increasing or decreasing process;
     pub fn stable_swap_ramp_amp(
         &mut self,
         pool_id: u64,

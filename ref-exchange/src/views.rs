@@ -44,7 +44,7 @@ pub struct PoolInfo {
     pub total_fee: u32,
     /// Total number of shares.
     pub shares_total_supply: U128,
-    pub amp: u32,
+    pub amp: u64,
 }
 
 impl From<Pool> for PoolInfo {
@@ -206,32 +206,32 @@ impl Contract {
         }
     }
 
-    pub fn predict_add_stable_liqudity(
+    pub fn predict_add_stable_liquidity(
         &self,
         pool_id: u64,
         amounts: &Vec<U128>,
     ) -> U128 {
         let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
-        pool.predict_add_stable_liqudity(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
+        pool.predict_add_stable_liquidity(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
             .into()
     }
 
-    pub fn predict_remove_liqudity(
+    pub fn predict_remove_liquidity(
         &self,
         pool_id: u64,
         shares: U128,
     ) -> Vec<U128> {
         let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
-        pool.predict_remove_liqudity(shares.into()).into_iter().map(|x| U128(x)).collect()
+        pool.predict_remove_liquidity(shares.into()).into_iter().map(|x| U128(x)).collect()
     }
 
-    pub fn predict_remove_liqudity_by_tokens(
+    pub fn predict_remove_liquidity_by_tokens(
         &self,
         pool_id: u64,
         amounts: &Vec<U128>,
     ) -> U128 {
         let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
-        pool.predict_remove_liqudity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
+        pool.predict_remove_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
             .into()
     }
 }
