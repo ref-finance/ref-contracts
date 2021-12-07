@@ -113,7 +113,7 @@ fn sim_stable_swap() {
             token_account_ids: tokens.into_iter().map(|x| x.account_id()).collect(),
             amounts: vec![U128(100002*ONE_DAI), U128(99999*ONE_USDT+2500), U128(99999*ONE_USDC+2500)],
             total_fee: 25,
-            shares_total_supply: U128(300000*ONE_LPT+997999990125778),
+            shares_total_supply: U128(300000*ONE_LPT + 499999996666583 + 499999993277742),
         }
     );
 }
@@ -291,8 +291,11 @@ fn sim_stable_lp() {
     out_come.assert_success();
     println!("{:#?}", get_logs(&out_come));
     assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1100*ONE_LPT-502598491280079770545);
-    assert_eq!(mft_balance_of(&pool, ":0", &user2.account_id()), 499699997426210330025-498596260775994577944);
-    assert_eq!(mft_total_supply(&pool, ":0"), last_lpt_supply-498596260775994577944+95600058313591488);
+    // previous lpt - removed lpt
+    assert_eq!(mft_balance_of(&pool, ":0", &user2.account_id()), 499699997426210330025-498596260777261245961);
+    // last_lpt_supply - removed lpt + admin_fee_to_lpt
+    let last_lpt_supply = last_lpt_supply - 498596260777261245961 + 95600058313712936;
+    assert_eq!(mft_total_supply(&pool, ":0"), last_lpt_supply);
     assert!(pool_share_price(&pool, 0) > last_share_price);
     let last_share_price = pool_share_price(&pool, 0);
     println!("share_price: {}", last_share_price);
@@ -309,8 +312,11 @@ fn sim_stable_lp() {
     );
     out_come.assert_success();
     println!("{:#?}", get_logs(&out_come));
-    assert_eq!(mft_balance_of(&pool, ":0", &user3.account_id()), 299997852136734902917811274863);
-    assert_eq!(mft_total_supply(&pool, ":0"), 299998296064761697388281990824);
+    // minted_user_lpt
+    assert_eq!(mft_balance_of(&pool, ":0", &user3.account_id()), 299997852137498188726149828936);
+    // last_lpt_supply + minted_user_lpt + admin_fee_to_lpt
+    let last_lpt_supply = last_lpt_supply + 299997852137498188726149828936 + 143329282015797902428349;
+    assert_eq!(mft_total_supply(&pool, ":0"), last_lpt_supply);
     let last_share_price = pool_share_price(&pool, 0);
     println!("share_price: {}", last_share_price);
 }

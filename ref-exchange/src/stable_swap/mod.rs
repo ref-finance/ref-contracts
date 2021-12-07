@@ -16,7 +16,7 @@ mod math;
 pub const MIN_DECIMAL: u8 = 1;
 pub const MAX_DECIMAL: u8 = 18;
 pub const TARGET_DECIMAL: u8 = 18;
-pub const MIN_RESERVE: u128 = 1;
+pub const MIN_RESERVE: u128 = 1_000_000_000_000_000_000;
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct StableSwapPool {
@@ -24,8 +24,8 @@ pub struct StableSwapPool {
     pub token_account_ids: Vec<AccountId>,
     /// Each decimals for tokens in the pool
     pub token_decimals: Vec<u8>,
-    /// token amounts in original decimal.
-    pub amounts: Vec<Balance>,
+    /// token amounts in comparable decimal.
+    pub c_amounts: Vec<Balance>,
     /// Volumes accumulated by this pool.
     pub volumes: Vec<SwapVolume>,
     /// Fee charged for swap (gets divided by FEE_DIVISOR).
@@ -65,7 +65,7 @@ impl StableSwapPool {
         Self {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
             token_decimals,
-            amounts: vec![0u128; token_account_ids.len()],
+            c_amounts: vec![0u128; token_account_ids.len()],
             volumes: vec![SwapVolume::default(); token_account_ids.len()],
             total_fee,
             shares: LookupMap::new(StorageKey::Shares { pool_id: id }),
@@ -77,17 +77,26 @@ impl StableSwapPool {
         }
     }
 
-    fn amounts_to_c_amounts(&self, amounts: &Vec<u128>) -> (Vec<u128>, u128) {
-        let mut c_amounts = amounts.clone();
-        let mut sum: u128 = 0;
+    pub fn get_amounts(&self) ->Vec<u128> {
+        let mut amounts = self.c_amounts.clone();
         for (index, value) in self.token_decimals.iter().enumerate() {
             let factor = 10_u128
                 .checked_pow((TARGET_DECIMAL - value) as u32)
                 .unwrap();
-            c_amounts[index] *= factor;
-            sum += c_amounts[index];
+            amounts[index] = amounts[index].checked_div(factor).unwrap();
         }
-        (c_amounts, sum)
+        amounts
+    }
+
+    fn amounts_to_c_amounts(&self, amounts: &Vec<u128>) ->Vec<u128> {
+        let mut c_amounts = amounts.clone();
+        for (index, value) in self.token_decimals.iter().enumerate() {
+            let factor = 10_u128
+                .checked_pow((TARGET_DECIMAL - value) as u32)
+                .unwrap();
+            c_amounts[index] = c_amounts[index].checked_mul(factor).unwrap();
+        }
+        c_amounts
     }
 
     fn amount_to_c_amount(&self, amount: u128, index: usize) -> u128 {
@@ -95,18 +104,20 @@ impl StableSwapPool {
         let factor = 10_u128
                 .checked_pow((TARGET_DECIMAL - value) as u32)
                 .unwrap();
-        amount * factor
+        amount.checked_mul(factor).unwrap()
+    }
+
+    fn c_amount_to_amount(&self, c_amount: u128, index: usize) -> u128 {
+        let value = self.token_decimals.get(index).unwrap();
+        let factor = 10_u128
+                .checked_pow((TARGET_DECIMAL - value) as u32)
+                .unwrap();
+        c_amount.checked_div(factor).unwrap()
     }
 
     fn assert_min_reserve(&self, index: usize) {
         assert!(
-            self.amounts[index] >= MIN_RESERVE
-                .checked_mul(
-                    10_u128
-                        .checked_pow(self.token_decimals[index] as u32)
-                        .unwrap()
-                )
-                .unwrap(),
+            self.c_amounts[index] >= MIN_RESERVE,
             "{}",
             ERR69_MIN_RESERVE
         );
@@ -151,7 +162,7 @@ impl StableSwapPool {
     /// Get per lp token price, with 1e8 precision
     pub fn get_share_price(&self) -> u128 {
 
-        let (_, sum_token) = self.amounts_to_c_amounts(&self.amounts);
+        let sum_token = self.c_amounts.iter().sum::<u128>();
 
         U256::from(sum_token)
             .checked_mul(100000000.into())
@@ -171,8 +182,7 @@ impl StableSwapPool {
         let invariant = self.get_invariant();
 
         // make amounts into comparable-amounts
-        let (c_amounts, _) = self.amounts_to_c_amounts(amounts);
-        let (c_current_amounts, _) = self.amounts_to_c_amounts(&self.amounts);
+        let c_amounts = self.amounts_to_c_amounts(amounts);
 
         if self.shares_total_supply == 0 {
             // Bootstrapping the pool, request providing all non-zero balances,
@@ -192,7 +202,7 @@ impl StableSwapPool {
             invariant
                 .compute_lp_amount_for_deposit(
                     &c_amounts,
-                    &c_current_amounts,
+                    &self.c_amounts,
                     self.shares_total_supply,
                     &Fees::new(self.total_fee, &fees),
                 )
@@ -233,7 +243,7 @@ impl StableSwapPool {
         assert!(new_shares >= min_shares, "{}", ERR68_SLIPPAGE);
 
         for i in 0..n_coins {
-            self.amounts[i] = self.amounts[i].checked_add(amounts[i]).unwrap();
+            self.c_amounts[i] = self.c_amounts[i].checked_add(self.amount_to_c_amount(amounts[i], i)).unwrap();
         }
 
         self.mint_shares(sender_id, new_shares);
@@ -273,12 +283,13 @@ impl StableSwapPool {
         let n_coins = self.token_account_ids.len();
         let mut result = vec![0u128; n_coins];
         for i in 0..n_coins {
-            result[i] = U256::from(self.amounts[i])
+            result[i] = U256::from(self.c_amounts[i])
                 .checked_mul(shares.into())
                 .unwrap()
                 .checked_div(self.shares_total_supply.into())
                 .unwrap()
                 .as_u128();
+            result[i] = self.c_amount_to_amount(result[i], i);
         }
         result
     }
@@ -301,15 +312,16 @@ impl StableSwapPool {
         let mut result = vec![0u128; n_coins];
 
         for i in 0..n_coins {
-            result[i] = U256::from(self.amounts[i])
+            result[i] = U256::from(self.c_amounts[i])
                 .checked_mul(shares.into())
                 .unwrap()
                 .checked_div(self.shares_total_supply.into())
                 .unwrap()
                 .as_u128();
-            assert!(result[i] >= min_amounts[i], "{}", ERR68_SLIPPAGE);
-            self.amounts[i] = self.amounts[i].checked_sub(result[i]).unwrap();
+            self.c_amounts[i] = self.c_amounts[i].checked_sub(result[i]).unwrap();
             self.assert_min_reserve(i);
+            result[i] = self.c_amount_to_amount(result[i], i);
+            assert!(result[i] >= min_amounts[i], "{}", ERR68_SLIPPAGE);
         }
 
         self.burn_shares(&sender_id, prev_shares_amount, shares);
@@ -330,8 +342,7 @@ impl StableSwapPool {
         amounts: &Vec<Balance>,
         fees: &AdminFees,
     ) -> Balance {
-        let (c_amounts, _) = self.amounts_to_c_amounts(amounts);
-        let (c_current_amounts, _) = self.amounts_to_c_amounts(&self.amounts);
+        let c_amounts = self.amounts_to_c_amounts(amounts);
 
         let invariant = self.get_invariant();
         let trade_fee = Fees::new(self.total_fee, &fees);
@@ -339,7 +350,7 @@ impl StableSwapPool {
         let (burn_shares, _) = invariant
             .compute_lp_amount_for_withdraw(
                 &c_amounts,
-                &c_current_amounts,
+                &self.c_amounts,
                 self.shares_total_supply,
                 &trade_fee,
             )
@@ -363,8 +374,7 @@ impl StableSwapPool {
         let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
 
         // make amounts into comparable-amounts
-        let (c_amounts, _) = self.amounts_to_c_amounts(&amounts);
-        let (c_current_amounts, _) = self.amounts_to_c_amounts(&self.amounts);
+        let c_amounts = self.amounts_to_c_amounts(&amounts);
 
         let invariant = self.get_invariant();
         let trade_fee = Fees::new(self.total_fee, &fees);
@@ -372,7 +382,7 @@ impl StableSwapPool {
         let (burn_shares, fee_part) = invariant
             .compute_lp_amount_for_withdraw(
                 &c_amounts,
-                &c_current_amounts,
+                &self.c_amounts,
                 self.shares_total_supply,
                 &trade_fee,
             )
@@ -386,7 +396,7 @@ impl StableSwapPool {
         assert!(burn_shares <= max_burn_shares, "{}", ERR68_SLIPPAGE);
 
         for i in 0..n_coins {
-            self.amounts[i] = self.amounts[i].checked_sub(amounts[i]).unwrap();
+            self.c_amounts[i] = self.c_amounts[i].checked_sub(c_amounts[i]).unwrap();
             self.assert_min_reserve(i);
         }
         self.burn_shares(&sender_id, prev_shares_amount, burn_shares);
@@ -422,6 +432,7 @@ impl StableSwapPool {
 
     /// Returns number of tokens in outcome, given amount.
     /// Tokens are provided as indexes into token list for given pool.
+    /// All tokens are comparable tokens
     fn internal_get_return(
         &self,
         token_in: usize,
@@ -431,37 +442,35 @@ impl StableSwapPool {
     ) -> SwapResult {
         // make amounts into comparable-amounts
         let c_amount_in = self.amount_to_c_amount(amount_in, token_in);
-        let (c_current_amounts, _) = self.amounts_to_c_amounts(&self.amounts);
 
-        let invariant = self.get_invariant();
-
-        let mut ret = invariant
+        self.get_invariant()
             .swap_to(
                 token_in,
                 c_amount_in,
                 token_out,
-                &c_current_amounts,
+                &self.c_amounts,
                 &Fees::new(self.total_fee, &fees),
             )
-            .expect(ERR70_SWAP_OUT_CALC_ERR);
+            .expect(ERR70_SWAP_OUT_CALC_ERR)
 
-        let factor_x = 10_u128
-            .checked_pow((TARGET_DECIMAL - self.token_decimals[token_in]) as u32)
-            .unwrap();
-        let factor_y = 10_u128
-            .checked_pow((TARGET_DECIMAL - self.token_decimals[token_out]) as u32)
-            .unwrap();
-        ret.new_source_amount = ret.new_source_amount.checked_div(factor_x.into()).unwrap();
+        // let factor_x = 10_u128
+        //     .checked_pow((TARGET_DECIMAL - self.token_decimals[token_in]) as u32)
+        //     .unwrap();
+        // let factor_y = 10_u128
+        //     .checked_pow((TARGET_DECIMAL - self.token_decimals[token_out]) as u32)
+        //     .unwrap();
 
-        let total_y = (ret.new_destination_amount + ret.amount_swapped + ret.fee)
-            .checked_div(factor_y.into())
-            .unwrap();
-        ret.amount_swapped = ret.amount_swapped.checked_div(factor_y.into()).unwrap();
-        ret.admin_fee = ret.admin_fee.checked_div(factor_y.into()).unwrap();
-        ret.fee = ret.fee.checked_div(factor_y.into()).unwrap();
-        // fix rounding error by subtraction.
-        ret.new_destination_amount = total_y - ret.amount_swapped - ret.fee;
-        ret
+        // ret.new_source_amount = ret.new_source_amount.checked_div(factor_x.into()).unwrap();
+
+        // let total_y = (ret.new_destination_amount + ret.amount_swapped + ret.fee)
+        //     .checked_div(factor_y.into())
+        //     .unwrap();
+        // ret.amount_swapped = ret.amount_swapped.checked_div(factor_y.into()).unwrap();
+        // ret.admin_fee = ret.admin_fee.checked_div(factor_y.into()).unwrap();
+        // ret.fee = ret.fee.checked_div(factor_y.into()).unwrap();
+        // // fix rounding error by subtraction.
+        // ret.new_destination_amount = total_y - ret.amount_swapped - ret.fee;
+        // ret
     }
 
     /// Returns how much token you will receive if swap `token_amount_in` of `token_in` for `token_out`.
@@ -473,13 +482,14 @@ impl StableSwapPool {
         fees: &AdminFees,
     ) -> Balance {
         assert_ne!(token_in, token_out, "{}", ERR71_SWAP_DUP_TOKENS);
-        self.internal_get_return(
+        let c_amount_out = self.internal_get_return(
             self.token_index(token_in),
             amount_in,
             self.token_index(token_out),
             &fees,
         )
-        .amount_swapped
+        .amount_swapped;
+        self.c_amount_to_amount(c_amount_out, self.token_index(token_out))
     }
 
     /// Swap `token_amount_in` of `token_in` token into `token_out` and return how much was received.
@@ -497,25 +507,29 @@ impl StableSwapPool {
         let out_idx = self.token_index(token_out);
         let result = self.internal_get_return(in_idx, amount_in, out_idx, &fees);
         assert!(
-            result.amount_swapped >= min_amount_out,
+            self.c_amount_to_amount(result.amount_swapped, out_idx) >= min_amount_out,
             "{}",
             ERR68_SLIPPAGE
         );
         env::log(
             format!(
                 "Swapped {} {} for {} {}, total fee {}, admin fee {}",
-                amount_in, token_in, result.amount_swapped, token_out, result.fee, result.admin_fee
+                amount_in, token_in, 
+                self.c_amount_to_amount(result.amount_swapped, out_idx), 
+                token_out, 
+                self.c_amount_to_amount(result.fee, out_idx), 
+                self.c_amount_to_amount(result.admin_fee, out_idx)
             )
             .as_bytes(),
         );
 
-        self.amounts[in_idx] = result.new_source_amount;
-        self.amounts[out_idx] = result.new_destination_amount;
+        self.c_amounts[in_idx] = result.new_source_amount;
+        self.c_amounts[out_idx] = result.new_destination_amount;
         self.assert_min_reserve(out_idx);
 
         // Keeping track of volume per each input traded separately.
         self.volumes[in_idx].input.0 += amount_in;
-        self.volumes[out_idx].output.0 += result.amount_swapped;
+        self.volumes[out_idx].output.0 += self.c_amount_to_amount(result.amount_swapped, out_idx);
 
         // handle admin / referral fee.
         if fees.referral_fee + fees.exchange_fee > 0 {
@@ -533,7 +547,7 @@ impl StableSwapPool {
                                 "Referral {} got {} shares from {} {}",
                                 referral,
                                 referral_share,
-                                fee_token,
+                                self.c_amount_to_amount(fee_token, out_idx),
                                 self.token_account_ids[out_idx]
                             )
                             .as_bytes(),
@@ -551,7 +565,7 @@ impl StableSwapPool {
                         "Admin {} got {} shares from {} {}",
                         &fees.exchange_id,
                         exchange_share,
-                        fee_token,
+                        self.c_amount_to_amount(fee_token, out_idx),
                         self.token_account_ids[out_idx]
                     )
                     .as_bytes(),
@@ -559,7 +573,7 @@ impl StableSwapPool {
             }
         }
 
-        result.amount_swapped
+        self.c_amount_to_amount(result.amount_swapped, out_idx)
     }
 
     /// convert admin_fee into shares without any fee.
@@ -568,25 +582,22 @@ impl StableSwapPool {
         &mut self,
         sender_id: &AccountId,
         token_id: usize,
-        amount: Balance,
+        c_amount: Balance,
     ) -> Balance {
         let invariant = self.get_invariant();
 
-        // make amounts into comparable-amounts
-        let mut amounts = vec![0_u128; self.amounts.len()];
-        amounts[token_id] = amount;
-        let (c_amounts, _) = self.amounts_to_c_amounts(&amounts);
-        let (c_current_amounts, _) = self.amounts_to_c_amounts(&self.amounts);
+        let mut c_amounts = vec![0_u128; self.c_amounts.len()];
+        c_amounts[token_id] = c_amount;
 
         let (new_shares, _) = invariant
             .compute_lp_amount_for_deposit(
                 &c_amounts,
-                &c_current_amounts,
+                &self.c_amounts,
                 self.shares_total_supply,
                 &Fees::zero(),
             )
             .expect(ERR67_LPSHARE_CALC_ERR);
-        self.amounts[token_id] += amount;
+        self.c_amounts[token_id] += c_amount;
 
         self.mint_shares(sender_id, new_shares);
         new_shares
@@ -756,7 +767,7 @@ mod tests {
 
         let out = swap(&mut pool, 1, 10000000000, 2);
         assert_eq!(out, 9999495232);
-        assert_eq!(pool.amounts, vec![110000000000, 90000504768]);
+        assert_eq!(pool.c_amounts, vec![110000000000000000000000, 90000504767247802010004]);
     }
 
     #[test]
@@ -775,7 +786,7 @@ mod tests {
 
         let out = swap(&mut pool, 1, 0, 2);
         assert_eq!(out, 0);
-        assert_eq!(pool.amounts, vec![100000000000, 100000000000]);
+        assert_eq!(pool.c_amounts, vec![100000000000000000000000, 100000000000000000000000]);
     }
 
     #[test]
@@ -794,7 +805,7 @@ mod tests {
 
         let out = swap(&mut pool, 1, 1, 2);
         assert_eq!(out, 1);
-        assert_eq!(pool.amounts, vec![100000000001, 99999999999]);
+        assert_eq!(pool.c_amounts, vec![100000000001000000000000, 99999999999000000000000]);
     }
 
     #[test]
@@ -813,7 +824,7 @@ mod tests {
 
         let out = swap(&mut pool, 1, 100000000000, 2);
         assert_eq!(out, 98443663539);
-        assert_eq!(pool.amounts, vec![200000000000, 1556336461]);
+        assert_eq!(pool.c_amounts, vec![200000000000000000000000, 1556336460086846919343]);
     }
 
     #[test]
@@ -832,7 +843,7 @@ mod tests {
 
         let out = swap(&mut pool, 1, 99999000000, 2);
         assert_eq!(out, 98443167413);
-        assert_eq!(pool.amounts, vec![199999000000, 1556832587]);
+        assert_eq!(pool.c_amounts, vec![199999000000000000000000, 1556832586795864493703]);
     }
 
     #[test]
@@ -921,10 +932,10 @@ mod tests {
 
         let out = swap(&mut pool, 1, 1000000, 2);
         assert_eq!(out, 1000031);
-        assert_eq!(pool.amounts, vec![6000000, 8999969]);
+        assert_eq!(pool.c_amounts, vec![6000000000000000000, 8999968751649207660]);
         let out2 = swap(&mut pool, 2, out, 1);
         assert_eq!(out2, 999999); // due to precision difference.
-        assert_eq!(pool.amounts, vec![5000001, 10000000]);
+        assert_eq!(pool.c_amounts, vec![5000000248340316022, 9999999751649207660]);
 
         // Add only one side of the capital.
         let mut amounts2 = vec![5000000, 0];

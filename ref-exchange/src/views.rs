@@ -62,8 +62,8 @@ impl From<Pool> for PoolInfo {
             Pool::StableSwapPool(pool) => Self {
                 pool_kind,
                 amp: pool.get_amp(),
+                amounts: pool.get_amounts().into_iter().map(|a| U128(a)).collect(),
                 token_account_ids: pool.token_account_ids,
-                amounts: pool.amounts.into_iter().map(|a| U128(a)).collect(),
                 total_fee: pool.total_fee,
                 shares_total_supply: U128(pool.shares_total_supply),
             },
