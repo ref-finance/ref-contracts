@@ -453,24 +453,6 @@ impl StableSwapPool {
             )
             .expect(ERR70_SWAP_OUT_CALC_ERR)
 
-        // let factor_x = 10_u128
-        //     .checked_pow((TARGET_DECIMAL - self.token_decimals[token_in]) as u32)
-        //     .unwrap();
-        // let factor_y = 10_u128
-        //     .checked_pow((TARGET_DECIMAL - self.token_decimals[token_out]) as u32)
-        //     .unwrap();
-
-        // ret.new_source_amount = ret.new_source_amount.checked_div(factor_x.into()).unwrap();
-
-        // let total_y = (ret.new_destination_amount + ret.amount_swapped + ret.fee)
-        //     .checked_div(factor_y.into())
-        //     .unwrap();
-        // ret.amount_swapped = ret.amount_swapped.checked_div(factor_y.into()).unwrap();
-        // ret.admin_fee = ret.admin_fee.checked_div(factor_y.into()).unwrap();
-        // ret.fee = ret.fee.checked_div(factor_y.into()).unwrap();
-        // // fix rounding error by subtraction.
-        // ret.new_destination_amount = total_y - ret.amount_swapped - ret.fee;
-        // ret
     }
 
     /// Returns how much token you will receive if swap `token_amount_in` of `token_in` for `token_out`.
