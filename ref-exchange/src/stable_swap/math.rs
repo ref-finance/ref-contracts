@@ -5,8 +5,8 @@ use near_sdk::{Balance, Timestamp};
 use crate::admin_fee::AdminFees;
 use crate::utils::{FEE_DIVISOR, U256};
 
-/// Minimum ramp duration.
-pub const MIN_RAMP_DURATION: Timestamp = 86400;
+/// Minimum ramp duration, in nano sec.
+pub const MIN_RAMP_DURATION: Timestamp = 86400 * 1_000_000_000;
 /// Min amplification coefficient.
 pub const MIN_AMP: u128 = 1;
 /// Max amplification coefficient.
@@ -43,6 +43,8 @@ impl Fees {
         amount * (self.admin_fee as u128) / (FEE_DIVISOR as u128)
     }
 
+    /// Used to normalize fee applid on difference amount with ideal balance, This logic is from 
+    /// https://github.com/saber-hq/stable-swap/blob/5db776fb0a41a0d1a23d46b99ef412ca7ccc5bf6/stable-swap-program/program/src/fees.rs#L73
     pub fn normalized_trade_fee(&self, num_coins: u32, amount: Balance) -> Balance {
         let adjusted_trade_fee = (self.trade_fee * num_coins) / (4 * (num_coins - 1));
         amount * (adjusted_trade_fee as u128) / (FEE_DIVISOR as u128)
@@ -141,7 +143,6 @@ impl StableSwap {
             Some(0.into())
         } else {
             let amp_factor = self.compute_amp_factor()?;
-            // println!("#Debug amp_factor: {}", amp_factor);
             let mut d_prev: U256;
             let mut d: U256 = sum_x.into();
             for _ in 0..256 {
@@ -149,28 +150,21 @@ impl StableSwap {
                 let mut d_prod = d;
                 for c_amount in c_amounts {
                     d_prod = d_prod.checked_mul(d)?
-                    .checked_div((c_amount * n_coins + 1).into())?; // +1 to prevent divided by zero
+                    .checked_div((c_amount * n_coins).into())?;
                 }
                 d_prev = d;
-                // println!("#Debug d_prod: {:?}", d_prod);
 
                 let ann = amp_factor.checked_mul(n_coins.checked_pow(n_coins as u32)?.into())?;
-                // println!("#Debug ann: {}", ann);
-                // println!("#Debug sum_x: {}", sum_x);
-                // let ann = amp_factor.checked_mul(n_coins.into())?;
                 let leverage = (U256::from(sum_x)).checked_mul(ann.into())?;
-                // println!("#Debug leverage: {:?}", leverage);
                 // d = (ann * sum_x + d_prod * n_coins) * d_prev / ((ann - 1) * d_prev + (n_coins + 1) * d_prod)
                 let numerator = d_prev.checked_mul(
                     d_prod
                         .checked_mul(n_coins.into())?
                         .checked_add(leverage.into())?,
                 )?;
-                // println!("#Debug numerator: {:?}", numerator);
                 let denominator = d_prev
                     .checked_mul(ann.checked_sub(1)?.into())?
                     .checked_add(d_prod.checked_mul((n_coins + 1).into())?)?;
-                // println!("#Debug denominator: {:?}", denominator);
                 d = numerator.checked_div(denominator)?;
 
                 // Equality with the precision of 1
@@ -182,7 +176,6 @@ impl StableSwap {
                     break;
                 }
             }
-            // println!("D: {:?}", d);
             Some(d)
         }
     }
@@ -200,17 +193,13 @@ impl StableSwap {
         
         // Initial invariant
         let d_0 = self.compute_d(old_c_amounts)?;
-        // println!("[compute_lp_amount_for_deposit] d_0: {:?}", d_0);
-        // println!("[compute_lp_amount_for_deposit] deposit_c_amounts: {:?}", deposit_c_amounts);
 
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in deposit_c_amounts.iter().enumerate() {
             new_balances[index] = old_c_amounts[index].checked_add(*value)?;
         }
-        // println!("[compute_lp_amount_for_deposit] new_balances: {:?}", new_balances);
         // Invariant after change
         let d_1 = self.compute_d(&new_balances)?;
-        // println!("[compute_lp_amount_for_deposit] d_1: {:?}", d_1);
         if d_1 <= d_0 {
             None
         } else {
@@ -247,10 +236,6 @@ impl StableSwap {
                 .checked_div(d_0)?
                 .as_u128();
 
-            // println!(
-            //     "[compute_lp_amount_for_deposit] mint_shares: {}, fee_parts: {}", 
-            //     mint_shares, diff_shares-mint_shares
-            // );
             Some((mint_shares, diff_shares-mint_shares))
         }
     }
@@ -266,7 +251,6 @@ impl StableSwap {
     ) -> Option<U256> {
         let n_coins = current_c_amounts.len() as u128;
         let amp_factor = self.compute_amp_factor()?;
-        // let ann = amp_factor.checked_mul(n_coins as u128)?;
         let ann = amp_factor.checked_mul(n_coins.checked_pow(n_coins as u32)?.into())?;
         // invariant
         let d = self.compute_d(current_c_amounts)?;
@@ -319,16 +303,14 @@ impl StableSwap {
         let n_coins = old_c_amounts.len();
         // Initial invariant, D0
         let d_0 = self.compute_d(old_c_amounts)?;
-        // println!("[compute_lp_amount_for_withdraw] d_0: {:?}", d_0);
 
         // real invariant after withdraw, D1
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in withdraw_c_amounts.iter().enumerate() {
             new_balances[index] = old_c_amounts[index].checked_sub(*value)?;
         }
-        // println!("[compute_lp_amount_for_withdraw] new_balances: {:?}", new_balances);
+
         let d_1 = self.compute_d(&new_balances)?;
-        // println!("[compute_lp_amount_for_withdraw] d_1: {:?}", d_1);
 
         // compare ideal token portions from D1 with withdraws, to calculate diff fee.
         if d_1 >= d_0 {
@@ -366,8 +348,6 @@ impl StableSwap {
                 .checked_div(d_0)?
                 .as_u128();
 
-            // println!("[compute_lp_amount_for_withdraw] burn_shares: {}, fee_parts: {}", 
-            //     burn_shares, burn_shares-diff_shares);
             Some((burn_shares, burn_shares-diff_shares))
         }
 

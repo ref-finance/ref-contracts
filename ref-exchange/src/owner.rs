@@ -108,26 +108,6 @@ impl Contract {
         self.internal_save_account(&owner_id, deposits);
     }
 
-    /// Migration function from v2 to v2.
-    /// For next version upgrades, change this function.
-    #[init(ignore_state)]
-    // [AUDIT_09]
-    #[private]
-    pub fn migrate() -> Self {
-        let mut prev: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
-        prev.exchange_fee = 1600;
-        prev.referral_fee = 400;
-        prev
-    }
-
-    pub(crate) fn assert_owner(&self) {
-        assert_eq!(
-            env::predecessor_account_id(),
-            self.owner_id,
-            "ERR_NOT_ALLOWED"
-        );
-    }
-
     /// to eventually change a stable pool's amp factor
     /// pool_id: the target stable pool;
     /// future_amp_factor: the target amp factor, could be less or more than current one;
@@ -138,7 +118,7 @@ impl Contract {
         future_amp_factor: u64,
         future_amp_time: WrappedTimestamp,
     ) {
-        self.assert_owner();
+        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         match &mut pool {
             Pool::StableSwapPool(pool) => {
@@ -150,20 +130,41 @@ impl Contract {
     }
 
     pub fn stable_swap_stop_ramp_amp(&mut self, pool_id: u64) {
+        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         match &mut pool {
             Pool::StableSwapPool(pool) => pool.stop_ramp_amplification(),
             _ => env::panic(b"ERR_NOT_STABLE_POOL"),
         }
-        self.assert_owner();
         self.pools.replace(pool_id, &pool);
+    }
+
+    pub(crate) fn assert_owner(&self) {
+        assert_eq!(
+            env::predecessor_account_id(),
+            self.owner_id,
+            "ERR_NOT_ALLOWED"
+        );
     }
 
     pub(crate) fn is_owner_or_guardians(&self) -> bool {
         env::predecessor_account_id() == self.owner_id 
             || self.guardians.contains(&env::predecessor_account_id())
     }
+
+    /// Migration function from v2 to v2.
+    /// For next version upgrades, change this function.
+    #[init(ignore_state)]
+    // [AUDIT_09]
+    #[private]
+    pub fn migrate() -> Self {
+        let mut prev: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
+        prev.exchange_fee = 1600;
+        prev.referral_fee = 400;
+        prev
+    }
 }
+
 
 #[cfg(target_arch = "wasm32")]
 mod upgrade {

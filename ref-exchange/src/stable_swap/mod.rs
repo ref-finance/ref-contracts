@@ -115,9 +115,9 @@ impl StableSwapPool {
         c_amount.checked_div(factor).unwrap()
     }
 
-    fn assert_min_reserve(&self, index: usize) {
+    fn assert_min_reserve(&self, balance: u128) {
         assert!(
-            self.c_amounts[index] >= MIN_RESERVE,
+            balance >= MIN_RESERVE,
             "{}",
             ERR69_MIN_RESERVE
         );
@@ -319,7 +319,7 @@ impl StableSwapPool {
                 .unwrap()
                 .as_u128();
             self.c_amounts[i] = self.c_amounts[i].checked_sub(result[i]).unwrap();
-            self.assert_min_reserve(i);
+            self.assert_min_reserve(self.c_amounts[i]);
             result[i] = self.c_amount_to_amount(result[i], i);
             assert!(result[i] >= min_amounts[i], "{}", ERR68_SLIPPAGE);
         }
@@ -342,7 +342,11 @@ impl StableSwapPool {
         amounts: &Vec<Balance>,
         fees: &AdminFees,
     ) -> Balance {
+        let n_coins = self.token_account_ids.len();
         let c_amounts = self.amounts_to_c_amounts(amounts);
+        for i in 0..n_coins {
+            self.assert_min_reserve(self.c_amounts[i].checked_sub(c_amounts[i]).unwrap_or(0));
+        }
 
         let invariant = self.get_invariant();
         let trade_fee = Fees::new(self.total_fee, &fees);
@@ -375,6 +379,9 @@ impl StableSwapPool {
 
         // make amounts into comparable-amounts
         let c_amounts = self.amounts_to_c_amounts(&amounts);
+        for i in 0..n_coins {
+            self.assert_min_reserve(self.c_amounts[i].checked_sub(c_amounts[i]).unwrap_or(0));
+        }
 
         let invariant = self.get_invariant();
         let trade_fee = Fees::new(self.total_fee, &fees);
@@ -397,7 +404,7 @@ impl StableSwapPool {
 
         for i in 0..n_coins {
             self.c_amounts[i] = self.c_amounts[i].checked_sub(c_amounts[i]).unwrap();
-            self.assert_min_reserve(i);
+            self.assert_min_reserve(self.c_amounts[i]);
         }
         self.burn_shares(&sender_id, prev_shares_amount, burn_shares);
         env::log(
@@ -507,7 +514,7 @@ impl StableSwapPool {
 
         self.c_amounts[in_idx] = result.new_source_amount;
         self.c_amounts[out_idx] = result.new_destination_amount;
-        self.assert_min_reserve(out_idx);
+        self.assert_min_reserve(self.c_amounts[out_idx]);
 
         // Keeping track of volume per each input traded separately.
         self.volumes[in_idx].input.0 += amount_in;
@@ -559,7 +566,7 @@ impl StableSwapPool {
     }
 
     /// convert admin_fee into shares without any fee.
-    /// return share minted this time for the admin/refferal.
+    /// return share minted this time for the admin/referrer.
     fn admin_fee_to_liquidity(
         &mut self,
         sender_id: &AccountId,
@@ -962,9 +969,9 @@ mod tests {
             StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 2000);
         let mut amounts = vec![5000000, 10000000];
         let fees = AdminFees::new(1000); // 10% exchange fee
-        println!("before add_liquidity");
+
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-        println!("end of add_liquidity");
+
         let amount_out = pool.swap(
             accounts(1).as_ref(),
             1000000,
@@ -1012,7 +1019,7 @@ mod tests {
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0);
 
-        let start_ts = 1_000_000_000;
+        let start_ts = MIN_RAMP_DURATION + 1_000_000_000;
         testing_env!(context.block_timestamp(start_ts).build());
         pool.ramp_amplification(50000, start_ts + MIN_RAMP_DURATION * 10);
         testing_env!(context
