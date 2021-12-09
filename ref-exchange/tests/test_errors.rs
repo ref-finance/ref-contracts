@@ -5,7 +5,7 @@
 // ERR81 could not be tested with this approach
 
 use near_sdk::json_types::{U128, U64};
-use near_sdk_sim::{init_simulator, call, to_yocto, ExecutionResult, runtime};
+use near_sdk_sim::{init_simulator, call, view, to_yocto, ExecutionResult, runtime};
 
 use ref_exchange::SwapAction;
 use crate::common::utils::*;
@@ -306,67 +306,73 @@ fn sim_stable_e13 () {
     assert_failure(outcome, "E13: LP not registered");
 }
 
-// #[test]
-// fn sim_stable_e34 () {
-//     let root = init_simulator(None);
-//     let (owner, ex) = setup_exchange(&root, 1600, 400);
-//     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
-//     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
-//     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
-//     deposit_token(&root, &ex, vec![&token1, &token2], vec![1*ONE_DAI, 1*ONE_USDT]);
+#[test]
+fn sim_stable_e34 () {
+    let root = init_simulator(None);
+    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let token1 = test_token(&root, dai(), vec![ex.account_id()]);
+    let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
+    whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
+    deposit_token(&root, &ex, vec![&token1, &token2], vec![1000*ONE_DAI, 1000*ONE_USDT]);
 
-//     call!(
-//         owner,
-//         ex.add_stable_swap_pool(
-//             vec![token1.valid_account_id(), token2.valid_account_id()], 
-//             vec![18, 6],
-//             25,
-//             10000
-//         ),
-//         deposit = to_yocto("1")
-//     ).assert_success();
-//     call!(
-//         root,
-//         ex.add_stable_liquidity(0, vec![U128(1*ONE_DAI), U128(1*ONE_USDT)], U128(1)),
-//         deposit = to_yocto("0.01")
-//     )
-//     .assert_success();
+    call!(
+        owner,
+        ex.add_stable_swap_pool(
+            vec![token1.valid_account_id(), token2.valid_account_id()], 
+            vec![18, 6],
+            25,
+            10000
+        ),
+        deposit = to_yocto("1")
+    ).assert_success();
+    call!(
+        root,
+        ex.add_stable_liquidity(0, vec![U128(1000*ONE_DAI), U128(1000*ONE_USDT)], U128(1)),
+        deposit = to_yocto("0.01")
+    )
+    .assert_success();
 
-//     let outcome = call!(
-//         root,
-//         ex.remove_liquidity(0, U128(2*ONE_LPT+1), vec![U128(1), U128(1)]),
-//         deposit = 1
-//     );
-//     assert_failure(outcome, "E34: insufficient lp shares");
+    let lp_shares = view!(
+        ex.mft_balance_of(":0".to_string(), root.valid_account_id())
+    ).unwrap_json::<U128>();
+    let lp_shares = lp_shares.0;
 
-//     call!(
-//         owner,
-//         ex.mft_register(":0".to_string(), owner.valid_account_id()),
-//         deposit = to_yocto("1")
-//     )
-//     .assert_success();
+    let outcome = call!(
+        root,
+        ex.remove_liquidity(0, U128(lp_shares + 1), vec![U128(1), U128(1)]),
+        deposit = 1
+    );
+    assert_failure(outcome, "E34: insufficient lp shares");
 
-//     call!(
-//         root,
-//         ex.mft_transfer(":0".to_string(), owner.valid_account_id(), U128(1*ONE_LPT), None),
-//         deposit = 1
-//     )
-//     .assert_success();
+    call!(
+        owner,
+        ex.mft_register(":0".to_string(), owner.valid_account_id()),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
 
-//     let outcome = call!(
-//         root,
-//         ex.remove_liquidity_by_tokens(0, vec![U128(1*ONE_DAI), U128(1*ONE_USDT)], U128(1)),
-//         deposit = 1
-//     );
-//     assert_failure(outcome, "E34: insufficient lp shares");
+    // transfer all lp token to others
+    call!(
+        root,
+        ex.mft_transfer(":0".to_string(), owner.valid_account_id(), U128(lp_shares), None),
+        deposit = 1
+    )
+    .assert_success();
 
-//     let outcome = call!(
-//         root,
-//         ex.mft_transfer(":0".to_string(), owner.valid_account_id(), U128(2*ONE_LPT), None),
-//         deposit = 1
-//     );
-//     assert_failure(outcome, "E34: insufficient lp shares");
-// }
+    let outcome = call!(
+        root,
+        ex.remove_liquidity_by_tokens(0, vec![U128(1*ONE_DAI), U128(1*ONE_USDT)], U128(1)),
+        deposit = 1
+    );
+    assert_failure(outcome, "E34: insufficient lp shares");
+
+    let outcome = call!(
+        root,
+        ex.mft_transfer(":0".to_string(), owner.valid_account_id(), U128(2*ONE_LPT), None),
+        deposit = 1
+    );
+    assert_failure(outcome, "E34: insufficient lp shares");
+}
 
 #[test]
 fn sim_stable_e68 () {
