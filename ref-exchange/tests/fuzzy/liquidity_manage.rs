@@ -1,10 +1,11 @@
+#![allow(unused)] 
 use near_sdk_sim::{
     call, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
 use test_token::ContractContract as TestToken;
 use near_sdk::json_types::U128;
 use near_sdk::AccountId;
-use std::{collections::HashMap, convert::TryInto, process::id};
+use std::collections::HashMap;
 use ref_exchange::{ContractContract as Exchange, PoolInfo};
 use rand::Rng;
 use rand_pcg::Pcg32;
