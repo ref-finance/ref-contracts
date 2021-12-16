@@ -1,6 +1,6 @@
 [package]
 name = "ref-exchange"
-version = "1.0.1"
+version = "1.4.1"
 authors = ["Illia Polosukhin <illia.polosukhin@gmail.com>"]
 edition = "2018"
 publish = false
@@ -16,3 +16,5 @@ near-contract-standards = "3.1.0"
 [dev-dependencies]
 near-sdk-sim = "3.1.0"
 test-token = { path = "../test-token" }
+rand = "0.8"
+rand_pcg = "0.3"

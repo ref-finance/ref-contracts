@@ -1,7 +1,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, Balance};
 
-use crate::fees::SwapFees;
+use crate::admin_fee::AdminFees;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
 use crate::utils::SwapVolume;
@@ -37,11 +37,23 @@ impl Pool {
         &mut self,
         sender_id: &AccountId,
         amounts: &mut Vec<Balance>,
-        fees: SwapFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts),
-            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, &fees),
+            Pool::StableSwapPool(_) => unimplemented!(),
+        }
+    }
+
+    pub fn add_stable_liquidity(
+        &mut self,
+        sender_id: &AccountId,
+        amounts: &Vec<Balance>,
+        min_shares: Balance,
+        admin_fee: AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee),
         }
     }
 
@@ -51,12 +63,27 @@ impl Pool {
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
-        fees: SwapFees,
     ) -> Vec<Balance> {
         match self {
             Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts),
             Pool::StableSwapPool(pool) => {
-                pool.remove_liquidity(sender_id, shares, min_amounts, &fees)
+                pool.remove_liquidity_by_shares(sender_id, shares, min_amounts)
+            }
+        }
+    }
+
+    /// Removes liquidity from underlying pool.
+    pub fn remove_liquidity_by_tokens(
+        &mut self,
+        sender_id: &AccountId,
+        amounts: Vec<Balance>,
+        max_burn_shares: Balance,
+        admin_fee: AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(pool) => {
+                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee)
             }
         }
     }
@@ -91,6 +118,14 @@ impl Pool {
         }
     }
 
+    /// Returns given pool's share price.
+    pub fn get_share_price(&self) -> u128 {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(pool) => pool.get_share_price(),
+        }
+    }
+
     /// Swaps given number of token_in for token_out and returns received amount.
     pub fn swap(
         &mut self,
@@ -98,14 +133,14 @@ impl Pool {
         amount_in: Balance,
         token_out: &AccountId,
         min_amount_out: Balance,
-        fees: SwapFees,
+        admin_fee: AdminFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => {
-                pool.swap(token_in, amount_in, token_out, min_amount_out, fees)
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
             }
             Pool::StableSwapPool(pool) => {
-                pool.swap(token_in, amount_in, token_out, min_amount_out, &fees)
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
             }
         }
     }

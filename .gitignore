@@ -10,8 +10,11 @@ Cargo.lock
 **/*.rs.bk
 
 .idea
+.DS_Store
 
 neardev
 
 res/ref_exchange_local.wasm
 res/ref_farming_local.wasm
+
+build_docker_own.sh
