@@ -16,3 +16,5 @@ near-contract-standards = "3.1.0"
 near-sdk-sim = "3.1.0"
 test-token = { path = "../test-token" }
 ref-exchange = { path = "../ref-exchange" }
+rand = "0.8"
+rand_pcg = "0.3"

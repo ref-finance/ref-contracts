@@ -1,3 +1,4 @@
+#![allow(unused)] 
 pub const TOKENS: [&str; 10] = ["ref", "dai", "usdt", "usdc", "weth", "wnear", "1inch", "grt", "oct", "uni"];
 
 pub const EVERY_PREFERENCE_NUM: i32 = 1;

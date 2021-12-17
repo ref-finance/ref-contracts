@@ -1,3 +1,4 @@
+#![allow(unused)] 
 use near_sdk_sim::{
     call, to_yocto, view, ContractAccount, UserAccount,
 };

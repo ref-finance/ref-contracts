@@ -1,8 +1,8 @@
+#![allow(unused)] 
 use near_sdk_sim::{
     call, deploy, init_simulator, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
 use std::collections::HashMap;
-use std::os::unix::thread;
 use near_sdk::serde_json::{Value, from_value};
 use std::convert::TryFrom;
 use rand::Rng;

@@ -1,7 +1,8 @@
+#![allow(unused)] 
 use near_sdk_sim::{
     call, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
-use std::{collections::HashMap, convert::TryInto};
+use std::collections::HashMap;
 use near_sdk::AccountId;
 use near_sdk::json_types::U128;
 use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};

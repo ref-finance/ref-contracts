@@ -1,3 +1,4 @@
+#![allow(unused)] 
 use near_sdk::serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use near_sdk::AccountId;
