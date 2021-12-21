@@ -194,6 +194,16 @@ impl Contract {
         }
     }
 
+    pub(crate) fn internal_update_seed_min_deposit(
+        &mut self, 
+        seed_id: &String, 
+        min_deposit: U128) {
+            
+        let mut farm_seed = self.get_seed(&seed_id);
+        farm_seed.get_ref_mut().min_deposit = min_deposit.into();
+        self.data_mut().seeds.insert(&seed_id, &farm_seed);
+    }
+
     pub(crate) fn internal_seed_deposit(
         &mut self, 
         seed_id: &String, 
