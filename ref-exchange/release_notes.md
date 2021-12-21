@@ -1,5 +1,8 @@
 # Release Notes
 
+### Version 1.4.2
+1. Let guardians can call remove_exchange_fee_liquidity;
+
 ### Version 1.4.1
 1. Introduce Stable-Swap-Pool;
 

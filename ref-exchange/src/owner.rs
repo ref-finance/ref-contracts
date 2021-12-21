@@ -85,7 +85,7 @@ impl Contract {
     /// without any storage and fee.
     #[payable]
     pub fn remove_exchange_fee_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
-        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
         self.assert_owner();
         self.assert_contract_running();
         let ex_id = env::current_account_id();
