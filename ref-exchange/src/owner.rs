@@ -158,10 +158,13 @@ impl Contract {
     // [AUDIT_09]
     #[private]
     pub fn migrate() -> Self {
-        let mut prev: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
-        prev.exchange_fee = 1600;
-        prev.referral_fee = 400;
-        prev
+        assert_eq!(
+            env::predecessor_account_id(),
+            env::current_account_id(),
+            "ERR_NOT_ALLOWED"
+        );
+        let contract: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
+        contract
     }
 }
 
