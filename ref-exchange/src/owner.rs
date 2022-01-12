@@ -82,11 +82,11 @@ impl Contract {
     }
 
     /// Remove exchange fee liquidity to owner's inner account.
-    /// without any storage and fee.
+    /// Owner's inner account storage should be prepared in advance.
     #[payable]
     pub fn remove_exchange_fee_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
+        assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
-        self.assert_owner();
         self.assert_contract_running();
         let ex_id = env::current_account_id();
         let owner_id = self.owner_id.clone();
@@ -101,11 +101,33 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        let mut deposits = self.internal_unwrap_or_default_account(&owner_id);
+        let mut deposits = self.internal_unwrap_account(&owner_id);
         for i in 0..tokens.len() {
             deposits.deposit(&tokens[i], amounts[i]);
         }
         self.internal_save_account(&owner_id, deposits);
+    }
+
+    /// Withdraw owner inner account token to owner wallet.
+    /// Owner inner account should be prepared in advance.
+    #[payable]
+    pub fn withdraw_owner_token(
+        &mut self,
+        token_id: ValidAccountId,
+        amount: U128,
+    ) -> Promise {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
+        self.assert_contract_running();
+        let token_id: AccountId = token_id.into();
+        let amount: u128 = amount.into();
+        assert!(amount > 0, "{}", ERR29_ILLEGAL_WITHDRAW_AMOUNT);
+        let owner_id = self.owner_id.clone();
+        let mut account = self.internal_unwrap_account(&owner_id);
+        // Note: subtraction and deregistration will be reverted if the promise fails.
+        account.withdraw(&token_id, amount);
+        self.internal_save_account(&owner_id, account);
+        self.internal_send_tokens(&owner_id, &token_id, amount)
     }
 
     /// to eventually change a stable pool's amp factor
