@@ -5,7 +5,7 @@ set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-NAME="build_ref_exchange"
+NAME="build_jita_ref_exchange"
 
 if docker ps -a --format '{{.Names}}' | grep -Eq "^${NAME}\$"; then
     echo "Container exists"
@@ -22,7 +22,7 @@ docker create \
 fi
 
 docker start $NAME
-docker exec -it $NAME /bin/bash -c "rustup toolchain install stable-2020-10-08; rustup default stable-2020-10-08; rustup target add wasm32-unknown-unknown; cargo build --target wasm32-unknown-unknown --release"
+docker exec -it $NAME /bin/bash -c "rustup toolchain install stable-2021-11-01; rustup default stable-2021-11-01; rustup target add wasm32-unknown-unknown; cargo build --target wasm32-unknown-unknown --release"
 
 mkdir -p res
 cp $DIR/../target/wasm32-unknown-unknown/release/ref_exchange.wasm $DIR/../res/ref_exchange_release.wasm
