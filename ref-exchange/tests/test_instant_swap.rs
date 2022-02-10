@@ -4,6 +4,42 @@ use near_sdk_sim::{call, to_yocto};
 use crate::common::utils::*;
 pub mod common;
 
+// fn pack_action(
+//     pool_id: u32,
+//     token_in: &str,
+//     token_out: &str,
+//     amount_in: Option<u128>,
+//     min_amount_out: u128,
+// ) -> String {
+//     if let Some(amount_in) = amount_in {
+//         format!(
+//             "{{\"pool_id\": {}, \"token_in\": \"{}\", \"amount_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
+//             pool_id, token_in, amount_in, token_out, min_amount_out
+//         )
+//     } else {
+//         format!(
+//             "{{\"pool_id\": {}, \"token_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
+//             pool_id, token_in, token_out, min_amount_out
+//         )
+//     }
+// }
+
+// fn direct_swap(
+//     user: &UserAccount,
+//     contract: &ContractAccount<TestToken>,
+//     actions: Vec<String>,
+//     amount: u128,
+// ) -> ExecutionResult {
+//     // {{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"eth\", \"min_amount_out\": \"1\"}}
+//     let actions_str = actions.join(", ");
+//     let msg_str = format!("{{\"actions\": [{}]}}", actions_str);
+//     // println!("{}", msg_str);
+//     call!(
+//         user,
+//         contract.ft_transfer_call(to_va(swap()), amount.into(), None, msg_str),
+//         deposit = 1
+//     )
+// }
 
 #[test]
 fn instant_swap_scenario_01() {
@@ -401,4 +437,57 @@ fn instant_swap_scenario_03() {
     // println!("{}", get_error_status(&out_come));
     assert!(get_error_status(&out_come).contains("E22: not enough tokens in deposit"));
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("1"));
+}
+
+#[test]
+fn instant_swap_scenario_04() {
+    const ONE_DAI: u128 = 1000000000000000000;
+    const ONE_USDT: u128 = 1000000;
+    const ONE_USDC: u128 = 1000000;
+    let (root, owner, pool, tokens) = 
+        setup_stable_pool_with_liquidity(
+            vec![dai(), usdt(), usdc()],
+            vec![100000*ONE_DAI, 100000*ONE_USDT, 100000*ONE_USDC],
+            vec![18, 6, 6],
+            25,
+            10000,
+        );
+    let tokens = &tokens;
+    let user = root.create_user("user".to_string(), to_yocto("100"));
+    let token_in = &tokens[0];
+    let token_out = &tokens[1];
+    call!(user, token_in.mint(user.valid_account_id(), U128(10*ONE_DAI))).assert_success();
+
+    println!("Case 0401: non-registered user stable swap but not registered in token2");
+    let action = pack_action(0, &tokens[0].account_id(), &tokens[1].account_id(), None, 1);
+    let out_come = direct_swap_with_amount(&user, &tokens[0], vec![action], 1*ONE_DAI);
+    out_come.assert_success();
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come)
+        .contains("Smart contract panicked: The account user is not registered"));
+    assert!(get_storage_balance(&pool, user.valid_account_id()).is_none());
+    assert_eq!(balance_of(&tokens[0], &user.account_id), 9*ONE_DAI);
+
+    assert_eq!(
+        get_deposits(&pool, owner.valid_account_id())
+            .get(&token_out.account_id())
+            .unwrap()
+            .0,
+            997499
+    );
+
+    println!("Case 0402: non-registered user stable swap");
+    call!(
+        user,
+        token_out.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    let action = pack_action(0, &tokens[0].account_id(), &tokens[1].account_id(), None, 1);
+    let out_come = direct_swap_with_amount(&user, &tokens[0], vec![action], 1*ONE_DAI);
+    out_come.assert_success();
+    assert_eq!(get_error_count(&out_come), 0);
+    assert!(get_storage_balance(&pool, user.valid_account_id()).is_none());
+    assert_eq!(balance_of(&token_in, &user.account_id), 8*ONE_DAI);
+    assert_eq!(balance_of(&token_out, &user.account_id), 997499);
 }

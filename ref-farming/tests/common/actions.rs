@@ -32,7 +32,7 @@ pub(crate) fn prepair_pool_and_liquidity(
     call!(root, pool.mft_register(":0".to_string(), to_va(farming_id)), deposit = to_yocto("1"))
     .assert_success();
     for lp in lps {
-        add_liqudity(lp, &pool, &token1, &token2, 0);
+        add_liquidity(lp, &pool, &token1, &token2, 0);
     }
     (pool,token1, token2)
 }
@@ -164,7 +164,7 @@ pub(crate) fn prepair_multi_farms(
     (farming, farm_ids)
 }
 
-pub(crate) fn add_liqudity(
+pub(crate) fn add_liquidity(
     user: &UserAccount, 
     pool: &ContractAccount<TestRef>, 
     token1: &ContractAccount<TestToken>, 

@@ -32,6 +32,7 @@ fn modify_admin_fee() {
         view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
         PoolInfo {
             pool_kind: "SIMPLE_POOL".to_string(),
+            amp: 0,
             token_account_ids: vec![dai(), eth()],
             amounts: vec![to_yocto("10").into(), to_yocto("20").into()],
             total_fee: 25,

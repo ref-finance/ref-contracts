@@ -267,7 +267,7 @@ impl Contract {
     }
 
     /// Returns how much was refunded back to the sender.
-    /// If sender removed account in the meantime, the tokens are sent to the owner account.
+    /// If sender removed account in the meantime, the tokens are sent to the contract account.
     /// Tokens are never burnt.
     #[private]
     pub fn mft_resolve_transfer(
@@ -292,12 +292,13 @@ impl Contract {
             let receiver_balance = self.internal_mft_balance(token_id.clone(), &receiver_id);
             if receiver_balance > 0 {
                 let refund_amount = std::cmp::min(receiver_balance, unused_amount);
-                // If sender's account was deleted, we assume that they have also withdrew all the liquidity from pools.
-                // Funds are sent to the owner account.
+                
                 let refund_to = if self.accounts.get(&sender_id).is_some() {
                     sender_id
                 } else {
-                    self.owner_id.clone()
+                    // If sender's account was deleted, we assume that they have also withdrew all the liquidity from pools.
+                    // Funds are sent to the contract account.
+                    env::current_account_id()
                 };
                 self.internal_mft_transfer(token_id, &receiver_id, &refund_to, refund_amount, None);
             }
@@ -307,15 +308,19 @@ impl Contract {
 
     pub fn mft_metadata(&self, token_id: String) -> FungibleTokenMetadata {
         match parse_token_id(token_id) {
-            TokenOrPool::Pool(pool_id) => FungibleTokenMetadata {
-                // [AUDIT_08]
-                spec: "mft-1.0.0".to_string(),
-                name: format!("ref-pool-{}", pool_id),
-                symbol: format!("REF-POOL-{}", pool_id),
-                icon: None,
-                reference: None,
-                reference_hash: None,
-                decimals: 24,
+            TokenOrPool::Pool(pool_id) => {
+                let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+                let decimals = pool.get_share_decimal();
+                FungibleTokenMetadata {
+                    // [AUDIT_08]
+                    spec: "mft-1.0.0".to_string(),
+                    name: format!("ref-pool-{}", pool_id),
+                    symbol: format!("REF-POOL-{}", pool_id),
+                    icon: None,
+                    reference: None,
+                    reference_hash: None,
+                    decimals,
+                }
             },
             TokenOrPool::Token(_token_id) => unimplemented!(),
         }

@@ -181,6 +181,11 @@ impl SimplePool {
         shares: Balance,
         min_amounts: Vec<Balance>,
     ) -> Vec<Balance> {
+        assert_eq!(
+            min_amounts.len(),
+            self.token_account_ids.len(),
+            "ERR_WRONG_TOKEN_COUNT"
+        );
         let prev_shares_amount = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
         assert!(prev_shares_amount >= shares, "ERR_NOT_ENOUGH_SHARES");
         let mut result = vec![];
@@ -193,7 +198,7 @@ impl SimplePool {
             result.push(amount);
         }
         if prev_shares_amount == shares {
-            // [AUDIT_13] never unregister a LP when he remove liqudity.
+            // [AUDIT_13] Never unregister a LP when he removed all his liquidity.
             self.shares.insert(&sender_id, &0);
         } else {
             self.shares
@@ -279,6 +284,7 @@ impl SimplePool {
         min_amount_out: Balance,
         admin_fee: &AdminFees,
     ) -> Balance {
+        assert_ne!(token_in, token_out, "ERR_SAME_TOKEN_SWAP");
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
         let amount_out = self.internal_get_return(in_idx, amount_in, out_idx);

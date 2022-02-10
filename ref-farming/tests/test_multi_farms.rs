@@ -25,7 +25,7 @@ fn multi_farm_in_single_seed() {
     println!("----->> The pool prepaired.");
 
     // farmer add liqidity 
-    add_liqudity(&farmer, &pool, &token1, &token2, 0);
+    add_liquidity(&farmer, &pool, &token1, &token2, 0);
     assert_eq!(
         view!(pool.mft_balance_of(":0".to_string(), to_va(farmer.account_id.clone())))
             .unwrap_json::<U128>()
@@ -151,7 +151,7 @@ fn multi_farm_with_different_state() {
     println!("----->> The pool prepaired.");
 
     // farmer add liqidity 
-    add_liqudity(&farmer, &pool, &token1, &token2, 0);
+    add_liquidity(&farmer, &pool, &token1, &token2, 0);
     assert_eq!(
         view!(pool.mft_balance_of(":0".to_string(), to_va(farmer.account_id.clone())))
             .unwrap_json::<U128>()

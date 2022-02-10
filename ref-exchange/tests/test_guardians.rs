@@ -142,7 +142,7 @@ fn guardians_scenario_01() {
     assert_eq!(get_error_count(&out_come), 1);
     assert!(get_error_status(&out_come).contains("E51: contract paused"));
 
-    // add liqudity would fail
+    // add liquidity would fail
     let out_come = call!(
         root,
         pool.add_liquidity(0, vec![U128(to_yocto("10")), U128(to_yocto("20"))], None),

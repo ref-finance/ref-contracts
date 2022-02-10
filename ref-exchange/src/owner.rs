@@ -1,8 +1,9 @@
 //! Implement all the relevant logic for owner of this contract.
 
+use near_sdk::json_types::WrappedTimestamp;
+
 use crate::*;
 use crate::utils::FEE_DIVISOR;
-
 
 #[near_bindgen]
 impl Contract {
@@ -80,7 +81,7 @@ impl Contract {
         self.referral_fee = referral_fee;
     }
 
-    /// Remove exchange fee liqudity to owner's inner account.
+    /// Remove exchange fee liquidity to owner's inner account.
     /// without any storage and fee.
     #[payable]
     pub fn remove_exchange_fee_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
@@ -97,8 +98,6 @@ impl Contract {
                 .into_iter()
                 .map(|amount| amount.into())
                 .collect(),
-            AdminFees::zero(),
-            
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
@@ -109,16 +108,35 @@ impl Contract {
         self.internal_save_account(&owner_id, deposits);
     }
 
-    /// Migration function from v2 to v2.
-    /// For next version upgrades, change this function.
-    #[init(ignore_state)]
-    // [AUDIT_09]
-    #[private]
-    pub fn migrate() -> Self {
-        let mut prev: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
-        prev.exchange_fee = 1600;
-        prev.referral_fee = 400;
-        prev
+    /// to eventually change a stable pool's amp factor
+    /// pool_id: the target stable pool;
+    /// future_amp_factor: the target amp factor, could be less or more than current one;
+    /// future_amp_time: the endtime of the increasing or decreasing process;
+    pub fn stable_swap_ramp_amp(
+        &mut self,
+        pool_id: u64,
+        future_amp_factor: u64,
+        future_amp_time: WrappedTimestamp,
+    ) {
+        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
+        let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        match &mut pool {
+            Pool::StableSwapPool(pool) => {
+                pool.ramp_amplification(future_amp_factor as u128, future_amp_time.0)
+            }
+            _ => env::panic(b"ERR_NOT_STABLE_POOL"),
+        }
+        self.pools.replace(pool_id, &pool);
+    }
+
+    pub fn stable_swap_stop_ramp_amp(&mut self, pool_id: u64) {
+        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
+        let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        match &mut pool {
+            Pool::StableSwapPool(pool) => pool.stop_ramp_amplification(),
+            _ => env::panic(b"ERR_NOT_STABLE_POOL"),
+        }
+        self.pools.replace(pool_id, &pool);
     }
 
     pub(crate) fn assert_owner(&self) {
@@ -133,7 +151,20 @@ impl Contract {
         env::predecessor_account_id() == self.owner_id 
             || self.guardians.contains(&env::predecessor_account_id())
     }
+
+    /// Migration function from v2 to v2.
+    /// For next version upgrades, change this function.
+    #[init(ignore_state)]
+    // [AUDIT_09]
+    #[private]
+    pub fn migrate() -> Self {
+        let mut prev: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
+        prev.exchange_fee = 1600;
+        prev.referral_fee = 400;
+        prev
+    }
 }
+
 
 #[cfg(target_arch = "wasm32")]
 mod upgrade {
