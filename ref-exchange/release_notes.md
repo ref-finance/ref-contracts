@@ -1,5 +1,8 @@
 # Release Notes
 
+### Version 1.4.2
+1. Let owner can retrieve unmanaged NEP-141 tokens in contract account;
+
 ### Version 1.4.1
 1. Introduce Stable-Swap-Pool;
 
