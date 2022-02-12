@@ -8,6 +8,8 @@ EXCHANGE_DIR=ref-exchange
 EXCHANGE_BUILDER_NAME=build_ref_exchange
 EXCHANGE_RELEASE=ref_exchange
 
+test-all: test-exchange test-farming
+
 build-farming:
 	$(call create_builder,${FARMING_BUILDER_NAME},${FARMING_DIR})
 	$(call start_builder,${FARMING_BUILDER_NAME})
