@@ -67,6 +67,20 @@ pub fn check_token_duplicates(tokens: &[ValidAccountId]) {
     assert_eq!(token_set.len(), tokens.len(), "ERR_TOKEN_DUPLICATES");
 }
 
+/// parse an token into mft format 
+pub fn to_mft_format(token: &AccountId) -> Option<(String, Option<u64>)> {
+    let parts: Vec<&str> = token.split(":").collect();
+    if parts.len() == 2 {
+        if let Ok(pool_id) = str::parse::<u64>(parts[1]) {
+            Some((parts[0].to_string(), Some(pool_id)))
+        } else {
+            None
+        }
+    } else { 
+        Some((parts[0].to_string(), None))
+    }
+}
+
 /// Newton's method of integer square root.
 pub fn integer_sqrt(value: U256) -> U256 {
     let mut guess: U256 = (value + U256::one()) >> 1;

@@ -626,6 +626,10 @@ impl StableSwapPool {
         self.shares.insert(account_id, &0);
     }
 
+    pub fn share_is_registered(&mut self, account_id: &AccountId) -> bool {
+        self.shares.contains_key(account_id)
+    }
+
     /// Transfers shares from predecessor to receiver.
     pub fn share_transfer(&mut self, sender_id: &AccountId, receiver_id: &AccountId, amount: u128) {
         let balance = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);

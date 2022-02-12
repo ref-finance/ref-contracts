@@ -2,9 +2,8 @@ use std::cmp::min;
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
-use near_sdk::json_types::ValidAccountId;
 use near_sdk::{env, AccountId, Balance};
-use crate::StorageKey;
+use crate::{StorageKey, MFT_LOCKER};
 use crate::admin_fee::AdminFees;
 
 use crate::errors::{
@@ -42,7 +41,7 @@ pub struct SimplePool {
 impl SimplePool {
     pub fn new(
         id: u32,
-        token_account_ids: Vec<ValidAccountId>,
+        token_account_ids: Vec<AccountId>,
         total_fee: u32,
         exchange_fee: u32,
         referral_fee: u32,
@@ -54,7 +53,7 @@ impl SimplePool {
         // [AUDIT_10]
         assert_eq!(token_account_ids.len(), NUM_TOKENS, "ERR_SHOULD_HAVE_2_TOKENS");
         Self {
-            token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
+            token_account_ids: token_account_ids.clone(),
             amounts: vec![0u128; token_account_ids.len()],
             volumes: vec![SwapVolume::default(); token_account_ids.len()],
             total_fee,
@@ -77,6 +76,10 @@ impl SimplePool {
         self.shares.insert(account_id, &0);
     }
 
+    pub fn share_is_registered(&mut self, account_id: &AccountId) -> bool {
+        self.shares.contains_key(account_id)
+    }
+
     /// Transfers shares from predecessor to receiver.
     pub fn share_transfer(&mut self, sender_id: &AccountId, receiver_id: &AccountId, amount: u128) {
         let balance = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
@@ -84,6 +87,12 @@ impl SimplePool {
             self.shares.insert(&sender_id, &new_balance);
         } else {
             env::panic(b"ERR_NOT_ENOUGH_SHARES");
+        }
+        // if receiver is MFT_LOCKER and unregister, auto register
+        if receiver_id == MFT_LOCKER {
+            if self.shares.get(&receiver_id).is_none() {
+                self.shares.insert(&receiver_id, &0);
+            }
         }
         let balance_out = self
             .shares
@@ -342,7 +351,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
-        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 30, 0, 0);
+        let mut pool = SimplePool::new(0, vec![accounts(1).into(), accounts(2).into()], 30, 0, 0);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
@@ -392,7 +401,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
-        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 100, 100, 0);
+        let mut pool = SimplePool::new(0, vec![accounts(1).into(), accounts(2).into()], 100, 100, 0);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);

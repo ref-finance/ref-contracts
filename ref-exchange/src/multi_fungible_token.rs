@@ -1,6 +1,6 @@
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{ext_contract, near_bindgen, Balance, PromiseOrValue};
+use near_sdk::{ext_contract, near_bindgen, Balance, PromiseOrValue, serde_json};
 
 use crate::utils::{GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_RESOLVE_TRANSFER, NO_DEPOSIT};
 use crate::*;
@@ -58,7 +58,7 @@ fn parse_token_id(token_id: String) -> TokenOrPool {
 
 #[near_bindgen]
 impl Contract {
-    fn internal_mft_transfer(
+    pub(crate) fn internal_mft_transfer(
         &mut self,
         token_id: String,
         sender_id: &AccountId,
@@ -74,7 +74,7 @@ impl Contract {
                 pool.share_transfer(sender_id, receiver_id, amount);
                 self.pools.replace(pool_id, &pool);
                 log!(
-                    "Transfer shares {} pool: {} from {} to {}",
+                    "Transfer shares pool#{}: {} from {} to {}",
                     pool_id,
                     amount,
                     sender_id,
@@ -148,6 +148,16 @@ impl Contract {
         }
     }
 
+    pub fn mft_is_registered(&self, token_id: String, account_id: ValidAccountId) -> bool {
+        match parse_token_id(token_id) {
+            TokenOrPool::Token(_) => env::panic(b"ERR_INVALID_TOKEN"),
+            TokenOrPool::Pool(pool_id) => {
+                let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+                pool.share_is_registered(account_id.as_ref())
+            }
+        }
+    }
+
     /// Transfer one of internal tokens: LP or balances.
     /// `token_id` can either by account of the token or pool number.
     #[payable]
@@ -181,32 +191,79 @@ impl Contract {
         assert_one_yocto();
         self.assert_contract_running();
         let sender_id = env::predecessor_account_id();
-        self.internal_mft_transfer(
-            token_id.clone(),
-            &sender_id,
-            receiver_id.as_ref(),
-            amount.0,
-            memo,
-        );
-        ext_share_token_receiver::mft_on_transfer(
-            token_id.clone(),
-            sender_id.clone(),
-            amount,
-            msg,
-            receiver_id.as_ref(),
-            NO_DEPOSIT,
-            env::prepaid_gas() - GAS_FOR_FT_TRANSFER_CALL,
-        )
-        .then(ext_self::mft_resolve_transfer(
-            token_id,
-            sender_id,
-            receiver_id.into(),
-            amount,
-            &env::current_account_id(),
-            NO_DEPOSIT,
-            GAS_FOR_RESOLVE_TRANSFER,
-        ))
-        .into()
+        
+        if receiver_id.as_ref() == &env::current_account_id() {
+            // if receiver is self, goes to possible instant swap process
+            match parse_token_id(token_id.clone()) {
+                TokenOrPool::Pool(pool_id) => {
+                    let token_in = format!(":{}", pool_id);
+                    if msg.is_empty() {
+                        env::panic(ERR28_WRONG_MSG_FORMAT.as_bytes());
+                    } else {
+                        // instant swap
+                        let message =
+                            serde_json::from_str::<TokenReceiverMessage>(&msg).expect(ERR28_WRONG_MSG_FORMAT);
+                        match message {
+                            TokenReceiverMessage::Execute {
+                                referral_id,
+                                actions,
+                            } => {
+                                let referral_id = referral_id.map(|x| x.to_string());
+                                let out_amounts = self.internal_direct_actions(
+                                    token_in,
+                                    amount.0,
+                                    referral_id,
+                                    &actions,
+                                    &sender_id,
+                                );
+                                for (token_out, amount_out) in out_amounts.into_iter() {
+                                    log!(
+                                        "Send to {}: with {} token of amount {}",
+                                        &sender_id,
+                                        &token_out,
+                                        amount_out
+                                    );
+                                    self.internal_send_tokens(&sender_id, &token_out, amount_out);
+                                }
+                                // Even if send tokens fails, we don't return funds back to sender.
+                                PromiseOrValue::Value(U128(0))
+                            }
+                        }
+                    }
+                }
+                TokenOrPool::Token(_) => {
+                    env::panic("ERR_TOKEN_INVALID".as_bytes())
+                }
+            }
+        } else {
+            // ordinary process
+            self.internal_mft_transfer(
+                token_id.clone(),
+                &sender_id,
+                receiver_id.as_ref(),
+                amount.0,
+                memo,
+            );
+            ext_share_token_receiver::mft_on_transfer(
+                token_id.clone(),
+                sender_id.clone(),
+                amount,
+                msg,
+                receiver_id.as_ref(),
+                NO_DEPOSIT,
+                env::prepaid_gas() - GAS_FOR_FT_TRANSFER_CALL,
+            )
+            .then(ext_self::mft_resolve_transfer(
+                token_id,
+                sender_id,
+                receiver_id.into(),
+                amount,
+                &env::current_account_id(),
+                NO_DEPOSIT,
+                GAS_FOR_RESOLVE_TRANSFER,
+            ))
+            .into()
+        }
     }
 
     /// Returns how much was refunded back to the sender.

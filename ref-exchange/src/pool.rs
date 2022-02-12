@@ -212,4 +212,11 @@ impl Pool {
             Pool::StableSwapPool(pool) => pool.predict_remove_liquidity_by_tokens(amounts, fees),
         }
     }
+
+    pub fn share_is_registered(&mut self, account_id: &AccountId) -> bool {
+        match self {
+            Pool::SimplePool(pool) => pool.share_is_registered(account_id),
+            Pool::StableSwapPool(pool) => pool.share_is_registered(account_id),
+        }
+    }
 }

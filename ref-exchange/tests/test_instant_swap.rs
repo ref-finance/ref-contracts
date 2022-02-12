@@ -1,49 +1,45 @@
 use near_sdk::json_types::U128;
-use near_sdk_sim::{
-    call, to_yocto, ContractAccount, ExecutionResult, UserAccount,
-};
-
-use test_token::ContractContract as TestToken;
+use near_sdk_sim::{call, to_yocto};
 
 use crate::common::utils::*;
 pub mod common;
 
-fn pack_action(
-    pool_id: u32,
-    token_in: &str,
-    token_out: &str,
-    amount_in: Option<u128>,
-    min_amount_out: u128,
-) -> String {
-    if let Some(amount_in) = amount_in {
-        format!(
-            "{{\"pool_id\": {}, \"token_in\": \"{}\", \"amount_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
-            pool_id, token_in, amount_in, token_out, min_amount_out
-        )
-    } else {
-        format!(
-            "{{\"pool_id\": {}, \"token_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
-            pool_id, token_in, token_out, min_amount_out
-        )
-    }
-}
+// fn pack_action(
+//     pool_id: u32,
+//     token_in: &str,
+//     token_out: &str,
+//     amount_in: Option<u128>,
+//     min_amount_out: u128,
+// ) -> String {
+//     if let Some(amount_in) = amount_in {
+//         format!(
+//             "{{\"pool_id\": {}, \"token_in\": \"{}\", \"amount_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
+//             pool_id, token_in, amount_in, token_out, min_amount_out
+//         )
+//     } else {
+//         format!(
+//             "{{\"pool_id\": {}, \"token_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
+//             pool_id, token_in, token_out, min_amount_out
+//         )
+//     }
+// }
 
-fn direct_swap(
-    user: &UserAccount,
-    contract: &ContractAccount<TestToken>,
-    actions: Vec<String>,
-    amount: u128,
-) -> ExecutionResult {
-    // {{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"eth\", \"min_amount_out\": \"1\"}}
-    let actions_str = actions.join(", ");
-    let msg_str = format!("{{\"actions\": [{}]}}", actions_str);
-    // println!("{}", msg_str);
-    call!(
-        user,
-        contract.ft_transfer_call(to_va(swap()), amount.into(), None, msg_str),
-        deposit = 1
-    )
-}
+// fn direct_swap(
+//     user: &UserAccount,
+//     contract: &ContractAccount<TestToken>,
+//     actions: Vec<String>,
+//     amount: u128,
+// ) -> ExecutionResult {
+//     // {{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"eth\", \"min_amount_out\": \"1\"}}
+//     let actions_str = actions.join(", ");
+//     let msg_str = format!("{{\"actions\": [{}]}}", actions_str);
+//     // println!("{}", msg_str);
+//     call!(
+//         user,
+//         contract.ft_transfer_call(to_va(swap()), amount.into(), None, msg_str),
+//         deposit = 1
+//     )
+// }
 
 #[test]
 fn instant_swap_scenario_01() {
@@ -56,7 +52,7 @@ fn instant_swap_scenario_01() {
     .assert_success();
 
     println!("Case 0101: wrong msg");
-    let out_come = direct_swap(&new_user, &token1, vec!["wrong".to_string()], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token1, vec!["wrong".to_string()]);
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 1);
     assert!(get_error_status(&out_come).contains("E28: Illegal msg in ft_transfer_call"));
@@ -71,7 +67,7 @@ fn instant_swap_scenario_01() {
         None,
         to_yocto("1.9"),
     );
-    let out_come = direct_swap(&new_user, &token1, vec![action], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token1, vec![action]);
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     assert_eq!(get_error_count(&out_come), 1);
@@ -83,7 +79,7 @@ fn instant_swap_scenario_01() {
 
     println!("Case 0103: non-registered user swap but not registered in token2");
     let action = pack_action(0, &token1.account_id(), &token2.account_id(), None, 1);
-    let out_come = direct_swap(&new_user, &token1, vec![action], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token1, vec![action]);
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     assert_eq!(get_error_count(&out_come), 1);
@@ -110,7 +106,7 @@ fn instant_swap_scenario_01() {
 
     println!("Case 0104: non-registered user swap");
     let action = pack_action(0, &token1.account_id(), &token2.account_id(), None, 1);
-    let out_come = direct_swap(&new_user, &token1, vec![action], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token1, vec![action]);
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
     // println!("{:#?}", out_come.promise_results());
@@ -153,7 +149,7 @@ fn instant_swap_scenario_02() {
     );
     // println!("{:#?}", get_storage_balance(&pool, new_user.valid_account_id()).unwrap());
     let action = pack_action(0, &token1.account_id(), &token2.account_id(), None, 1);
-    let out_come = direct_swap(&new_user, &token1, vec![action], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token1, vec![action]);
     out_come.assert_success();
     // println!("swap one logs: {:#?}", get_logs(&out_come));
     // println!("{:#?}", out_come.promise_results());
@@ -200,7 +196,7 @@ fn instant_swap_scenario_02() {
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("9"));
     assert_eq!(balance_of(&token2, &new_user.account_id), to_yocto("10"));
     let action = pack_action(0, &token1.account_id(), &token2.account_id(), None, 1);
-    let out_come = direct_swap(&new_user, &token1, vec![action], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token1, vec![action]);
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     // println!("total logs: {:#?}", get_logs(&out_come));
@@ -256,7 +252,7 @@ fn instant_swap_scenario_02() {
         to_yocto("5")
     );
     let action = pack_action(0, &token1.account_id(), &token2.account_id(), None, 1);
-    let out_come = direct_swap(&new_user, &token1, vec![action], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token1, vec![action]);
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
     assert_eq!(
@@ -283,7 +279,7 @@ fn instant_swap_scenario_02() {
     )
     .assert_success();
     let action = pack_action(0, &token1.account_id(), &token2.account_id(), None, 1);
-    let out_come = direct_swap(&new_user, &token3, vec![action], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token3, vec![action]);
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 1);
     // println!("{}", get_error_status(&out_come));
@@ -346,7 +342,7 @@ fn instant_swap_scenario_03() {
     println!("Case 0301: two actions with one output token");
     let action1 = pack_action(0, &token1.account_id(), &token2.account_id(), None, 1);
     let action2 = pack_action(1, &token2.account_id(), &token3.account_id(), None, 1);
-    let out_come = direct_swap(&new_user, &token1, vec![action1, action2], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token1, vec![action1, action2]);
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     assert_eq!(get_error_count(&out_come), 0);
@@ -359,7 +355,7 @@ fn instant_swap_scenario_03() {
     println!("Case 0302: two actions with tow output token");
     let action1 = pack_action(0, &token1.account_id(), &token2.account_id(), None, 1);
     let action2 = pack_action(1, &token2.account_id(), &token3.account_id(), Some(to_yocto("1")), 1);
-    let out_come = direct_swap(&new_user, &token1, vec![action1, action2], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token1, vec![action1, action2]);
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     assert_eq!(get_error_count(&out_come), 0);
@@ -375,7 +371,7 @@ fn instant_swap_scenario_03() {
     assert!(!is_register_to_token(&token2, new_user.valid_account_id()));
     let action1 = pack_action(0, &token1.account_id(), &token2.account_id(), None, 1);
     let action2 = pack_action(1, &token2.account_id(), &token3.account_id(), Some(to_yocto("1")), 1);
-    let out_come = direct_swap(&new_user, &token1, vec![action1, action2], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token1, vec![action1, action2]);
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     assert_eq!(get_error_count(&out_come), 1);
@@ -409,7 +405,7 @@ fn instant_swap_scenario_03() {
         Some(to_yocto("1")),
         1,
     );
-    let out_come = direct_swap(&new_user, &token1, vec![action1, action2], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token1, vec![action1, action2]);
     out_come.assert_success();
     // println!("{:#?}", out_come.promise_results());
     assert_eq!(get_error_count(&out_come), 1);
@@ -435,7 +431,7 @@ fn instant_swap_scenario_03() {
         Some(to_yocto("1.2")),
         1,
     );
-    let out_come = direct_swap(&new_user, &token1, vec![action1, action2], to_yocto("1"));
+    let out_come = direct_swap(&new_user, &token1, vec![action1, action2]);
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 1);
     // println!("{}", get_error_status(&out_come));
@@ -464,7 +460,7 @@ fn instant_swap_scenario_04() {
 
     println!("Case 0401: non-registered user stable swap but not registered in token2");
     let action = pack_action(0, &tokens[0].account_id(), &tokens[1].account_id(), None, 1);
-    let out_come = direct_swap(&user, &tokens[0], vec![action], 1*ONE_DAI);
+    let out_come = direct_swap_with_amount(&user, &tokens[0], vec![action], 1*ONE_DAI);
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 1);
     assert!(get_error_status(&out_come)
@@ -488,7 +484,7 @@ fn instant_swap_scenario_04() {
     )
     .assert_success();
     let action = pack_action(0, &tokens[0].account_id(), &tokens[1].account_id(), None, 1);
-    let out_come = direct_swap(&user, &tokens[0], vec![action], 1*ONE_DAI);
+    let out_come = direct_swap_with_amount(&user, &tokens[0], vec![action], 1*ONE_DAI);
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
     assert!(get_storage_balance(&pool, user.valid_account_id()).is_none());

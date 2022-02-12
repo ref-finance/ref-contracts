@@ -124,6 +124,11 @@ pub fn get_version(pool: &ContractAccount<Exchange>) -> String {
     view!(pool.version()).unwrap_json::<String>()
 }
 
+/// get ref-exchange's mft_is_registered
+pub fn get_mft_is_registered(pool: &ContractAccount<Exchange>, token_id: String, account_id: ValidAccountId) -> bool {
+    view!(pool.mft_is_registered(token_id, account_id)).unwrap_json::<bool>()
+}
+
 /// get ref-exchange's pool count
 pub fn get_num_of_pools(pool: &ContractAccount<Exchange>) -> u64 {
     view!(pool.get_number_of_pools()).unwrap_json::<u64>()
@@ -236,6 +241,57 @@ pub fn swap() -> AccountId {
 
 pub fn to_va(a: AccountId) -> ValidAccountId {
     ValidAccountId::try_from(a).unwrap()
+}
+
+pub fn pack_action(
+    pool_id: u32,
+    token_in: &str,
+    token_out: &str,
+    amount_in: Option<u128>,
+    min_amount_out: u128,
+) -> String {
+    if let Some(amount_in) = amount_in {
+        format!(
+            "{{\"pool_id\": {}, \"token_in\": \"{}\", \"amount_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
+            pool_id, token_in, amount_in, token_out, min_amount_out
+        )
+    } else {
+        format!(
+            "{{\"pool_id\": {}, \"token_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
+            pool_id, token_in, token_out, min_amount_out
+        )
+    }
+}
+
+pub fn direct_swap(
+    user: &UserAccount,
+    contract: &ContractAccount<TestToken>,
+    actions: Vec<String>,
+) -> ExecutionResult {
+    // {{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"eth\", \"min_amount_out\": \"1\"}}
+    let actions_str = actions.join(", ");
+    let msg_str = format!("{{\"actions\": [{}]}}", actions_str);
+    // println!("{}", msg_str);
+    call!(
+        user,
+        contract.ft_transfer_call(to_va(swap()), to_yocto("1").into(), None, msg_str),
+        deposit = 1
+    )
+}
+
+pub fn direct_swap_with_amount(
+    user: &UserAccount,
+    contract: &ContractAccount<TestToken>,
+    actions: Vec<String>,
+    amount: u128,
+) -> ExecutionResult {
+    let actions_str = actions.join(", ");
+    let msg_str = format!("{{\"actions\": [{}]}}", actions_str);
+    call!(
+        user,
+        contract.ft_transfer_call(to_va(swap()), amount.into(), None, msg_str),
+        deposit = 1
+    )
 }
 
 pub fn setup_pool_with_liquidity() -> (
