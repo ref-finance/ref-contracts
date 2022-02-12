@@ -41,14 +41,14 @@ remove-builders:
 
 define create_builder 
 	docker ps -a | grep $(1) || docker create \
-     --mount type=bind,source=${PWD},target=/host \
-     --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
-     --name=$(1) \
-     -w /host/$(2) \
-     -e RUSTFLAGS='-C link-arg=-s' \
-     -it \
-     ${NEAR_CONTRACT_BUILDER_IMAGE} \
-     /bin/bash
+		--mount type=bind,source=${PWD},target=/host \
+		--cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
+		--name=$(1) \
+		-w /host/$(2) \
+		-e RUSTFLAGS='-C link-arg=-s' \
+		-it \
+		${NEAR_CONTRACT_BUILDER_IMAGE} \
+		/bin/bash
 endef
 
 define start_builder
