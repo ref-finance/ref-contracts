@@ -1,9 +1,9 @@
 name: Test ref-farming
-on: [push]
-  #  push:
-  #    branches: [ master ]
-  #  pull_request:
-  #    branches: [ master ]
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
 jobs:
   test_ref_farming:
     runs-on: ubuntu-latest 
