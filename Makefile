@@ -14,6 +14,7 @@ build-farming:
 	$(call create_builder,${FARMING_BUILDER_NAME},${FARMING_DIR})
 	$(call start_builder,${FARMING_BUILDER_NAME})
 	$(call setup_builder,${FARMING_BUILDER_NAME})
+	docker exec ${FARMING_BUILDER_NAME} /bin/bash build_local.sh
 	
 test-farming: build-farming
 	docker exec ${FARMING_BUILDER_NAME} cargo test 
