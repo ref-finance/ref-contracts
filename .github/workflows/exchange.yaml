@@ -1,9 +1,9 @@
 name: Test ref-exchange 
 on: 
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 jobs:
   test_ref_exchange:
     runs-on: ubuntu-latest 
