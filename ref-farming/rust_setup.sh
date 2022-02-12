@@ -1,5 +1,5 @@
 #/bin/bash
-VER=2020-10-08
+VER=2021-11-01
 rustup toolchain install stable-$VER
 rustup default stable-$VER
 rustup target add wasm32-unknown-unknown
