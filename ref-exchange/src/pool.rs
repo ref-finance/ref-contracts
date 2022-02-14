@@ -213,7 +213,7 @@ impl Pool {
         }
     }
 
-    pub fn share_is_registered(&mut self, account_id: &AccountId) -> bool {
+    pub fn share_is_registered(&self, account_id: &AccountId) -> bool {
         match self {
             Pool::SimplePool(pool) => pool.share_is_registered(account_id),
             Pool::StableSwapPool(pool) => pool.share_is_registered(account_id),

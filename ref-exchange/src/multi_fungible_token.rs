@@ -1,6 +1,6 @@
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{ext_contract, near_bindgen, Balance, PromiseOrValue, serde_json};
+use near_sdk::{ext_contract, near_bindgen, serde_json, Balance, PromiseOrValue};
 
 use crate::utils::{GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_RESOLVE_TRANSFER, NO_DEPOSIT};
 use crate::*;
@@ -84,7 +84,7 @@ impl Contract {
             TokenOrPool::Token(token_id) => {
                 let mut sender_account: Account = self.internal_unwrap_account(&sender_id);
                 let mut receiver_account: Account = self.internal_unwrap_account(&receiver_id);
-                
+
                 sender_account.withdraw(&token_id, amount);
                 receiver_account.deposit(&token_id, amount);
                 self.internal_save_account(&sender_id, sender_account);
@@ -148,13 +148,15 @@ impl Contract {
         }
     }
 
+    /// See if given account has registered the mft token or not
     pub fn mft_is_registered(&self, token_id: String, account_id: ValidAccountId) -> bool {
         match parse_token_id(token_id) {
             TokenOrPool::Token(_) => env::panic(b"ERR_INVALID_TOKEN"),
-            TokenOrPool::Pool(pool_id) => {
-                let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
-                pool.share_is_registered(account_id.as_ref())
-            }
+            TokenOrPool::Pool(pool_id) => self
+                .pools
+                .get(pool_id)
+                .expect("ERR_NO_POOL")
+                .share_is_registered(account_id.as_ref()),
         }
     }
 
@@ -191,7 +193,7 @@ impl Contract {
         assert_one_yocto();
         self.assert_contract_running();
         let sender_id = env::predecessor_account_id();
-        
+
         if receiver_id.as_ref() == &env::current_account_id() {
             // if receiver is self, goes to possible instant swap process
             match parse_token_id(token_id.clone()) {
@@ -201,8 +203,8 @@ impl Contract {
                         env::panic(ERR28_WRONG_MSG_FORMAT.as_bytes());
                     } else {
                         // instant swap
-                        let message =
-                            serde_json::from_str::<TokenReceiverMessage>(&msg).expect(ERR28_WRONG_MSG_FORMAT);
+                        let message = serde_json::from_str::<TokenReceiverMessage>(&msg)
+                            .expect(ERR28_WRONG_MSG_FORMAT);
                         match message {
                             TokenReceiverMessage::Execute {
                                 referral_id,
@@ -231,9 +233,7 @@ impl Contract {
                         }
                     }
                 }
-                TokenOrPool::Token(_) => {
-                    env::panic("ERR_TOKEN_INVALID".as_bytes())
-                }
+                TokenOrPool::Token(_) => env::panic("ERR_TOKEN_INVALID".as_bytes()),
             }
         } else {
             // ordinary process
@@ -292,7 +292,7 @@ impl Contract {
             let receiver_balance = self.internal_mft_balance(token_id.clone(), &receiver_id);
             if receiver_balance > 0 {
                 let refund_amount = std::cmp::min(receiver_balance, unused_amount);
-                
+
                 let refund_to = if self.accounts.get(&sender_id).is_some() {
                     sender_id
                 } else {

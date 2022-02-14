@@ -67,18 +67,10 @@ pub fn check_token_duplicates(tokens: &[ValidAccountId]) {
     assert_eq!(token_set.len(), tokens.len(), "ERR_TOKEN_DUPLICATES");
 }
 
-/// parse an token into mft format 
-pub fn to_mft_format(token: &AccountId) -> Option<(String, Option<u64>)> {
-    let parts: Vec<&str> = token.split(":").collect();
-    if parts.len() == 2 {
-        if let Ok(pool_id) = str::parse::<u64>(parts[1]) {
-            Some((parts[0].to_string(), Some(pool_id)))
-        } else {
-            None
-        }
-    } else { 
-        Some((parts[0].to_string(), None))
-    }
+/// Checks if there are any duplicates in the given list of string.
+pub fn check_string_duplicates(items: &[String]) {
+    let item_set: HashSet<_> = items.iter().collect();
+    assert_eq!(item_set.len(), items.len(), "ERR_DUPLICATES");
 }
 
 /// Newton's method of integer square root.

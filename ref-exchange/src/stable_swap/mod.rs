@@ -9,7 +9,7 @@ use crate::stable_swap::math::{
     Fees, StableSwap, SwapResult, MAX_AMP, MAX_AMP_CHANGE, MIN_AMP, MIN_RAMP_DURATION,
 };
 use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR, U256};
-use crate::StorageKey;
+use crate::{StorageKey, MFT_LOCKER};
 
 mod math;
 
@@ -626,7 +626,7 @@ impl StableSwapPool {
         self.shares.insert(account_id, &0);
     }
 
-    pub fn share_is_registered(&mut self, account_id: &AccountId) -> bool {
+    pub fn share_is_registered(&self, account_id: &AccountId) -> bool {
         self.shares.contains_key(account_id)
     }
 
@@ -637,6 +637,12 @@ impl StableSwapPool {
             self.shares.insert(&sender_id, &new_balance);
         } else {
             env::panic(ERR34_INSUFFICIENT_LP_SHARES.as_bytes());
+        }
+        // if receiver is MFT_LOCKER and unregister, auto register
+        if receiver_id == MFT_LOCKER {
+            if self.shares.get(&receiver_id).is_none() {
+                self.shares.insert(&receiver_id, &0);
+            }
         }
         let balance_out = self
             .shares

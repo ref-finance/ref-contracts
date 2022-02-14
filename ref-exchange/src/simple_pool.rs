@@ -5,10 +5,7 @@ use near_sdk::collections::LookupMap;
 use near_sdk::{env, AccountId, Balance};
 use crate::{StorageKey, MFT_LOCKER};
 use crate::admin_fee::AdminFees;
-
-use crate::errors::{
-    ERR13_LP_NOT_REGISTERED, ERR14_LP_ALREADY_REGISTERED, ERR31_ZERO_AMOUNT, ERR32_ZERO_SHARES,
-};
+use crate::errors::*;
 use crate::utils::{
     add_to_collection, integer_sqrt, SwapVolume, FEE_DIVISOR, INIT_SHARES_SUPPLY, U256,
 };
@@ -76,17 +73,17 @@ impl SimplePool {
         self.shares.insert(account_id, &0);
     }
 
-    pub fn share_is_registered(&mut self, account_id: &AccountId) -> bool {
+    pub fn share_is_registered(&self, account_id: &AccountId) -> bool {
         self.shares.contains_key(account_id)
     }
 
     /// Transfers shares from predecessor to receiver.
     pub fn share_transfer(&mut self, sender_id: &AccountId, receiver_id: &AccountId, amount: u128) {
-        let balance = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
+        let balance = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
         if let Some(new_balance) = balance.checked_sub(amount) {
             self.shares.insert(&sender_id, &new_balance);
         } else {
-            env::panic(b"ERR_NOT_ENOUGH_SHARES");
+            env::panic(ERR34_INSUFFICIENT_LP_SHARES.as_bytes());
         }
         // if receiver is MFT_LOCKER and unregister, auto register
         if receiver_id == MFT_LOCKER {
