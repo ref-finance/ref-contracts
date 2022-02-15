@@ -2,6 +2,7 @@
 
 ### Version 1.4.2
 1. Let owner can retrieve unmanaged NEP-141 tokens in contract account;
+2. support withdraw token's full amount in inner-account with 0 in amount parameter;
 
 ### Version 1.4.1
 1. Introduce Stable-Swap-Pool;
