@@ -61,7 +61,7 @@ define setup_builder
 endef
 
 define remove_builder
-	docker stop $(1) && docker rm $(1) 
+	docker stop $(1) && sleep 3 && docker rm $(1) 
 endef
 
 define release_wasm
