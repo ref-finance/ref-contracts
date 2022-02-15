@@ -205,7 +205,7 @@ impl Contract {
         pool_id: u64,
         amounts: Vec<U128>,
         min_amounts: Option<Vec<U128>>,
-    ) {
+    ) -> U128 {
         self.assert_contract_running();
         assert!(
             env::attached_deposit() > 0,
@@ -216,7 +216,7 @@ impl Contract {
         let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
         let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
         // Add amounts given to liquidity first. It will return the balanced amounts.
-        pool.add_liquidity(
+        let shares = pool.add_liquidity(
             &sender_id,
             &mut amounts,
         );
@@ -235,6 +235,7 @@ impl Contract {
         self.internal_save_account(&sender_id, deposits);
         self.pools.replace(pool_id, &pool);
         self.internal_check_storage(prev_storage);
+        U128(shares)
     }
 
     /// For stable swap pool, user can add liquidity with token's combination as his will.
