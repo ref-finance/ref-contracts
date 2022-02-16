@@ -9,7 +9,7 @@ use crate::common::utils::*;
 pub mod common;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_131.wasm",
+    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_141.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange_release.wasm",
 }
 
@@ -46,9 +46,9 @@ fn test_upgrade() {
     .assert_success();
     let metadata = get_metadata(&pool);
     // println!("{:#?}", metadata);
-    assert_eq!(metadata.version, "1.4.1".to_string());
-    assert_eq!(metadata.exchange_fee, 1600);
-    assert_eq!(metadata.referral_fee, 400);
+    assert_eq!(metadata.version, "1.4.2".to_string());
+    assert_eq!(metadata.exchange_fee, 4);
+    assert_eq!(metadata.referral_fee, 1);
     assert_eq!(metadata.state, RunningState::Running);
 
     // Upgrade to the same code migration is skipped.
