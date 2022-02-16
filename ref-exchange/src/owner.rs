@@ -1,9 +1,10 @@
 //! Implement all the relevant logic for owner of this contract.
 
 use near_sdk::json_types::WrappedTimestamp;
+use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 
 use crate::*;
-use crate::utils::FEE_DIVISOR;
+use crate::utils::{FEE_DIVISOR, GAS_FOR_BASIC_OP};
 
 #[near_bindgen]
 impl Contract {
@@ -16,6 +17,33 @@ impl Contract {
     /// Get the owner of this account.
     pub fn get_owner(&self) -> AccountId {
         self.owner_id.clone()
+    }
+
+    /// Retrieve NEP-141 tokens that not mananged by contract to owner,
+    /// Caution: Must check that `amount <= total_amount_in_account - amount_managed_by_contract` before calling !!!
+    /// Returns promise of ft_transfer action.
+    #[payable]
+    pub fn retrieve_unmanaged_token(&mut self, token_id: ValidAccountId, amount: U128) -> Promise {
+        self.assert_owner();
+        assert_one_yocto();
+        let token_id: AccountId = token_id.into();
+        let amount: u128 = amount.into();
+        assert!(amount > 0, "{}", ERR29_ILLEGAL_WITHDRAW_AMOUNT);
+        env::log(
+            format!(
+                "Going to retrieve token {} to owner, amount: {}",
+                &token_id, amount
+            )
+            .as_bytes(),
+        ); 
+        ext_fungible_token::ft_transfer(
+            self.owner_id.clone(),
+            U128(amount),
+            None,
+            &token_id,
+            1,
+            env::prepaid_gas() - GAS_FOR_BASIC_OP,
+        )
     }
 
     /// Extend guardians. Only can be called by owner.
@@ -180,11 +208,6 @@ impl Contract {
     // [AUDIT_09]
     #[private]
     pub fn migrate() -> Self {
-        assert_eq!(
-            env::predecessor_account_id(),
-            env::current_account_id(),
-            "ERR_NOT_ALLOWED"
-        );
         let contract: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
         contract
     }

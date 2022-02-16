@@ -241,6 +241,7 @@ impl Contract {
     }
 
     /// Withdraws given token from the deposits of given user.
+    /// a zero amount means to withdraw all in user's inner account.
     /// Optional unregister will try to remove record of this token from AccountDeposit for given user.
     /// Unregister will fail if the left over balance is non 0.
     #[payable]
@@ -253,10 +254,16 @@ impl Contract {
         assert_one_yocto();
         self.assert_contract_running();
         let token_id: AccountId = token_id.into();
-        let amount: u128 = amount.into();
-        assert!(amount > 0, "{}", ERR29_ILLEGAL_WITHDRAW_AMOUNT);
         let sender_id = env::predecessor_account_id();
         let mut account = self.internal_unwrap_account(&sender_id);
+        
+        // get full amount if amount param is 0
+        let mut amount: u128 = amount.into();
+        if amount == 0 {
+            amount = account.get_balance(&token_id).expect(ERR21_TOKEN_NOT_REG);
+        }
+        assert!(amount > 0, "{}", ERR29_ILLEGAL_WITHDRAW_AMOUNT);
+        
         // Note: subtraction and deregistration will be reverted if the promise fails.
         account.withdraw(&token_id, amount);
         if unregister == Some(true) {
