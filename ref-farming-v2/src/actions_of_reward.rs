@@ -30,13 +30,11 @@ impl Contract {
     pub fn claim_reward_by_farm(&mut self, farm_id: FarmId) {
         let sender_id = env::predecessor_account_id();
         self.internal_claim_user_reward_by_farm_id(&sender_id, &farm_id);
-        self.assert_storage_usage(&sender_id);
     }
 
     pub fn claim_reward_by_seed(&mut self, seed_id: SeedId) {
         let sender_id = env::predecessor_account_id();
         self.internal_claim_user_reward_by_seed_id(&sender_id, &seed_id);
-        self.assert_storage_usage(&sender_id);
     }
 
     /// Withdraws given reward token of given user.
@@ -214,7 +212,7 @@ impl Contract {
 
     #[inline]
     pub(crate) fn get_farmer_default(&self, from: &AccountId) -> VersionedFarmer {
-        let orig = self.data().farmers.get(from).unwrap_or(VersionedFarmer::new(from.clone(), 0));
+        let orig = self.data().farmers.get(from).unwrap_or(VersionedFarmer::new(from.clone()));
         if orig.need_upgrade() {
             orig.upgrade()
         } else {

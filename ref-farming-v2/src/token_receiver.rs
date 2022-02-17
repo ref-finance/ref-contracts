@@ -63,8 +63,6 @@ impl FungibleTokenReceiver for Contract {
                 false
             );
             
-            self.assert_storage_usage(&sender);
-
             env::log(
                 format!(
                     "{} deposit FT seed {} with amount {}.",
@@ -249,8 +247,6 @@ impl MFTTokenReceiver for Contract {
             }
             
             self.internal_seed_deposit(&seed_id, &sender_id, amount, amount, SeedType::MFT, false);
-
-            self.assert_storage_usage(&sender_id);
 
             env::log(
                 format!(

@@ -377,17 +377,4 @@ impl Contract {
     pub fn get_cd_strategy(&self) -> CDStrategyInfo {
         (&self.data().cd_strategy).into()
     }
-
-    /// Get farmer's storage deposit and needed in the account of current version
-    pub fn get_user_storage_state(&self, account_id: ValidAccountId) -> Option<StorageState> {
-        let (locked, deposited) = self.internal_farmer_storage(account_id.as_ref()); 
-        if locked > 0 {
-            Some(StorageState {
-                deposit: U128(deposited),
-                usage: U128(locked),
-            })
-        } else {
-           None
-        }
-    }
 }

@@ -15,24 +15,9 @@ impl Contract {
 
         self.assert_owner();
         
-        let prev_storage = env::storage_usage();
-
         let min_deposit: u128 = min_deposit.unwrap_or(U128(MIN_SEED_DEPOSIT)).0;
 
         let farm_id = self.internal_add_farm(&terms, min_deposit);
-
-        // Check how much storage cost and refund the left over back.
-        let storage_needed = env::storage_usage() - prev_storage;
-        let storage_cost = storage_needed as u128 * env::storage_byte_cost();
-        assert!(
-            storage_cost <= env::attached_deposit(),
-            "{}: {}", ERR11_INSUFFICIENT_STORAGE, storage_needed
-        );
-
-        let refund = env::attached_deposit() - storage_cost;
-        if refund > 0 {
-            Promise::new(env::predecessor_account_id()).transfer(refund);
-        }
 
         farm_id
     }
