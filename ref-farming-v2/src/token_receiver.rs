@@ -1,9 +1,9 @@
 use crate::*;
 use crate::errors::*;
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{serde_json, PromiseOrValue, Timestamp};
+use near_sdk::{serde_json, PromiseOrValue};
 use near_sdk::json_types::{U128};
-use crate::utils::{MFT_TAG, MAX_CDACCOUNT_NUM};
+use crate::utils::{MFT_TAG};
 use crate::farm_seed::SeedType;
 
 
@@ -97,7 +97,7 @@ impl FungibleTokenReceiver for Contract {
                             )
                         }
 
-                        let seed_power = self.generate_cd_account(&sender, seed_id, cd_strategy, amount.into());
+                        let seed_power = self.generate_cd_account(&sender, seed_id, index, cd_strategy, amount.into());
 
                         self.internal_seed_deposit(
                             &env::predecessor_account_id(), 
@@ -303,7 +303,7 @@ impl MFTTokenReceiver for Contract {
                         )
                     }
                     
-                    let seed_power = self.generate_cd_account(&sender_id, seed_id.clone(), cd_strategy, amount.into());
+                    let seed_power = self.generate_cd_account(&sender_id, seed_id.clone(), index, cd_strategy, amount.into());
                     
                     self.internal_seed_deposit(
                         &seed_id, 

@@ -1,12 +1,8 @@
-use near_sdk_sim::{view, call, init_simulator, to_yocto};
-// use near_sdk::json_types::{U128};
-use near_sdk::serde_json::Value;
-use ref_farming_v2::{HRSimpleFarmTerms};
+use near_sdk_sim::{call, init_simulator, to_yocto};
 
 use crate::common::utils::*;
 use crate::common::init::deploy_farming;
-use crate::common::views::*;
-use crate::common::actions::*;
+
 
 mod common;
 

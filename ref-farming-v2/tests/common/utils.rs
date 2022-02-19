@@ -1,3 +1,4 @@
+#![allow(unused)] 
 use std::convert::TryFrom;
 use near_sdk::{AccountId};
 use near_sdk::json_types::{ValidAccountId};
@@ -25,6 +26,10 @@ pub(crate) fn to_va(a: AccountId) -> ValidAccountId {
 
 pub(crate) fn generate_cd_account_msg(index: u64, seed_id: String, cd_strategy: usize) -> String{
     format!("{{\"index\": {}, \"seed_id\": \"{}\", \"cd_strategy\": {}}}", index, seed_id, cd_strategy)
+}
+
+pub(crate) fn append_cd_account_msg(index: u64, seed_id: String) -> String{
+    format!("{{\"index\": {}, \"seed_id\": \"{}\"}}", index, seed_id)
 }
 
 pub(crate) fn generate_reward_msg(farm_id: String) -> String{

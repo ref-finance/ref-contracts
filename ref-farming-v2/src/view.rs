@@ -30,14 +30,6 @@ pub struct Metadata {
     pub reward_count: U64,
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
-#[serde(crate = "near_sdk::serde")]
-#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
-pub struct StorageState {
-    pub deposit: U128,
-    pub usage: U128,
-}
-
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct FarmInfo {
@@ -110,6 +102,15 @@ impl From<&Farm> for FarmInfo {
             }
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub struct UserSeedInfo {
+    pub seed_id: SeedId,
+    pub amount: U128,
+    pub power: U128,
+    pub farms: Vec<CDAccountInfo>
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -366,9 +367,43 @@ impl Contract {
         }
     }
 
-    pub fn get_number_of_user_cd_accounts(&self, account_id: ValidAccountId) -> u64 {
-        let farmer = self.get_farmer(&account_id.into());
-        farmer.get_ref().cd_accounts.len()
+    pub fn get_user_seed_info(&self, account_id: ValidAccountId, seed_id: SeedId) -> Option<UserSeedInfo> {
+        if let Some(farmer) = self.get_farmer_wrapped(account_id.as_ref()){
+            Some(UserSeedInfo{
+                seed_id: seed_id.clone(),
+                amount: farmer.get_ref().seed_amounts.get(&seed_id).map_or(U128(0), |&v| U128(v)),
+                power: farmer.get_ref().seed_powers.get(&seed_id).map_or(U128(0), |&v| U128(v)),
+                farms: farmer.get_ref().cd_accounts.iter().map(|cd_account| {
+                    cd_account.into()
+                }).collect()
+            })
+        }else{
+            None
+        }
+    }
+
+    pub fn list_user_seed_info(&self, account_id: ValidAccountId, from_index: u64, limit: u64) -> HashMap<SeedId, UserSeedInfo> {
+        if let Some(farmer) = self.get_farmer_wrapped(account_id.as_ref()){
+            let keys = self.data().seeds.keys_as_vector();
+        (from_index..std::cmp::min(from_index + limit, keys.len()))
+            .map(|index| {
+                let seed_id = keys.get(index).unwrap();
+                (
+                    seed_id.clone(),
+                    UserSeedInfo{
+                        seed_id: seed_id.clone(),
+                        amount: farmer.get_ref().seed_amounts.get(&seed_id).map_or(U128(0), |&v| U128(v)),
+                        power: farmer.get_ref().seed_powers.get(&seed_id).map_or(U128(0), |&v| U128(v)),
+                        farms: farmer.get_ref().cd_accounts.iter().map(|cd_account| {
+                            cd_account.into()
+                        }).collect()
+                    },
+                )
+            })
+            .collect()
+        }else{
+            HashMap::new()
+        }
     }
 
     pub fn list_user_cd_account(&self, account_id: ValidAccountId, from_index: u64, limit: u64) -> Vec<CDAccountInfo> {

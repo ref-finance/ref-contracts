@@ -20,8 +20,6 @@ use crate::StorageKeys;
 #[serde(crate = "near_sdk::serde")]
 pub struct CDAccount {
     pub seed_id: SeedId,
-    /// gain additional numerator.
-    pub additional: u32,
     /// From ft_on_transfer、ft_on_transfer amount
     pub seed_amount: Balance,
     /// self.seed_amount * CDStrategy.additional[self.cd_strategy] / CDStrategy.denominator
@@ -33,11 +31,11 @@ pub struct CDAccount {
 }
 
 impl Contract {
-    pub(crate) fn generate_cd_account(&mut self, sender: &AccountId, seed_id: SeedId, cd_strategy: usize, amount: Balance) -> Balance {
+    pub(crate) fn generate_cd_account(&mut self, sender: &AccountId, seed_id: SeedId, index: u64, cd_strategy: usize, amount: Balance) -> Balance {
         let mut farmer = self.get_farmer(sender);
-        assert!(farmer.get_ref().cd_accounts.len() < MAX_CDACCOUNT_NUM - 1, "{}", ERR61_CDACCOUNT_NUM_HAS_REACHED_LIMIT);
 
-        assert!(cd_strategy < STRATEGY_LIMIT, "{}", ERR62_INVALID_CD_STRATEGY_INDEX);
+        assert!(farmer.get_ref().cd_accounts.len() < MAX_CDACCOUNT_NUM, "{}", ERR61_CDACCOUNT_NUM_HAS_REACHED_LIMIT);
+        assert!(farmer.get_ref().cd_accounts.len() == index, "{}", ERR62_INVALID_CD_STRATEGY_INDEX);
 
         let strategy = &self.data().cd_strategy.stake_strategy[cd_strategy];
         assert!(strategy.enable, "{}", ERR62_INVALID_CD_STRATEGY_INDEX);
@@ -47,7 +45,6 @@ impl Contract {
 
         let cd_account = CDAccount{
             seed_id,
-            additional: strategy.additional,
             seed_amount: amount,
             seed_power: amount + power,
             begin_sec: now,
@@ -57,7 +54,7 @@ impl Contract {
         farmer.get_ref_mut().cd_accounts.push(&cd_account);
         self.data_mut().farmers.insert(&sender, &farmer);
 
-        power
+        amount + power
     }
 
     pub(crate) fn append_cd_account(&mut self, sender: &AccountId, index: u64, amount: Balance) -> Balance{
@@ -65,7 +62,7 @@ impl Contract {
 
         let mut cd_account = farmer.get_ref().cd_accounts.get(index).unwrap();
 
-        let total_power = U256::from(amount) * U256::from(cd_account.additional) / U256::from(DENOMINATOE);
+        let total_power = U256::from(amount) * U256::from(cd_account.seed_power - cd_account.seed_amount) / U256::from(cd_account.seed_amount);
 
         let lock_sec = cd_account.end_sec - cd_account.begin_sec;
         let passed_sec = to_sec(env::block_timestamp()) - cd_account.begin_sec;
@@ -80,7 +77,7 @@ impl Contract {
         farmer.get_ref_mut().cd_accounts.replace(index, &cd_account);
         self.data_mut().farmers.insert(&sender, &farmer);
 
-        remain_power
+        amount + remain_power
     }
 
     pub(crate) fn internal_remove_cd_account(&mut self, sender_id: &AccountId, index: u64) -> (SeedType, CDAccount, Balance)  {

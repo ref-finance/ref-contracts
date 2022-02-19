@@ -5,7 +5,7 @@ use near_contract_standards::storage_management::{
 use std::convert::TryInto;
 
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{assert_one_yocto, env, near_bindgen, Promise, Balance};
+use near_sdk::{assert_one_yocto, env, near_bindgen, Promise};
 
 use crate::errors::*;
 use crate::*;

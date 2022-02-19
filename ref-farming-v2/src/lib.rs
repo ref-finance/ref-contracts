@@ -6,7 +6,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId};
 use near_sdk::collections::{LookupMap, UnorderedMap};
-use near_sdk::{env, near_bindgen, Balance, AccountId, PanicOnDefault, Timestamp};
+use near_sdk::{env, near_bindgen, Balance, AccountId, PanicOnDefault};
 use near_sdk::BorshStorageKey;
 
 use crate::farm::{Farm, FarmId};
@@ -20,6 +20,7 @@ pub use crate::simple_farm::HRSimpleFarmTerms;
 pub use crate::view::FarmInfo;
 pub use crate::view::CDAccountInfo;
 pub use crate::view::CDStrategyInfo;
+pub use crate::view::UserSeedInfo;
 
 
 mod utils;

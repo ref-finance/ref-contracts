@@ -222,15 +222,16 @@ pub(crate) fn assert_farming(
 #[allow(dead_code)]
 pub(crate) fn assert_strategy(
     strategy_info: &CDStrategyInfo,
-    locking_time: Vec<u64>,
-    additional: Vec<u32>,
+    index: usize,
+    lock_sec: u32,
+    additional: u32,
+    enable: bool,
     damage: u32,
-    denominator: u32,
 ) {
-    assert_eq!(strategy_info.locking_time, locking_time);
-    assert_eq!(strategy_info.additional, additional);
+    assert_eq!(strategy_info.stake_strategy[index].lock_sec, lock_sec);
+    assert_eq!(strategy_info.stake_strategy[index].additional, additional);
+    assert_eq!(strategy_info.stake_strategy[index].enable, enable);
     assert_eq!(strategy_info.damage, damage);
-    assert_eq!(strategy_info.denominator, denominator);
 }
 
 // =============  internal methods ================

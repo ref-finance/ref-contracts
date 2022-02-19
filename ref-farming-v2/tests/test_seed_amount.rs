@@ -1,6 +1,5 @@
 use near_sdk_sim::{call, init_simulator, to_yocto, view};
 use near_sdk::json_types::{U128};
-use near_sdk::serde_json::Value;
 
 use ref_farming_v2::{HRSimpleFarmTerms};
 
@@ -188,7 +187,7 @@ fn seed_amount_huge() {
         deposit = 1
     )
     .assert_success();
-    let farm_info = show_farminfo(&farming, farm_id.clone(), false);
+    let _farm_info = show_farminfo(&farming, farm_id.clone(), false);
 
     let out_come = call!(
         farmer1,
