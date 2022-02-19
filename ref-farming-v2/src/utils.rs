@@ -8,6 +8,8 @@ use crate::errors::*;
 
 pub type TimestampSec = u32;
 
+pub const STRATEGY_LIMIT: usize = 32;
+pub const DENOMINATOE: u128 = 10_000;
 pub const MIN_SEED_DEPOSIT: u128 = 1_000_000_000_000_000_000;
 pub const STORAGE_BALANCE_MIN_BOUND: u128 = 100_000_000_000_000_000_000_000;
 pub const MAX_CDACCOUNT_NUM: u64 = 16;

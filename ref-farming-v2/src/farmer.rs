@@ -7,58 +7,80 @@
 use std::collections::HashMap;
 use near_sdk::collections::{LookupMap, Vector};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{env, AccountId, Balance, Timestamp};
+use near_sdk::{env, AccountId, Balance};
 use near_sdk::serde::{Deserialize, Serialize};
 use crate::{SeedId, FarmId, RPS};
 use crate::farm_seed::SeedType;
 use crate::*;
 use crate::errors::*;
-use crate::utils::U256;
+use crate::utils::*;
 use crate::StorageKeys;
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct CDAccount {
     pub seed_id: SeedId,
-    /// Index of CDStrategy member(locking_time、additional)
-    /// Affected only when CDAccount created
-    pub cd_strategy: usize,
+    /// gain additional numerator.
+    pub additional: u32,
     /// From ft_on_transfer、ft_on_transfer amount
     pub seed_amount: Balance,
     /// self.seed_amount * CDStrategy.additional[self.cd_strategy] / CDStrategy.denominator
     pub seed_power: Balance,
-    /// seed stake begin timestamp: env::block_timestamp()
-    pub begin_sec: Timestamp,
-    /// seed stake end timestamp: self.begin_sec + CDStrategy.locking_time[self.cd_strategy]
-    pub end_sec: Timestamp
+    /// seed stake begin sec: to_sec(env::block_timestamp())
+    pub begin_sec: u32,
+    /// seed stake end sec: self.begin_sec + CDStrategy.lock_secs
+    pub end_sec: u32
 }
 
 impl Contract {
-    pub(crate) fn generate_cd_account(&self, seed_id: SeedId, cd_strategy: usize, amount: Balance) -> CDAccount {
-        let strategy = &self.data().cd_strategy;
-        assert!(cd_strategy < strategy.locking_time.len() && cd_strategy < strategy.additional.len(), "{}", ERR62_INVALID_CD_STRATEGY_INDEX);
-        let now = env::block_timestamp();
-        let power = (U256::from(amount) * U256::from(strategy.additional[cd_strategy]) / U256::from(strategy.denominator)).as_u128();
-        CDAccount{
+    pub(crate) fn generate_cd_account(&mut self, sender: &AccountId, seed_id: SeedId, cd_strategy: usize, amount: Balance) -> Balance {
+        let mut farmer = self.get_farmer(sender);
+        assert!(farmer.get_ref().cd_accounts.len() < MAX_CDACCOUNT_NUM - 1, "{}", ERR61_CDACCOUNT_NUM_HAS_REACHED_LIMIT);
+
+        assert!(cd_strategy < STRATEGY_LIMIT, "{}", ERR62_INVALID_CD_STRATEGY_INDEX);
+
+        let strategy = &self.data().cd_strategy.stake_strategy[cd_strategy];
+        assert!(strategy.enable, "{}", ERR62_INVALID_CD_STRATEGY_INDEX);
+
+        let now = to_sec(env::block_timestamp());
+        let power = (U256::from(amount) * U256::from(strategy.additional) / U256::from(DENOMINATOE)).as_u128();
+
+        let cd_account = CDAccount{
             seed_id,
-            cd_strategy,
+            additional: strategy.additional,
             seed_amount: amount,
             seed_power: amount + power,
             begin_sec: now,
-            end_sec: now + strategy.locking_time[cd_strategy]
-        }
+            end_sec: now + strategy.lock_sec
+        };
+
+        farmer.get_ref_mut().cd_accounts.push(&cd_account);
+        self.data_mut().farmers.insert(&sender, &farmer);
+
+        power
     }
 
-    pub(crate) fn append_cd_account(&self, amount: Balance, cd_account: &mut CDAccount) {
-        let strategy = &self.data().cd_strategy;
-        let total_power = U256::from(amount) * U256::from(strategy.additional[cd_account.cd_strategy]) / U256::from(strategy.denominator);
-        let locking_time = cd_account.end_sec - cd_account.begin_sec;
-        let passing_time = env::block_timestamp() - cd_account.begin_sec;
-        assert!(locking_time > passing_time, "{}", ERR64_EXPIRED_CD_ACCOUNT);
-        let residue_time = locking_time - passing_time;
-        let residue_power = (total_power * U256::from(residue_time) / U256::from(locking_time)).as_u128();
+    pub(crate) fn append_cd_account(&mut self, sender: &AccountId, index: u64, amount: Balance) -> Balance{
+        let mut farmer = self.get_farmer(sender);
+
+        let mut cd_account = farmer.get_ref().cd_accounts.get(index).unwrap();
+
+        let total_power = U256::from(amount) * U256::from(cd_account.additional) / U256::from(DENOMINATOE);
+
+        let lock_sec = cd_account.end_sec - cd_account.begin_sec;
+        let passed_sec = to_sec(env::block_timestamp()) - cd_account.begin_sec;
+        assert!(lock_sec > passed_sec, "{}", ERR64_EXPIRED_CD_ACCOUNT);
+
+        let remain_sec = lock_sec - passed_sec;
+        let remain_power = (total_power * U256::from(remain_sec) / U256::from(lock_sec)).as_u128();
+
         cd_account.seed_amount += amount;
-        cd_account.seed_power += amount + residue_power;
+        cd_account.seed_power += amount + remain_power;
+
+        farmer.get_ref_mut().cd_accounts.replace(index, &cd_account);
+        self.data_mut().farmers.insert(&sender, &farmer);
+
+        remain_power
     }
 
     pub(crate) fn internal_remove_cd_account(&mut self, sender_id: &AccountId, index: u64) -> (SeedType, CDAccount, Balance)  {
@@ -92,14 +114,14 @@ impl Contract {
         self.data_mut().seeds.insert(seed_id, &farm_seed);
 
         let strategy = &self.data().cd_strategy;
-        let liquidated_damages = if env::block_timestamp() >= cd_account.end_sec {
+        let liquidated_damages = if to_sec(env::block_timestamp()) >= cd_account.end_sec {
             0_u128
         } else {
-            let total = U256::from(cd_account.seed_amount) * U256::from(strategy.damage) / U256::from(strategy.denominator);
-            let locking_time = cd_account.end_sec - cd_account.begin_sec;
-            let passing_time = env::block_timestamp() - cd_account.begin_sec;
-            let residue_time = locking_time - passing_time;
-            (total * U256::from(residue_time) / U256::from(locking_time)).as_u128()
+            let total = U256::from(cd_account.seed_amount) * U256::from(strategy.damage) / U256::from(DENOMINATOE);
+            let lock_sec = cd_account.end_sec - cd_account.begin_sec;
+            let passed_sec = to_sec(env::block_timestamp()) - cd_account.begin_sec;
+            let remain_time = lock_sec - passed_sec;
+            (total * U256::from(remain_time) / U256::from(lock_sec)).as_u128()
         };
         let withdraw_seed = cd_account.seed_amount - liquidated_damages;
         (farm_seed.get_ref().seed_type.clone(), cd_account.clone(), withdraw_seed)

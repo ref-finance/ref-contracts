@@ -22,42 +22,28 @@ impl Contract {
         farm_seed.get_ref_mut().min_deposit = min_deposit.into();
     }
 
-    pub fn modify_cd_strategy_lock_time(&mut self, index: usize, timestamp: Timestamp) {
+    pub fn modify_cd_strategy_item(&mut self, index: usize, lock_sec: u32, additional: u32) {
         self.assert_owner();
-        if timestamp == 0 {
-            assert!(self.data().cd_strategy.locking_time.len() > index, "{}", ERR62_INVALID_CD_STRATEGY_INDEX);
-            self.data_mut().cd_strategy.locking_time.remove(index);
-        } else {
-            if index >= self.data().cd_strategy.locking_time.len(){
-                self.data_mut().cd_strategy.locking_time.push(timestamp);
-            } else {
-                self.data_mut().cd_strategy.locking_time[index] = timestamp;
-            }
-        }
-    }
+        assert!(index < STRATEGY_LIMIT, "{}", ERR62_INVALID_CD_STRATEGY_INDEX);
 
-    pub fn modify_cd_strategy_additional(&mut self, index: usize, additional: u32) {
-        self.assert_owner();
-        if additional == 0 {
-            assert!(self.data().cd_strategy.additional.len() > index, "{}", ERR62_INVALID_CD_STRATEGY_INDEX);
-            self.data_mut().cd_strategy.additional.remove(index);
+        if lock_sec == 0 {
+            self.data_mut().cd_strategy.stake_strategy[index] = StakeStrategy{
+                lock_sec: 0,
+                additional: 0,
+                enable: false,
+            };
         } else {
-            if index >= self.data().cd_strategy.additional.len(){
-                self.data_mut().cd_strategy.additional.push(additional);
-            } else {
-                self.data_mut().cd_strategy.additional[index] = additional;
-            }
+            self.data_mut().cd_strategy.stake_strategy[index] = StakeStrategy{
+                lock_sec,
+                additional,
+                enable: true,
+            };
         }
     }
 
     pub fn modify_cd_strategy_damage(&mut self, damage: u32) {
         self.assert_owner();
         self.data_mut().cd_strategy.damage = damage;
-    }
-
-    pub fn modify_cd_strategy_denominator(&mut self, denominator: u32) {
-        self.assert_owner();
-        self.data_mut().cd_strategy.denominator = denominator;
     }
 
     /// Migration function between versions.

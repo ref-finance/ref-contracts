@@ -116,18 +116,16 @@ impl From<&Farm> for FarmInfo {
 #[serde(crate = "near_sdk::serde")]
 pub struct CDAccountInfo {
     pub seed_id: SeedId,
-    pub cd_strategy: usize,
     pub seed_amount: U128,
     pub seed_power: U128,
-    pub begin_sec: Timestamp,
-    pub end_sec: Timestamp
+    pub begin_sec: u32,
+    pub end_sec: u32
 }
 
 impl From<CDAccount> for CDAccountInfo {
     fn from(cd_account: CDAccount) -> Self {
         CDAccountInfo{
             seed_id: cd_account.seed_id.clone(),
-            cd_strategy: cd_account.cd_strategy,
             seed_amount: cd_account.seed_amount.into(),
             seed_power: cd_account.seed_power.into(),
             begin_sec: cd_account.begin_sec,
@@ -138,20 +136,29 @@ impl From<CDAccount> for CDAccountInfo {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(crate = "near_sdk::serde")]
+pub struct StakeStrategyInfo{
+     pub lock_sec: u32,
+     pub additional: u32,
+     pub enable: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[serde(crate = "near_sdk::serde")]
 pub struct CDStrategyInfo {
-    pub locking_time: Vec<Timestamp>,
-    pub additional: Vec<u32>,
+    pub stake_strategy: Vec<StakeStrategyInfo>,
     pub damage: u32,
-    pub denominator: u32,
 }
 
 impl From<&CDStrategy> for CDStrategyInfo {
     fn from(cd_strategy: &CDStrategy) -> Self {
         CDStrategyInfo{
-            locking_time: cd_strategy.locking_time.clone(),
-            additional: cd_strategy.additional.clone(),
+            stake_strategy: cd_strategy.stake_strategy.iter().map(|item|
+                StakeStrategyInfo{
+                    lock_sec: item.lock_sec,
+                    additional: item.additional,
+                    enable: item.enable,
+                }).collect(),
             damage: cd_strategy.damage,
-            denominator: cd_strategy.denominator,
         }
     }
 }

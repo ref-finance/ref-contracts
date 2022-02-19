@@ -13,6 +13,7 @@ use crate::farm::{Farm, FarmId};
 use crate::simple_farm::{RPS};
 use crate::farm_seed::{VersionedFarmSeed, SeedId};
 use crate::farmer::{VersionedFarmer, Farmer};
+use crate::utils::STRATEGY_LIMIT;
 
 // for simulator test
 pub use crate::simple_farm::HRSimpleFarmTerms;
@@ -53,14 +54,20 @@ pub enum StorageKeys {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
+pub struct StakeStrategy{
+    /// duration of seed lock.
+    pub lock_sec: u32,
+    /// gain additional numerator.
+    pub additional: u32,
+    pub enable: bool,
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub struct CDStrategy {
-    pub locking_time: Vec<Timestamp>,
-    /// gain additional numerator 
-    pub additional: Vec<u32>,
-    /// liquidated damages numerator.  
+    /// total of 32 different strategies are supported.
+    pub stake_strategy: Vec<StakeStrategy>,
+    /// liquidated damages numerator.
     pub damage: u32,
-    /// denominator for additional、damage
-    pub denominator: u32,
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -118,10 +125,12 @@ impl Contract {
                 outdated_farms: UnorderedMap::new(StorageKeys::OutdatedFarm),
                 reward_info: UnorderedMap::new(StorageKeys::RewardInfo),
                 cd_strategy: CDStrategy{
-                    locking_time: Vec::new(),
-                    additional: Vec::new(),
+                    stake_strategy: vec![StakeStrategy{
+                        lock_sec: 0,
+                        additional: 0,
+                        enable: false
+                    }; STRATEGY_LIMIT],
                     damage: 0,
-                    denominator: 0,
                 }
             }),
         }

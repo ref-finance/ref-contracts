@@ -14,10 +14,14 @@ use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 #[serde(crate = "near_sdk::serde")]
 #[serde(untagged)]
 enum TokenReceiverMessage {
-    CDAccount {
+    NewCDAccount {
         index: u64,
         seed_id: SeedId,
         cd_strategy: usize,
+    },
+    AppendCDAccount {
+        index: u64,
+        seed_id: SeedId,
     },
     Reward {
         farm_id: FarmId,
@@ -76,12 +80,11 @@ impl FungibleTokenReceiver for Contract {
             let message =
                 serde_json::from_str::<TokenReceiverMessage>(&msg).expect(ERR51_WRONG_MSG_FORMAT);
             match message {
-                TokenReceiverMessage::CDAccount {
+                TokenReceiverMessage::NewCDAccount {
                     index,
                     seed_id,
                     cd_strategy,
                 } => {
-                    // ****** create/append CD account ********
                     if let Some(seed_farm) = self.get_seed_wrapped(&seed_id) {
                         if amount < seed_farm.get_ref().min_deposit {
                             env::panic(
@@ -94,26 +97,7 @@ impl FungibleTokenReceiver for Contract {
                             )
                         }
 
-                        let mut seed_power = 0_u128;
-                        let mut farmer = self.get_farmer(&sender);
-                        let latest_index = farmer.get_ref().cd_accounts.len();
-                        assert!(latest_index < MAX_CDACCOUNT_NUM, "{}", ERR61_CDACCOUNT_NUM_HAS_REACHED_LIMIT);
-                        let is_create = index >= latest_index;
-
-                        if is_create {
-                            let cd_account = self.generate_cd_account(seed_id, cd_strategy, amount.into());
-                            farmer.get_ref_mut().cd_accounts.push(&cd_account);
-                            seed_power = cd_account.seed_power;
-                            // farming_amount = farmer.get_ref_mut().create_cd_account(seed_id, cd_strategy, amount.into(), &self.data().cd_strategy);
-                        } else {
-                            let mut cd_account = farmer.get_ref().cd_accounts.get(index).unwrap();
-                            self.append_cd_account(amount.into(), &mut cd_account);
-                            farmer.get_ref_mut().cd_accounts.replace(index, &cd_account);
-                            seed_power = cd_account.seed_power;
-                            // farming_amount = farmer.get_ref_mut().append_cd_account(index, seed_id, cd_strategy, amount.into(), &self.data().cd_strategy);
-                        }
-
-                        self.data_mut().farmers.insert(&sender, &farmer);
+                        let seed_power = self.generate_cd_account(&sender, seed_id, cd_strategy, amount.into());
 
                         self.internal_seed_deposit(
                             &env::predecessor_account_id(), 
@@ -126,10 +110,51 @@ impl FungibleTokenReceiver for Contract {
 
                         env::log(
                             format!(
-                                "{} {} CD account {} with amount {}. FT seed increase {}",
+                                "{} create CD account with seed amount {}, seed power {}",
                                 sender, 
-                                if is_create { "create" } else { "append" }, 
-                                if is_create { latest_index } else { index }, 
+                                amount,
+                                seed_power
+                            )
+                            .as_bytes(),
+                        );
+
+                        PromiseOrValue::Value(U128(0))
+                    }else{
+                        env::panic(format!("{}", ERR31_SEED_NOT_EXIST).as_bytes())
+                    }
+                },
+                TokenReceiverMessage::AppendCDAccount {
+                    index,
+                    seed_id,
+                } => {
+                    if let Some(seed_farm) = self.get_seed_wrapped(&seed_id) {
+                        if amount < seed_farm.get_ref().min_deposit {
+                            env::panic(
+                                format!(
+                                    "{} {}", 
+                                    ERR34_BELOW_MIN_SEED_DEPOSITED, 
+                                    seed_farm.get_ref().min_deposit
+                                )
+                                .as_bytes()
+                            )
+                        }
+
+                        let seed_power = self.append_cd_account(&sender, index, amount.into());
+
+                        self.internal_seed_deposit(
+                            &env::predecessor_account_id(), 
+                            &sender, 
+                            amount,
+                            seed_power, 
+                            SeedType::FT,
+                            true
+                        );
+
+                        env::log(
+                            format!(
+                                "{} append CD account {} with seed amount {}, seed power {}",
+                                sender, 
+                                index, 
                                 amount,
                                 seed_power
                             )
@@ -261,12 +286,11 @@ impl MFTTokenReceiver for Contract {
             let message =
                 serde_json::from_str::<TokenReceiverMessage>(&msg).expect(ERR51_WRONG_MSG_FORMAT);
             match message {
-                TokenReceiverMessage::CDAccount {
+                TokenReceiverMessage::NewCDAccount {
                     index,
                     seed_id,
                     cd_strategy,
                 } => {
-                    // ****** add/update CD account ********
                     let seed_farm = self.get_seed(&seed_id);
                     if amount < seed_farm.get_ref().min_deposit {
                         env::panic(
@@ -279,27 +303,8 @@ impl MFTTokenReceiver for Contract {
                         )
                     }
                     
-                    let mut seed_power = 0_u128;
-                    let mut farmer = self.get_farmer(&sender_id);
-                    let latest_index = farmer.get_ref().cd_accounts.len();
-                    assert!(latest_index < MAX_CDACCOUNT_NUM, "{}", ERR61_CDACCOUNT_NUM_HAS_REACHED_LIMIT);
-                    let is_create = index >= latest_index;
-
-                    if is_create {
-                        let cd_account = self.generate_cd_account(seed_id.clone(), cd_strategy, amount.into());
-                        farmer.get_ref_mut().cd_accounts.push(&cd_account);
-                        seed_power = cd_account.seed_power;
-                        // farming_amount = farmer.get_ref_mut().create_cd_account(seed_id, cd_strategy, amount.into(), &self.data().cd_strategy);
-                    } else {
-                        let mut cd_account = farmer.get_ref().cd_accounts.get(index).unwrap();
-                        self.append_cd_account(amount.into(), &mut cd_account);
-                        farmer.get_ref_mut().cd_accounts.replace(index, &cd_account);
-                        seed_power = cd_account.seed_power;
-                        // farming_amount = farmer.get_ref_mut().append_cd_account(index, seed_id, cd_strategy, amount.into(), &self.data().cd_strategy);
-                    }
-
-                    self.data_mut().farmers.insert(&sender_id, &farmer);
-
+                    let seed_power = self.generate_cd_account(&sender_id, seed_id.clone(), cd_strategy, amount.into());
+                    
                     self.internal_seed_deposit(
                         &seed_id, 
                         &sender_id, 
@@ -311,10 +316,48 @@ impl MFTTokenReceiver for Contract {
 
                     env::log(
                         format!(
-                            "{} {} CD account {} with amount {}. MFT seed increase {}",
+                            "{} create CD account with seed amount {}, seed power {}",
                             sender_id, 
-                            if is_create { "create" } else { "append" }, 
-                            if is_create { latest_index } else { index }, 
+                            amount,
+                            seed_power
+                        )
+                        .as_bytes(),
+                    );
+
+                    PromiseOrValue::Value(U128(0))
+                },
+                TokenReceiverMessage::AppendCDAccount {
+                    index,
+                    seed_id,
+                } => {
+                    let seed_farm = self.get_seed(&seed_id);
+                    if amount < seed_farm.get_ref().min_deposit {
+                        env::panic(
+                            format!(
+                                "{} {}", 
+                                ERR34_BELOW_MIN_SEED_DEPOSITED, 
+                                seed_farm.get_ref().min_deposit
+                            )
+                            .as_bytes()
+                        )
+                    }
+                    
+                    let seed_power = self.append_cd_account(&sender_id, index, amount.into());
+                    
+                    self.internal_seed_deposit(
+                        &seed_id, 
+                        &sender_id, 
+                        amount, 
+                        seed_power, 
+                        SeedType::MFT,
+                        true
+                    );
+
+                    env::log(
+                        format!(
+                            "{} append CD account {} with seed amount {}, seed power {}",
+                            sender_id, 
+                            index,
                             amount,
                             seed_power
                         )
