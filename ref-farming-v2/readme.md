@@ -433,28 +433,13 @@ pub(crate) fn distribute(&mut self, total_seeds: &Balance)
 ```
 to calculate and update the farm.
 
+### User Register
+This contract obeys NEP-145 to manage storage, but choose a fixed storage fee policy in this contract. Each user only needs deposit to lock a fixed 0.1 NEAR as storage cost.
 
+Detailed interface description could be found at [NEP-145](https://nomicon.io/Standards/StorageManagement.html).
 
-# Things need to explain
-## Storage fee in this contract
-As each farmer would have a place to record his rps in each farm he involved, the storage belongs to a farmer may increase out of his notice.  
+Here we only list some common-use interfaces:
 
-For example, when a new farm established and running, which accepts the farmer's seed that has been staked in the contract, then at the following action such as claim_reward, or deposit/withdraw seeds invoked by the farmer, his storage would expand to record the new rps related to that farm.  
-
-Consider that, and also to improve farmer's user-experience, we have a `suggested_min_storage_usage()` which covers 5 seed, 5 reward and 10 farms as one shot. When farmer register for the first time, we will force him to deposit more or equal to that amount, which is about 1,688 bytes, 0.0134 near. 
-```rust
-const MAX_ACCOUNT_LENGTH: u128 = 64;
-const MIN_FARMER_LENGTH: u128 = MAX_ACCOUNT_LENGTH + 16 + 4 * 3;
-/// Returns minimal storage usage possible.
-/// 5 reward tokens, 5 seed tokens, 10 farms as assumption.
-pub(crate) fn suggested_min_storage_usage() -> Balance {
-    (
-        MIN_FARMER_LENGTH 
-        + 2_u128 * 5_u128 * (MAX_ACCOUNT_LENGTH + 16)
-        + 10_u128 * (MAX_ACCOUNT_LENGTH + 32)
-    ) * env::storage_byte_cost()
-}
-```
-And when a farmer owes storage fee, then before he storage_deposit more fee,  
-all changeable method would fail with ERR11_INSUFFICIENT_STORAGE.
-
+* `storage_deposit`, to register a user,
+* `storage_unregister`, to unregister caller self and get 0.1 NEAR back,
+* `storage_balance_of`, to get given user storage balance.
