@@ -20,6 +20,7 @@ pub struct SeedInfo {
     pub farms: Vec<FarmId>,
     pub next_index: u32,
     pub amount: U128,
+    pub power: U128,
     pub min_deposit: U128,
 }
 

@@ -143,6 +143,7 @@ pub struct SeedInfo {
     pub farms: Vec<FarmId>,
     pub next_index: u32,
     pub amount: U128,
+    pub power: U128,
     pub min_deposit: U128,
 }
 
@@ -158,6 +159,7 @@ impl From<&FarmSeed> for SeedInfo {
             seed_type,
             next_index: fs.next_index,
             amount: fs.total_seed_amount.into(),
+            power: fs.total_seed_power.into(),
             min_deposit: fs.min_deposit.into(),
             farms: fs.farms.iter().map(|key| key.clone()).collect(),
         }
