@@ -110,7 +110,7 @@ pub struct UserSeedInfo {
     pub seed_id: SeedId,
     pub amount: U128,
     pub power: U128,
-    pub farms: Vec<CDAccountInfo>
+    pub cds: Vec<CDAccountInfo>
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -371,9 +371,15 @@ impl Contract {
         if let Some(farmer) = self.get_farmer_wrapped(account_id.as_ref()){
             Some(UserSeedInfo{
                 seed_id: seed_id.clone(),
-                amount: farmer.get_ref().seed_amounts.get(&seed_id).map_or(U128(0), |&v| U128(v)),
+                amount: farmer.get_ref().seed_amounts.get(&seed_id).map_or(U128(0), |&v| {
+                    let mut cd_amount_total = 0;
+                    for f in farmer.get_ref().cd_accounts.iter(){
+                        cd_amount_total += f.seed_amount;
+                    }
+                    U128(v + cd_amount_total)
+                }),
                 power: farmer.get_ref().seed_powers.get(&seed_id).map_or(U128(0), |&v| U128(v)),
-                farms: farmer.get_ref().cd_accounts.iter().map(|cd_account| {
+                cds: farmer.get_ref().cd_accounts.iter().map(|cd_account| {
                     cd_account.into()
                 }).collect()
             })
@@ -392,9 +398,15 @@ impl Contract {
                     seed_id.clone(),
                     UserSeedInfo{
                         seed_id: seed_id.clone(),
-                        amount: farmer.get_ref().seed_amounts.get(&seed_id).map_or(U128(0), |&v| U128(v)),
+                        amount: farmer.get_ref().seed_amounts.get(&seed_id).map_or(U128(0), |&v| {
+                            let mut cd_amount_total = 0;
+                            for f in farmer.get_ref().cd_accounts.iter(){
+                                cd_amount_total += f.seed_amount;
+                            }
+                            U128(v + cd_amount_total)
+                        }),
                         power: farmer.get_ref().seed_powers.get(&seed_id).map_or(U128(0), |&v| U128(v)),
-                        farms: farmer.get_ref().cd_accounts.iter().map(|cd_account| {
+                        cds: farmer.get_ref().cd_accounts.iter().map(|cd_account| {
                             cd_account.into()
                         }).collect()
                     },

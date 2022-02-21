@@ -742,7 +742,7 @@ fn cd_account_invalid_id_and_limit(){
         );
         out_come.assert_success();
         let user_seed_info = view!(farming.get_user_seed_info(farmer.valid_account_id(), seed_id.clone())).unwrap_json::<UserSeedInfo>();
-        assert!(user_seed_info.farms.len() == (index + 1) as usize);
+        assert!(user_seed_info.cds.len() == (index + 1) as usize);
     }
     
     let out_come = call!(
@@ -821,8 +821,8 @@ fn cd_account_remove(){
     .0, to_yocto("0.99"));
 
     let user_seed_info = view!(farming.get_user_seed_info(farmer.valid_account_id(), seed_id.clone())).unwrap_json::<UserSeedInfo>();
-    assert_eq!(user_seed_info.farms[0].seed_amount.0, to_yocto("0.01"));
-    assert_eq!(user_seed_info.farms[0].seed_power.0, to_yocto("0.02"));
+    assert_eq!(user_seed_info.cds[0].seed_amount.0, to_yocto("0.01"));
+    assert_eq!(user_seed_info.cds[0].seed_power.0, to_yocto("0.02"));
     root.borrow_runtime_mut().cur_block.block_timestamp = current_timestamp + to_nano(1000);
     let out_come = call!(
         farmer,
@@ -848,8 +848,8 @@ fn cd_account_remove(){
     .0, to_yocto("0"));
 
     let user_seed_info = view!(farming.get_user_seed_info(farmer.valid_account_id(), seed_id.clone())).unwrap_json::<UserSeedInfo>();
-    assert_eq!(user_seed_info.farms[0].seed_amount.0, to_yocto("1"));
-    assert_eq!(user_seed_info.farms[0].seed_power.0, to_yocto("2"));
+    assert_eq!(user_seed_info.cds[0].seed_amount.0, to_yocto("1"));
+    assert_eq!(user_seed_info.cds[0].seed_power.0, to_yocto("2"));
     root.borrow_runtime_mut().cur_block.block_timestamp = current_timestamp + to_nano(500);
     let out_come = call!(
         farmer,
@@ -931,8 +931,8 @@ fn cd_account_append(){
     .0, to_yocto("0.99"));
 
     let user_seed_info = view!(farming.get_user_seed_info(farmer.valid_account_id(), seed_id.clone())).unwrap_json::<UserSeedInfo>();
-    assert_eq!(user_seed_info.farms[0].seed_amount.0, to_yocto("0.01"));
-    assert_eq!(user_seed_info.farms[0].seed_power.0, to_yocto("0.02"));
+    assert_eq!(user_seed_info.cds[0].seed_amount.0, to_yocto("0.01"));
+    assert_eq!(user_seed_info.cds[0].seed_power.0, to_yocto("0.02"));
     let out_come = call!(
         farmer,
         pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, append_cd_account_msg(0, seed_id.clone())),
@@ -940,9 +940,9 @@ fn cd_account_append(){
     );
     out_come.assert_success();
     let user_seed_info = view!(farming.get_user_seed_info(farmer.valid_account_id(), seed_id.clone())).unwrap_json::<UserSeedInfo>();
-    assert_eq!(user_seed_info.farms[0].seed_amount.0, to_yocto("0.02"));
-    assert!(user_seed_info.farms[0].seed_power.0 < to_yocto("0.04"));
-    assert!(user_seed_info.farms[0].seed_power.0 > to_yocto("0.039"));
+    assert_eq!(user_seed_info.cds[0].seed_amount.0, to_yocto("0.02"));
+    assert!(user_seed_info.cds[0].seed_power.0 < to_yocto("0.04"));
+    assert!(user_seed_info.cds[0].seed_power.0 > to_yocto("0.039"));
 
     root.borrow_runtime_mut().cur_block.block_timestamp = current_timestamp + to_nano(500);
 
@@ -954,10 +954,10 @@ fn cd_account_append(){
     out_come.assert_success();
     let user_seed_info = view!(farming.get_user_seed_info(farmer.valid_account_id(), seed_id.clone())).unwrap_json::<UserSeedInfo>();
 
-    assert_eq!(user_seed_info.farms[0].seed_amount.0, to_yocto("0.03"));
-    println!("{}", user_seed_info.farms[0].seed_power.0);
-    assert!(user_seed_info.farms[0].seed_power.0 < to_yocto("0.055"));
-    assert!(user_seed_info.farms[0].seed_power.0 > to_yocto("0.054"));
+    assert_eq!(user_seed_info.cds[0].seed_amount.0, to_yocto("0.03"));
+    println!("{}", user_seed_info.cds[0].seed_power.0);
+    assert!(user_seed_info.cds[0].seed_power.0 < to_yocto("0.055"));
+    assert!(user_seed_info.cds[0].seed_power.0 > to_yocto("0.054"));
 
     root.borrow_runtime_mut().cur_block.block_timestamp = current_timestamp + to_nano(1000);
     let out_come = call!(

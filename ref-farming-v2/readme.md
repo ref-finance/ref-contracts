@@ -72,7 +72,7 @@ pub struct UserSeedInfo {
     pub seed_id: SeedId,
     pub amount: U128,
     pub power: U128,
-    pub farms: Vec<CDAccountInfo>
+    pub cds: Vec<CDAccountInfo>
 }
 
 /// used to create a farm
