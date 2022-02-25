@@ -14,7 +14,7 @@ docker create \
      --mount type=bind,source=$DIR/..,target=/host \
      --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
      --name=$NAME \
-     -w /host/ref-farming \
+     -w /host/ref-farming-v2 \
      -e RUSTFLAGS='-C link-arg=-s' \
      -it \
      nearprotocol/contract-builder \
@@ -25,5 +25,5 @@ docker start $NAME
 docker exec -it $NAME /bin/bash -c "rustup toolchain install stable-2021-11-01; rustup default stable-2021-11-01; rustup target add wasm32-unknown-unknown; cargo build --target wasm32-unknown-unknown --release"
 
 mkdir -p res
-cp $DIR/../target/wasm32-unknown-unknown/release/ref_farming.wasm $DIR/../res/ref_farming_release.wasm
+cp $DIR/../target/wasm32-unknown-unknown/release/ref_farming.wasm $DIR/../res/ref_farming_v2_release.wasm
 
