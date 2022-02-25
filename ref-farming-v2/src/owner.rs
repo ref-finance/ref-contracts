@@ -22,20 +22,20 @@ impl Contract {
         farm_seed.get_ref_mut().min_deposit = min_deposit.into();
     }
 
-    pub fn modify_cd_strategy_item(&mut self, index: usize, lock_sec: u32, additional: u32) {
+    pub fn modify_cd_strategy_item(&mut self, index: usize, lock_sec: u32, power_reward_rate: u32) {
         self.assert_owner();
         assert!(index < STRATEGY_LIMIT, "{}", ERR62_INVALID_CD_STRATEGY_INDEX);
 
         if lock_sec == 0 {
-            self.data_mut().cd_strategy.stake_strategy[index] = StakeStrategy{
+            self.data_mut().cd_strategy.stake_strategy[index] = CDStakeItem{
                 lock_sec: 0,
-                additional: 0,
+                power_reward_rate: 0,
                 enable: false,
             };
         } else {
-            self.data_mut().cd_strategy.stake_strategy[index] = StakeStrategy{
+            self.data_mut().cd_strategy.stake_strategy[index] = CDStakeItem{
                 lock_sec,
-                additional,
+                power_reward_rate,
                 enable: true,
             };
         }
@@ -43,7 +43,7 @@ impl Contract {
 
     pub fn modify_cd_strategy_damage(&mut self, damage: u32) {
         self.assert_owner();
-        self.data_mut().cd_strategy.damage = damage;
+        self.data_mut().cd_strategy.seed_slash_rate = damage;
     }
 
     /// Migration function between versions.

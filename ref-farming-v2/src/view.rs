@@ -137,29 +137,29 @@ impl From<CDAccount> for CDAccountInfo {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(crate = "near_sdk::serde")]
-pub struct StakeStrategyInfo{
-     pub lock_sec: u32,
-     pub additional: u32,
-     pub enable: bool,
+pub struct CDStakeItemInfo{
+    pub enable: bool,
+    pub lock_sec: u32,
+    pub power_reward_rate: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct CDStrategyInfo {
-    pub stake_strategy: Vec<StakeStrategyInfo>,
-    pub damage: u32,
+    pub stake_strategy: Vec<CDStakeItemInfo>,
+    pub seed_slash_rate: u32,
 }
 
 impl From<&CDStrategy> for CDStrategyInfo {
     fn from(cd_strategy: &CDStrategy) -> Self {
         CDStrategyInfo{
             stake_strategy: cd_strategy.stake_strategy.iter().map(|item|
-                StakeStrategyInfo{
+                CDStakeItemInfo {
                     lock_sec: item.lock_sec,
-                    additional: item.additional,
+                    power_reward_rate: item.power_reward_rate,
                     enable: item.enable,
                 }).collect(),
-            damage: cd_strategy.damage,
+            seed_slash_rate: cd_strategy.seed_slash_rate,
         }
     }
 }

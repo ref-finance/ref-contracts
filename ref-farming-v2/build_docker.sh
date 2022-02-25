@@ -5,7 +5,7 @@ set -e
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
-NAME="build_ref_farming"
+NAME="build_v2_ref_farming"
 
 if docker ps -a --format '{{.Names}}' | grep -Eq "^${NAME}\$"; then
     echo "Container exists"

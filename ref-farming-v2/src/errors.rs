@@ -34,6 +34,9 @@ pub const ERR61_CDACCOUNT_NUM_HAS_REACHED_LIMIT: &str = "E61: the number of CDAc
 pub const ERR62_INVALID_CD_STRATEGY_INDEX: &str = "E62: invalid CDStrategy index";
 pub const ERR63_INVALID_CD_ACCOUNT_INDEX: &str = "E63: invalid CDAccount index";
 pub const ERR64_EXPIRED_CD_ACCOUNT: &str = "E64: expired CDAccount";
-
+pub const ERR65_NON_EMPTY_CD_ACCOUNT: &str = "E65: Non-empty CDAccount";
+pub const ERR66_EMPTY_CD_ACCOUNT: &str = "E66: Empty CDAccount";
+pub const ERR67_UNMATCHED_SEED_ID: &str = "E67: Unmatched SeedId";
+pub const ERR68_INVALID_CD_STRATEGY: &str = "E68: Invalid CD Strategy";
 
 pub const ERR500: &str = "E500: Internal ERROR!";

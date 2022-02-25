@@ -55,20 +55,21 @@ pub enum StorageKeys {
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
-pub struct StakeStrategy{
-    /// duration of seed lock.
-    pub lock_sec: u32,
-    /// gain additional numerator.
-    pub additional: u32,
+pub struct CDStakeItem{
     pub enable: bool,
+    /// minimum duration of seed lock in secs.
+    pub lock_sec: u32,
+    /// power reward multiple rate numerator.
+    pub power_reward_rate: u32,
+    
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub struct CDStrategy {
-    /// total of 32 different strategies are supported.
-    pub stake_strategy: Vec<StakeStrategy>,
-    /// liquidated damages numerator.
-    pub damage: u32,
+    /// total of STRATEGY_LIMIT different strategies are supported.
+    pub stake_strategy: Vec<CDStakeItem>,
+    /// seed slash rate numerator.
+    pub seed_slash_rate: u32,
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -126,12 +127,12 @@ impl Contract {
                 outdated_farms: UnorderedMap::new(StorageKeys::OutdatedFarm),
                 reward_info: UnorderedMap::new(StorageKeys::RewardInfo),
                 cd_strategy: CDStrategy{
-                    stake_strategy: vec![StakeStrategy{
+                    stake_strategy: vec![CDStakeItem{
                         lock_sec: 0,
-                        additional: 0,
+                        power_reward_rate: 0,
                         enable: false
                     }; STRATEGY_LIMIT],
-                    damage: 0,
+                    seed_slash_rate: 0,
                 }
             }),
         }
