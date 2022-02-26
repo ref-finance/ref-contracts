@@ -139,7 +139,7 @@ impl FungibleTokenReceiver for Contract {
                             )
                         }
 
-                        let seed_power = self.append_cd_account(&sender, index, amount.into());
+                        let seed_power = self.append_cd_account(&sender, seed_id, index, amount.into());
 
                         self.internal_seed_deposit(
                             &env::predecessor_account_id(), 
@@ -342,7 +342,7 @@ impl MFTTokenReceiver for Contract {
                         )
                     }
                     
-                    let seed_power = self.append_cd_account(&sender_id, index, amount.into());
+                    let seed_power = self.append_cd_account(&sender_id, seed_id.clone(), index, amount.into());
                     
                     self.internal_seed_deposit(
                         &seed_id, 
