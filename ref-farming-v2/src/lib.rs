@@ -4,16 +4,17 @@
 * lib.rs is the main entry point.
 */
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::{ValidAccountId};
+use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::collections::{LookupMap, UnorderedMap};
-use near_sdk::{env, near_bindgen, Balance, AccountId, PanicOnDefault};
+use near_sdk::{env, near_bindgen, Balance, AccountId, PanicOnDefault, PromiseResult};
 use near_sdk::BorshStorageKey;
 
 use crate::farm::{Farm, FarmId};
 use crate::simple_farm::{RPS};
 use crate::farm_seed::{VersionedFarmSeed, SeedId};
 use crate::farmer::{VersionedFarmer, Farmer};
-use crate::utils::STRATEGY_LIMIT;
+use crate::utils::{STRATEGY_LIMIT, DENOM};
+use crate::errors::{ERR32_NOT_ENOUGH_SEED, ERR25_CALLBACK_POST_WITHDRAW_INVALID};
 
 // for simulator test
 pub use crate::simple_farm::HRSimpleFarmTerms;
@@ -33,7 +34,7 @@ mod simple_farm;
 mod storage_impl;
 
 mod actions_of_farm;
-mod actions_of_farmer;
+// mod actions_of_farmer;
 mod actions_of_seed;
 mod actions_of_reward;
 mod view;
@@ -52,23 +53,26 @@ pub enum StorageKeys {
     RewardInfo,
     UserRps { account_id: AccountId },
     CDAccount { account_id: AccountId },
+    SeedSlashed,
+    SeedLostfound,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
-pub struct StakeStrategy{
-    /// duration of seed lock.
-    pub lock_sec: u32,
-    /// gain additional numerator.
-    pub additional: u32,
+pub struct CDStakeItem{
     pub enable: bool,
+    /// minimum duration of seed lock in secs.
+    pub lock_sec: u32,
+    /// power reward multiple rate numerator.
+    pub power_reward_rate: u32,
+    
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub struct CDStrategy {
-    /// total of 32 different strategies are supported.
-    pub stake_strategy: Vec<StakeStrategy>,
-    /// liquidated damages numerator.
-    pub damage: u32,
+    /// total of STRATEGY_LIMIT different strategies are supported.
+    pub stake_strategy: Vec<CDStakeItem>,
+    /// seed slash rate numerator.
+    pub seed_slash_rate: u32,
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -80,6 +84,12 @@ pub struct ContractData {
     // record seeds and the farms under it.
     // seeds: UnorderedMap<SeedId, FarmSeed>,
     seeds: UnorderedMap<SeedId, VersionedFarmSeed>,
+
+    // all slashed seed would recorded in here
+    seeds_slashed: UnorderedMap<SeedId, Balance>,
+
+    // if unstake seed encounter error, the seed would go to here
+    seeds_lostfound: UnorderedMap<SeedId, Balance>,
 
     // each farmer has a structure to describe
     // farmers: LookupMap<AccountId, Farmer>,
@@ -121,19 +131,129 @@ impl Contract {
                 owner_id: owner_id.into(),
                 farmer_count: 0,
                 seeds: UnorderedMap::new(StorageKeys::Seed),
+                seeds_slashed: UnorderedMap::new(StorageKeys::SeedSlashed),
+                seeds_lostfound: UnorderedMap::new(StorageKeys::SeedLostfound),
                 farmers: LookupMap::new(StorageKeys::Farmer),
                 farms: UnorderedMap::new(StorageKeys::Farm),
                 outdated_farms: UnorderedMap::new(StorageKeys::OutdatedFarm),
                 reward_info: UnorderedMap::new(StorageKeys::RewardInfo),
                 cd_strategy: CDStrategy{
-                    stake_strategy: vec![StakeStrategy{
+                    stake_strategy: vec![CDStakeItem{
                         lock_sec: 0,
-                        additional: 0,
+                        power_reward_rate: 0,
                         enable: false
                     }; STRATEGY_LIMIT],
-                    damage: 0,
+                    seed_slash_rate: 0,
                 }
             }),
+        }
+    }
+
+    /// if withdraw seed encounter async error, it would go to seeds_lostfound
+    #[private]
+    pub fn callback_withdraw_seed(&mut self, seed_id: SeedId, sender_id: AccountId, amount: U128) {
+        assert_eq!(
+            env::promise_results_count(),
+            1,
+            "{}",
+            ERR25_CALLBACK_POST_WITHDRAW_INVALID
+        );
+        let amount: Balance = amount.into();
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Failed => {
+                env::log(
+                    format!(
+                        "{} withdraw {} seed with amount {}, Failed.",
+                        sender_id, seed_id, amount,
+                    )
+                    .as_bytes(),
+                );
+                // all seed amount go to lostfound
+                let seed_amount = self.data().seeds_lostfound.get(&seed_id).unwrap_or(0);
+                self.data_mut().seeds_lostfound.insert(&seed_id, &(seed_amount + amount));
+            },
+            PromiseResult::Successful(_) => {
+                env::log(
+                    format!(
+                        "{} withdraw {} seed with amount {}, Succeed.",
+                        sender_id, seed_id, amount,
+                    )
+                    .as_bytes(),
+                );
+            }
+        }
+    }
+
+    /// if withdraw seed lostfound encounter async error, it would go to seeds_lostfound
+    #[private]
+    pub fn callback_withdraw_seed_lostfound(&mut self, seed_id: SeedId, sender_id: AccountId, amount: U128) {
+        assert_eq!(
+            env::promise_results_count(),
+            1,
+            "{}",
+            ERR25_CALLBACK_POST_WITHDRAW_INVALID
+        );
+        let amount: Balance = amount.into();
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Failed => {
+                env::log(
+                    format!(
+                        "Owner help {} to withdraw {} seed from lostfound with amount {}, Failed.",
+                        sender_id, seed_id, amount,
+                    )
+                    .as_bytes(),
+                );
+                // all seed amount go to lostfound
+                let seed_amount = self.data().seeds_lostfound.get(&seed_id).unwrap_or(0);
+                self.data_mut().seeds_lostfound.insert(&seed_id, &(seed_amount + amount));
+            },
+            PromiseResult::Successful(_) => {
+                env::log(
+                    format!(
+                        "Owner help {} withdraw {} seed from lostfound with amount {}, Succeed.",
+                        sender_id, seed_id, amount,
+                    )
+                    .as_bytes(),
+                );
+            }
+        }
+    }
+
+    /// if withdraw seed slashed encounter async error, it would go back to seeds_slashed
+    #[private]
+    pub fn callback_withdraw_seed_slashed(&mut self, seed_id: SeedId, amount: U128) {
+        assert_eq!(
+            env::promise_results_count(),
+            1,
+            "{}",
+            ERR25_CALLBACK_POST_WITHDRAW_INVALID
+        );
+        let amount: Balance = amount.into();
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Failed => {
+                env::log(
+                    format!(
+                        "Owner withdraw {} seed slashed with amount {}, Failed.",
+                        seed_id, amount,
+                    )
+                    .as_bytes(),
+                );
+                // all seed amount go back to seed slashed
+                let seed_amount = self.data().seeds_slashed.get(&seed_id).unwrap_or(0);
+                self.data_mut().seeds_slashed.insert(&seed_id, &(seed_amount + amount));
+            },
+            PromiseResult::Successful(_) => {
+                env::log(
+                    format!(
+                        "Owner withdraw {} seed with amount {}, Succeed.",
+                        seed_id, amount,
+                    )
+                    .as_bytes(),
+                );
+            }
         }
     }
 }

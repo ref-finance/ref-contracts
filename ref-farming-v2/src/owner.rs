@@ -1,6 +1,11 @@
 use crate::*;
 use crate::errors::*;
-
+use crate::utils::{
+    assert_one_yocto, ext_fungible_token, ext_multi_fungible_token, ext_self, parse_seed_id,
+    wrap_mft_token_id, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_WITHDRAW_SEED,
+};
+use std::convert::TryInto;
+use near_sdk::Promise;
 use near_sdk::json_types::U128;
 
 #[near_bindgen]
@@ -20,30 +25,135 @@ impl Contract {
         self.assert_owner();
         let mut farm_seed = self.get_seed(&seed_id);
         farm_seed.get_ref_mut().min_deposit = min_deposit.into();
+        self.data_mut().seeds.insert(&seed_id, &farm_seed);
     }
 
-    pub fn modify_cd_strategy_item(&mut self, index: usize, lock_sec: u32, additional: u32) {
+    pub fn modify_seed_slash_rate(&mut self, seed_id: String, slash_rate: u32) {
+        self.assert_owner();
+        assert!(slash_rate as u128 <= DENOM, "INVALID_SLASH_RATE");
+        let mut farm_seed = self.get_seed(&seed_id);
+        farm_seed.get_ref_mut().slash_rate = slash_rate;
+        self.data_mut().seeds.insert(&seed_id, &farm_seed);
+    }
+
+    pub fn modify_cd_strategy_item(&mut self, index: usize, lock_sec: u32, power_reward_rate: u32) {
         self.assert_owner();
         assert!(index < STRATEGY_LIMIT, "{}", ERR62_INVALID_CD_STRATEGY_INDEX);
 
         if lock_sec == 0 {
-            self.data_mut().cd_strategy.stake_strategy[index] = StakeStrategy{
+            self.data_mut().cd_strategy.stake_strategy[index] = CDStakeItem{
                 lock_sec: 0,
-                additional: 0,
+                power_reward_rate: 0,
                 enable: false,
             };
         } else {
-            self.data_mut().cd_strategy.stake_strategy[index] = StakeStrategy{
+            self.data_mut().cd_strategy.stake_strategy[index] = CDStakeItem{
                 lock_sec,
-                additional,
+                power_reward_rate,
                 enable: true,
             };
         }
     }
 
-    pub fn modify_cd_strategy_damage(&mut self, damage: u32) {
+    pub fn modify_default_seed_slash_rate(&mut self, slash_rate: u32) {
         self.assert_owner();
-        self.data_mut().cd_strategy.damage = damage;
+        self.data_mut().cd_strategy.seed_slash_rate = slash_rate;
+    }
+
+    /// Owner retrieve those slashed seed
+    pub fn withdraw_seed_slashed(&mut self, seed_id: SeedId) -> Promise {
+        assert_one_yocto();
+        self.assert_owner();
+        let sender_id = self.data().owner_id.clone();
+        // update inner state
+        let amount = self.data_mut().seeds_slashed.remove(&seed_id).unwrap();
+        assert!(amount > 0, "{}", ERR32_NOT_ENOUGH_SEED);
+
+        let (receiver_id, token_id) = parse_seed_id(&seed_id);
+        if receiver_id == token_id {
+            ext_fungible_token::ft_transfer(
+                sender_id.clone().try_into().unwrap(),
+                amount.into(),
+                None,
+                &seed_id,
+                1, // one yocto near
+                GAS_FOR_FT_TRANSFER,
+            )
+            .then(ext_self::callback_withdraw_seed_slashed(
+                seed_id.clone(),
+                amount.into(),
+                &env::current_account_id(),
+                0,
+                GAS_FOR_RESOLVE_WITHDRAW_SEED,
+            ))
+        } else {
+            ext_multi_fungible_token::mft_transfer(
+                wrap_mft_token_id(&token_id),
+                sender_id.clone().try_into().unwrap(),
+                amount.into(),
+                None,
+                &receiver_id,
+                1, // one yocto near
+                GAS_FOR_FT_TRANSFER,
+            )
+            .then(ext_self::callback_withdraw_seed_slashed(
+                seed_id.clone(),
+                amount.into(),
+                &env::current_account_id(),
+                0,
+                GAS_FOR_RESOLVE_WITHDRAW_SEED,
+            ))
+        }
+    }
+
+    /// owner help to return those who lost seed when withdraw,
+    /// It's owner's responsibility to verify amount and seed id before calling
+    pub fn return_seed_lostfound(&mut self, sender_id: ValidAccountId, seed_id: SeedId, amount: Balance) -> Promise {
+        assert_one_yocto();
+        self.assert_owner();
+        let sender_id: AccountId = sender_id.into();
+        // update inner state
+        let max_amount = self.data().seeds_lostfound.get(&seed_id).unwrap();
+        assert!(amount <= max_amount, "{}", ERR32_NOT_ENOUGH_SEED);
+        self.data_mut().seeds_lostfound.insert(&seed_id, &(max_amount - amount));
+
+        let (receiver_id, token_id) = parse_seed_id(&seed_id);
+        if receiver_id == token_id {
+            ext_fungible_token::ft_transfer(
+                sender_id.clone().try_into().unwrap(),
+                amount.into(),
+                None,
+                &seed_id,
+                1, // one yocto near
+                GAS_FOR_FT_TRANSFER,
+            )
+            .then(ext_self::callback_withdraw_seed_lostfound(
+                seed_id.clone(),
+                sender_id.clone(),
+                amount.into(),
+                &env::current_account_id(),
+                0,
+                GAS_FOR_RESOLVE_WITHDRAW_SEED,
+            ))
+        } else {
+            ext_multi_fungible_token::mft_transfer(
+                wrap_mft_token_id(&token_id),
+                sender_id.clone().try_into().unwrap(),
+                amount.into(),
+                None,
+                &receiver_id,
+                1, // one yocto near
+                GAS_FOR_FT_TRANSFER,
+            )
+            .then(ext_self::callback_withdraw_seed_lostfound(
+                seed_id.clone(),
+                sender_id.clone(),
+                amount.into(),
+                &env::current_account_id(),
+                0,
+                GAS_FOR_RESOLVE_WITHDRAW_SEED,
+            ))
+        }
     }
 
     /// Migration function between versions.

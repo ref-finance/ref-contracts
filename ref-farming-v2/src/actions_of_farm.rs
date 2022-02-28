@@ -41,7 +41,7 @@ impl Contract {
                 .as_bytes(),
             );
         } else {
-            farm_seed = VersionedFarmSeed::new(&terms.seed_id, min_deposit);
+            farm_seed = VersionedFarmSeed::new(&terms.seed_id, min_deposit, self.data().cd_strategy.seed_slash_rate);
             env::log(
                 format!(
                     "The first farm created In seed {}, with min_deposit {}",

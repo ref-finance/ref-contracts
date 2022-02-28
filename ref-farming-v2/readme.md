@@ -45,16 +45,16 @@ pub struct FarmInfo {
 }
 
 /// CDAccount stake strategy info
-pub struct StakeStrategyInfo{
-     pub lock_sec: u32,
-     pub additional: u32,
-     pub enable: bool,
+pub struct CDStakeItemInfo{
+    pub enable: bool,
+    pub lock_sec: u32,
+    pub power_reward_rate: u32,
 }
 
 /// CDAccount strategy info
 pub struct CDStrategyInfo {
-    pub stake_strategy: Vec<StakeStrategyInfo>,
-    pub damage: u32,
+    pub stake_strategy: Vec<CDStakeItemInfo>,
+    pub seed_slash_rate: u32,
 }
 
 

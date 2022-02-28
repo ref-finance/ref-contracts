@@ -38,10 +38,12 @@ pub struct FarmSeed {
     pub total_seed_amount: Balance,
     pub total_seed_power: Balance,
     pub min_deposit: Balance,
+    /// the CD Account slash rate for this seed
+    pub slash_rate: u32,
 }
 
 impl FarmSeed {
-    pub fn new(seed_id: &SeedId, min_deposit: Balance) -> Self {
+    pub fn new(seed_id: &SeedId, min_deposit: Balance, default_slash_rate: u32) -> Self {
         let (token_id, token_index) = parse_seed_id(seed_id);
         let seed_type: SeedType;
         if token_id == token_index {
@@ -57,6 +59,7 @@ impl FarmSeed {
             total_seed_amount: 0,
             total_seed_power: 0,
             min_deposit,
+            slash_rate: default_slash_rate,
         }
     }
 
@@ -95,8 +98,8 @@ pub enum VersionedFarmSeed {
 
 impl VersionedFarmSeed {
 
-    pub fn new(seed_id: &SeedId, min_deposit: Balance) -> Self {
-        VersionedFarmSeed::V101(FarmSeed::new(seed_id, min_deposit))
+    pub fn new(seed_id: &SeedId, min_deposit: Balance, default_slash_rate: u32) -> Self {
+        VersionedFarmSeed::V101(FarmSeed::new(seed_id, min_deposit, default_slash_rate))
     }
 
     /// Upgrades from other versions to the currently used version.
@@ -145,6 +148,7 @@ pub struct SeedInfo {
     pub amount: U128,
     pub power: U128,
     pub min_deposit: U128,
+    pub slash_rate: u32,
 }
 
 impl From<&FarmSeed> for SeedInfo {
@@ -161,6 +165,7 @@ impl From<&FarmSeed> for SeedInfo {
             amount: fs.total_seed_amount.into(),
             power: fs.total_seed_power.into(),
             min_deposit: fs.min_deposit.into(),
+            slash_rate: fs.slash_rate,
             farms: fs.farms.iter().map(|key| key.clone()).collect(),
         }
     }
