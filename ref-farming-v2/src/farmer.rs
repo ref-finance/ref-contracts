@@ -181,12 +181,12 @@ impl Contract {
                 )
                 .as_bytes(),
             );
-            // all seed amount go to lostfound
+            // all seed amount go to seed_slashed
             let seed_amount = self.data().seeds_slashed.get(&seed_id).unwrap_or(0);
             self.data_mut().seeds_slashed.insert(&seed_id, &(seed_amount + seed_slashed));
         }
 
-        // TODO: possible gas bottleneck?
+        // TODO: possible gas bottleneck? 32 farms in one seed. gas consumption?
         if farmer_seed_power_remain == 0 {
             // remove farmer rps of relative farm
             for farm_id in farm_seed.get_ref().farms.iter() {
