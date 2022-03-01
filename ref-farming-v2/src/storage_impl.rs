@@ -74,9 +74,9 @@ impl StorageManagement for Contract {
                 farmer.get_ref().seed_powers.is_empty(),
                 "{}", ERR13_STORAGE_UNREGISTER_SEED_POWER_NOT_EMPTY
             );
+            // todo: how about his rps lookup map? maybe already cleaned when unstake all seeds
             self.data_mut().farmers.remove(&account_id);
             self.data_mut().farmer_count -= 1;
-            // TODO: should make sure tranfer is OK with a callback
             Promise::new(account_id.clone()).transfer(STORAGE_BALANCE_MIN_BOUND);
             true
         } else {

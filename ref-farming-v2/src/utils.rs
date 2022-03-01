@@ -11,7 +11,7 @@ pub const DENOM: u128 = 10_000;
 pub const MIN_SEED_DEPOSIT: u128 = 1_000_000_000_000_000_000;
 pub const STORAGE_BALANCE_MIN_BOUND: u128 = 100_000_000_000_000_000_000_000;
 pub const MAX_CDACCOUNT_NUM: u64 = 16;
-pub const MAX_FARM_NUM: usize = 16;
+pub const MAX_FARM_NUM: usize = 32;
 /// Amount of gas for fungible token transfers.
 pub const GAS_FOR_FT_TRANSFER: Gas = 20_000_000_000_000;
 /// Amount of gas for reward token transfers resolve.
