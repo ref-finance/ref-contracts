@@ -140,7 +140,7 @@ impl Contract {
     pub(crate) fn append_cd_account(&mut self, sender: &AccountId, seed_id: SeedId, index: u64, amount: Balance) -> Balance{
         let mut farmer = self.get_farmer(sender);
 
-        assert!(index <= farmer.get_ref().cd_accounts.len(), "{}", ERR63_INVALID_CD_ACCOUNT_INDEX);
+        assert!(index < farmer.get_ref().cd_accounts.len(), "{}", ERR63_INVALID_CD_ACCOUNT_INDEX);
 
         let mut cd_account = farmer.get_ref().cd_accounts.get(index).unwrap();
 
@@ -154,7 +154,7 @@ impl Contract {
 
     pub(crate) fn internal_unstake_from_cd_account(&mut self, sender_id: &AccountId, index: u64, amount: Balance) -> (SeedId, Balance)  {
         let farmer = self.get_farmer(sender_id);
-        assert!(index <= farmer.get_ref().cd_accounts.len(), "{}", ERR63_INVALID_CD_ACCOUNT_INDEX);
+        assert!(index < farmer.get_ref().cd_accounts.len(), "{}", ERR63_INVALID_CD_ACCOUNT_INDEX);
         let seed_id = &farmer.get_ref().cd_accounts.get(index).unwrap().seed_id;
         // first, claim all reward of the user for this seed farms 
         // to update user reward_per_seed in each farm

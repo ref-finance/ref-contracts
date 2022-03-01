@@ -65,11 +65,11 @@ impl Contract {
     }
 
     #[payable]
-    pub fn withdraw_seed_from_cd_account(&mut self, index: u64, amount: Balance) -> Promise {
+    pub fn withdraw_seed_from_cd_account(&mut self, index: u64, amount: U128) -> Promise {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
         // update inner state
-        let (seed_id, amount) = self.internal_unstake_from_cd_account(&sender_id, index, amount);
+        let (seed_id, amount) = self.internal_unstake_from_cd_account(&sender_id, index, amount.0);
         let (receiver_id, token_id) = parse_seed_id(&seed_id);
         if receiver_id == token_id {
             ext_fungible_token::ft_transfer(

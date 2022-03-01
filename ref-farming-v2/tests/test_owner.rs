@@ -52,7 +52,7 @@ pub fn test_strategy(){
 
     call!(
         owner,
-        farming.modify_cd_strategy_damage(20)
+        farming.modify_default_seed_slash_rate(20)
     ).assert_success();
     let strategy_info = view!(farming.get_cd_strategy()).unwrap_json::<CDStrategyInfo>();
     assert_strategy(&strategy_info, 0, 0, 0, false, 20);

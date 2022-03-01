@@ -268,7 +268,7 @@ fn single_farm_cd_account() {
 
     let out_come = call!(
         farmer2,
-        farming.remove_cd_account(0),
+        farming.withdraw_seed_from_cd_account(0, to_yocto("0.5").into()),
         deposit = 1
     );
     out_come.assert_success();
@@ -732,7 +732,7 @@ fn cd_account_invalid_id_and_limit(){
         deposit = 1
     );
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
-    assert!(ex_status.contains("E62: invalid CDStrategy index"));
+    assert!(ex_status.contains("E63: invalid CDAccount index"));
 
     for index in 0..16{
         let out_come = call!(
@@ -751,7 +751,7 @@ fn cd_account_invalid_id_and_limit(){
         deposit = 1
     );
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
-    assert!(ex_status.contains("E61: the number of CDAccounts has reached its limit"));
+    assert!(ex_status.contains("E63: invalid CDAccount index"));
 }
 
 #[test]
@@ -773,6 +773,17 @@ fn cd_account_remove(){
     let farming = deploy_farming(&root, farming_id(), owner.account_id());
     call!(farmer, farming.storage_deposit(None, None), deposit = to_yocto("1")).assert_success();
     println!("<<----- farming deployed, farmers registered.");
+
+    //set cd strategy
+    call!(
+        owner,
+        farming.modify_cd_strategy_item(0, 1000, 10_000)
+    ).assert_success();
+
+    call!(
+        owner,
+        farming.modify_default_seed_slash_rate(10_000)
+    ).assert_success();
 
     // create farm
     println!("----->> Create farm.");
@@ -796,18 +807,6 @@ fn cd_account_remove(){
     root.borrow_runtime().current_block().block_height, 
     root.borrow_runtime().current_block().block_timestamp);
 
-    //set cd strategy
-    call!(
-        owner,
-        farming.modify_cd_strategy_item(0, 1000, 10_000)
-    ).assert_success();
-
-    call!(
-        owner,
-        farming.modify_cd_strategy_damage(10_000)
-    ).assert_success();
-
-
     //remove after end sec
     let out_come = call!(
         farmer,
@@ -826,7 +825,7 @@ fn cd_account_remove(){
     root.borrow_runtime_mut().cur_block.block_timestamp = current_timestamp + to_nano(1000);
     let out_come = call!(
         farmer,
-        farming.remove_cd_account(0),
+        farming.withdraw_seed_from_cd_account(0, to_yocto("0.01").into()),
         deposit = 1
     );
     out_come.assert_success();
@@ -853,7 +852,7 @@ fn cd_account_remove(){
     root.borrow_runtime_mut().cur_block.block_timestamp = current_timestamp + to_nano(500);
     let out_come = call!(
         farmer,
-        farming.remove_cd_account(0),
+        farming.withdraw_seed_from_cd_account(0, to_yocto("1").into()),
         deposit = 1
     );
     out_come.assert_success();
@@ -915,7 +914,7 @@ fn cd_account_append(){
 
     call!(
         owner,
-        farming.modify_cd_strategy_damage(10_000)
+        farming.modify_default_seed_slash_rate(10_000)
     ).assert_success();
 
     //
@@ -955,7 +954,6 @@ fn cd_account_append(){
     let user_seed_info = view!(farming.get_user_seed_info(farmer.valid_account_id(), seed_id.clone())).unwrap_json::<UserSeedInfo>();
 
     assert_eq!(user_seed_info.cds[0].seed_amount.0, to_yocto("0.03"));
-    println!("{}", user_seed_info.cds[0].seed_power.0);
     assert!(user_seed_info.cds[0].seed_power.0 < to_yocto("0.055"));
     assert!(user_seed_info.cds[0].seed_power.0 > to_yocto("0.054"));
 
@@ -965,7 +963,10 @@ fn cd_account_append(){
         pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, append_cd_account_msg(0, seed_id.clone())),
         deposit = 1
     );
-    let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
-    assert!(ex_status.contains("E64: expired CDAccount"));
-    
+    out_come.assert_success();
+    let user_seed_info = view!(farming.get_user_seed_info(farmer.valid_account_id(), seed_id.clone())).unwrap_json::<UserSeedInfo>();
+
+    assert_eq!(user_seed_info.cds[0].seed_amount.0, to_yocto("0.04"));
+    assert!(user_seed_info.cds[0].seed_power.0 < to_yocto("0.065"));
+    assert!(user_seed_info.cds[0].seed_power.0 > to_yocto("0.064"));
 }

@@ -192,7 +192,7 @@ fn multi_farm_with_different_state() {
     mint_token(&token1, &root, to_yocto("5000"));
     call!(
         root,
-        token1.ft_transfer_call(to_va(farming_id()), to_yocto("500").into(), None, format!("{}{}{}", "{\"farm_id\": \"", farm0_id.clone(), "\"}")),
+        token1.ft_transfer_call(to_va(farming_id()), to_yocto("500").into(), None, generate_reward_msg(farm0_id.clone())),
         deposit = 1
     )
     .assert_success();
@@ -241,7 +241,7 @@ fn multi_farm_with_different_state() {
     println!("    Farm {} created at Height#{}", farm2_id.clone(), root.borrow_runtime().current_block().block_height);
     call!(
         root,
-        token1.ft_transfer_call(to_va(farming_id()), to_yocto("500").into(), None, format!("{}{}{}", "{\"farm_id\": \"", farm2_id.clone(), "\"}")),
+        token1.ft_transfer_call(to_va(farming_id()), to_yocto("500").into(), None, generate_reward_msg(farm2_id.clone())),
         deposit = 1
     )
     .assert_success();
@@ -311,7 +311,7 @@ fn multi_farm_with_different_state() {
     assert_eq!(unclaim.0, to_yocto("0"));
     call!(
         root,
-        token1.ft_transfer_call(to_va(farming_id()), to_yocto("500").into(), None, format!("{}{}{}", "{\"farm_id\": \"", farm1_id.clone(), "\"}")),
+        token1.ft_transfer_call(to_va(farming_id()), to_yocto("500").into(), None, generate_reward_msg(farm1_id.clone())),
         deposit = 1
     )
     .assert_success();

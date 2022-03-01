@@ -98,7 +98,7 @@ pub(crate) fn prepair_farm(
     mint_token(&token, &root, total_reward.into());
     call!(
         root,
-        token.ft_transfer_call(to_va(farming_id()), total_reward.into(), None, format!("{}{}{}", "{\"farm_id\": \"", farm_id.clone(), "\"}")),
+        token.ft_transfer_call(to_va(farming_id()), total_reward.into(), None, generate_reward_msg(farm_id.clone())),
         deposit = 1
     )
     .assert_success();
@@ -151,7 +151,7 @@ pub(crate) fn prepair_multi_farms(
         }
         call!(
             root,
-            token.ft_transfer_call(to_va(farming_id()), total_reward.into(), None, format!("{}{}{}", "{\"farm_id\": \"", farm_id.clone(), "\"}")),
+            token.ft_transfer_call(to_va(farming_id()), total_reward.into(), None, generate_reward_msg(farm_id.clone())),
             deposit = 1
         )
         .assert_success();

@@ -16,6 +16,7 @@ pub struct SeedInfo {
     pub amount: U128,
     pub power: U128,
     pub min_deposit: U128,
+    pub slash_rate: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -230,9 +231,9 @@ pub(crate) fn assert_strategy(
     damage: u32,
 ) {
     assert_eq!(strategy_info.stake_strategy[index].lock_sec, lock_sec);
-    assert_eq!(strategy_info.stake_strategy[index].additional, additional);
+    assert_eq!(strategy_info.stake_strategy[index].power_reward_rate, additional);
     assert_eq!(strategy_info.stake_strategy[index].enable, enable);
-    assert_eq!(strategy_info.damage, damage);
+    assert_eq!(strategy_info.seed_slash_rate, damage);
 }
 
 // =============  internal methods ================

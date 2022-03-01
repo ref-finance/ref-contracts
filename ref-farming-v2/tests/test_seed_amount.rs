@@ -183,7 +183,7 @@ fn seed_amount_huge() {
 
     call!(
         farmer1,
-        token3.ft_transfer_call(to_va(farming_id()), U128(to_yocto("10")), None, format!("{}{}{}", "{\"farm_id\": \"", farm_id.clone(), "\"}")),
+        token3.ft_transfer_call(to_va(farming_id()), U128(to_yocto("10")), None, generate_reward_msg(farm_id.clone())),
         deposit = 1
     )
     .assert_success();
