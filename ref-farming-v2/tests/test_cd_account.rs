@@ -856,12 +856,18 @@ fn cd_account_remove(){
         deposit = 1
     );
     out_come.assert_success();
+    let lostfound_info = show_shashed(&farming, false);
+    assert!(lostfound_info.get(&seed_id).unwrap().0 > to_yocto("0.49"));
+    assert!(lostfound_info.get(&seed_id).unwrap().0 < to_yocto("0.51"));
     assert!(view!(pool.mft_balance_of(":0".to_string(), farmer.valid_account_id()))
     .unwrap_json::<U128>()
     .0 > to_yocto("0.49"));
     assert!(view!(pool.mft_balance_of(":0".to_string(), farmer.valid_account_id()))
     .unwrap_json::<U128>()
     .0 < to_yocto("0.51"));
+    assert_eq!(view!(pool.mft_balance_of(":0".to_string(), farmer.valid_account_id()))
+    .unwrap_json::<U128>()
+    .0 + lostfound_info.get(&seed_id).unwrap().0, to_yocto("1"));
 }
 
 #[test]

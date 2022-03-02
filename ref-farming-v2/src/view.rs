@@ -431,4 +431,32 @@ impl Contract {
     pub fn get_cd_strategy(&self) -> CDStrategyInfo {
         (&self.data().cd_strategy).into()
     }
+
+    /// return slashed seed and its amount in this contract in a hashmap
+    pub fn list_shashed(&self, from_index: u64, limit: u64) -> HashMap<SeedId, U128> {
+        let keys = self.data().seeds_slashed.keys_as_vector();
+
+        (from_index..std::cmp::min(from_index + limit, keys.len()))
+            .map(|index| {
+                (
+                    keys.get(index).unwrap(),
+                    self.data().seeds_slashed.get(&keys.get(index).unwrap()).unwrap().into()
+                )
+            })
+            .collect()
+    }
+
+    /// return lostfound seed and its amount in this contract in a hashmap
+    pub fn list_lostfound(&self, from_index: u64, limit: u64) -> HashMap<SeedId, U128> {
+        let keys = self.data().seeds_lostfound.keys_as_vector();
+
+        (from_index..std::cmp::min(from_index + limit, keys.len()))
+            .map(|index| {
+                (
+                    keys.get(index).unwrap(),
+                    self.data().seeds_lostfound.get(&keys.get(index).unwrap()).unwrap().into()
+                )
+            })
+            .collect()
+    }
 }

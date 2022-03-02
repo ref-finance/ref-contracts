@@ -160,7 +160,7 @@ pub(crate) fn prepair_multi_farms(
 
         println!("  Farm {} created and running at Height#{}", farm_id.clone(), root.borrow_runtime().current_block().block_height);
     }
-    if farm_count >= 15 {
+    if farm_count >= 32 {
         let out_come = call!(
             owner,
             farming.create_simple_farm(HRSimpleFarmTerms{

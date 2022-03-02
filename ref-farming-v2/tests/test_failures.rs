@@ -1,4 +1,4 @@
-use near_sdk_sim::{call, init_simulator, to_yocto};
+use near_sdk_sim::{call, init_simulator, to_yocto, view};
 use near_sdk::json_types::{U128};
 use ref_farming_v2::{HRSimpleFarmTerms};
 
@@ -481,6 +481,9 @@ fn failure_e25_withdraw_seed_ft() {
 
     let user_seeds = show_user_seed_amounts(&farming, farmer1.account_id(), false);
     assert_eq!(user_seeds.get(&format!("{}", token2.account_id())).unwrap().0, 400);
+
+    let lostfound_info = show_lostfound(&farming, false);
+    assert_eq!(lostfound_info.get(&format!("{}", token2.account_id())).unwrap().0, 100);
 }
 
 #[test]

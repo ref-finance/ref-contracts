@@ -35,7 +35,7 @@ fn multi_farm_in_single_seed() {
     println!("----->> Liquidity added by farmer.");
 
     // create farm with token1
-    let (farming, farm_ids) = prepair_multi_farms(&root, &owner, &token1, to_yocto("10"), 16);
+    let (farming, farm_ids) = prepair_multi_farms(&root, &owner, &token1, to_yocto("10"), 32);
     let farm_id = farm_ids[farm_ids.len() - 1].clone();
     println!("----->> Farm till {} is ready.", farm_id.clone());
 

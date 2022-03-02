@@ -200,6 +200,34 @@ pub(crate) fn show_storage_balance(farming: &ContractAccount<Farming>, farmer: S
     ret
 }
 
+#[allow(dead_code)]
+pub(crate) fn show_lostfound(
+    farming: &ContractAccount<Farming>,
+    show_print: bool,
+) -> HashMap<String, U128> {
+    let ret = view!(farming.list_lostfound(0, 100)).unwrap_json::<HashMap<String, U128>>();
+    if show_print {
+        for (k, v) in &ret {
+            println!("FarmSeed=>  {}: {:#?}", k, v);
+        }
+    }
+    ret
+}
+
+#[allow(dead_code)]
+pub(crate) fn show_shashed(
+    farming: &ContractAccount<Farming>,
+    show_print: bool,
+) -> HashMap<String, U128> {
+    let ret = view!(farming.list_shashed(0, 100)).unwrap_json::<HashMap<String, U128>>();
+    if show_print {
+        for (k, v) in &ret {
+            println!("FarmSeed=>  {}: {:#?}", k, v);
+        }
+    }
+    ret
+}
+
 // =============  Assertions  ===============
 #[allow(dead_code)]
 pub(crate) fn assert_farming(
