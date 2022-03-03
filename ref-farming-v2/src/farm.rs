@@ -79,15 +79,15 @@ impl Farm {
         }
     }
 
-    pub fn can_be_removed(&self, total_seeds: &Balance) -> bool {
+    pub fn can_be_removed(&self, expire_sec: u32) -> bool {
         match self {
-            Farm::SimpleFarm(farm) => farm.can_be_removed(total_seeds),
+            Farm::SimpleFarm(farm) => farm.can_be_removed(expire_sec),
         }
     }
 
-    pub fn move_to_clear(&mut self, total_seeds: &Balance) -> bool {
+    pub fn move_to_clear(&mut self) {
         match self {
-            Farm::SimpleFarm(farm) => farm.move_to_clear(total_seeds),
+            Farm::SimpleFarm(farm) => farm.move_to_clear(),
         }
     }
 

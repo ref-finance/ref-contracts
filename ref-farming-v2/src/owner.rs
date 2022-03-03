@@ -7,7 +7,6 @@ use crate::utils::{
 use std::convert::TryInto;
 use near_sdk::Promise;
 use near_sdk::json_types::U128;
-use crate::legacy::*;
 
 #[near_bindgen]
 impl Contract {
@@ -16,10 +15,15 @@ impl Contract {
         self.data_mut().owner_id = owner_id.into();
     }
 
-    /// force clean 
-    pub fn force_clean_farm(&mut self, farm_id: String) -> bool {
+    /// force clean, only those farm_expire_sec after ended can be clean
+    pub fn force_clean_farm(&mut self, farm_id: String) {
         self.assert_owner();
         self.internal_remove_farm_by_farm_id(&farm_id)
+    }
+
+    pub fn modify_default_farm_expire_sec(&mut self, farm_expire_sec: u32) {
+        self.assert_owner();
+        self.data_mut().farm_expire_sec = farm_expire_sec;
     }
 
     pub fn modify_seed_min_deposit(&mut self, seed_id: String, min_deposit: U128) {
@@ -162,25 +166,47 @@ impl Contract {
     #[init(ignore_state)]
     #[private]
     pub fn migrate() -> Self {
-        let prev_contract: PrevContract = env::state_read().expect("ERR_NOT_INITIALIZED");
-        let prev_data = match prev_contract.data {
-            PrevVersionedContractData::Current(data) => data,
-        };
+        // let prev_contract: PrevContract = env::state_read().expect("ERR_NOT_INITIALIZED");
+        // let prev_data = match prev_contract.data {
+        //     PrevVersionedContractData::Current(data) => data,
+        // };
 
-        Contract {
-            data: VersionedContractData::V200(ContractData {
-                owner_id: prev_data.owner_id,
-                farmer_count: prev_data.farmer_count,
-                seeds: prev_data.seeds,
-                seeds_slashed: prev_data.seeds_slashed,
-                seeds_lostfound: prev_data.seeds_lostfound,
-                farmers: prev_data.farmers,
-                farms: prev_data.farms,
-                outdated_farms: prev_data.outdated_farms,
-                reward_info: prev_data.reward_info,
-                cd_strategy: prev_data.cd_strategy,
-            })
-        }
+        // Contract {
+        //     data: VersionedContractData::V200(ContractData {
+        //         owner_id: prev_data.owner_id,
+        //         farmer_count: prev_data.farmer_count,
+        //         seeds: prev_data.seeds,
+        //         seeds_slashed: prev_data.seeds_slashed,
+        //         seeds_lostfound: prev_data.seeds_lostfound,
+        //         farmers: prev_data.farmers,
+        //         farms: prev_data.farms,
+        //         outdated_farms: prev_data.outdated_farms,
+        //         reward_info: prev_data.reward_info,
+        //         cd_strategy: prev_data.cd_strategy,
+        //     })
+        // }
+
+        let mut contract: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
+        let data = match contract.data {
+            VersionedContractData::V200(data) => {
+                ContractData {
+                    owner_id: data.owner_id,
+                    farmer_count: data.farmer_count,
+                    seeds: data.seeds,
+                    seeds_slashed: data.seeds_slashed,
+                    seeds_lostfound: data.seeds_lostfound,
+                    farmers: data.farmers,
+                    farms: data.farms,
+                    outdated_farms: data.outdated_farms,
+                    reward_info: data.reward_info,
+                    cd_strategy: data.cd_strategy,
+                    farm_expire_sec: DEFAULT_FARM_EXPIRE_SEC,
+                }
+            },
+            VersionedContractData::V201(data) => data,
+        };
+        contract.data = VersionedContractData::V201(data);
+        contract
     }
 
     pub(crate) fn assert_owner(&self) {

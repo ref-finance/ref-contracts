@@ -1,10 +1,22 @@
-use near_sdk::json_types::{U128};
+use near_sdk::json_types::{U128, U64};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk_sim::{view, ContractAccount};
 
 use super::utils::to_va;
 use ref_farming_v2::{ContractContract as Farming, FarmInfo, CDStrategyInfo};
 use std::collections::HashMap;
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub struct Metadata {
+    pub version: String,
+    pub owner_id: String,
+    pub farmer_count: U64,
+    pub farm_count: U64,
+    pub seed_count: U64,
+    pub reward_count: U64,
+}
+
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(crate = "near_sdk::serde")]
@@ -24,6 +36,11 @@ pub struct SeedInfo {
 pub struct StorageBalance {
     pub total: U128,
     pub available: U128,
+}
+
+
+pub fn get_metadata(farming: &ContractAccount<Farming>) -> Metadata {
+    view!(farming.get_metadata()).unwrap_json::<Metadata>()
 }
 
 #[allow(dead_code)]
@@ -272,3 +289,4 @@ fn get_farminfo(farming: &ContractAccount<Farming>, farm_id: String) -> FarmInfo
 fn get_outdated_farminfo(farming: &ContractAccount<Farming>, farm_id: String) -> FarmInfo {
     view!(farming.get_outdated_farm(farm_id)).unwrap_json::<FarmInfo>()
 }
+

@@ -353,13 +353,21 @@ fn single_farm_cd_account() {
     assert_eq!(unclaim.0, to_yocto("0"));
     let unclaim = show_unclaim(&farming, farmer2.account_id(), farm_id.clone(), false);
     assert_eq!(unclaim.0, to_yocto("0"));
+    call!(
+        owner,
+        farming.modify_default_farm_expire_sec(1),
+        deposit = 0
+    ).assert_success();
     let out_come = call!(
         owner,
         farming.force_clean_farm(farm_id.clone()),
         deposit = 0
     );
-    out_come.assert_success();
-    assert_eq!(Value::Bool(false), out_come.unwrap_json_value());
+    // out_come.assert_success();
+    assert!(!out_come.is_ok());
+    let ex_status = out_come.status();
+    // println!("ex_status: {:?}", ex_status);
+    assert!(format!("{:?}", ex_status).contains("Farm can NOT be removed now"));
 
     println!("----->> move to 40 secs later and farmer2 add cd account.");
     assert!(root.borrow_runtime_mut().produce_blocks(40).is_ok());
@@ -421,11 +429,11 @@ fn single_farm_cd_account() {
         deposit = 0
     );
     out_come.assert_success();
-    assert_eq!(Value::Bool(true), out_come.unwrap_json_value());
+    // assert_eq!(Value::Bool(true), out_come.unwrap_json_value());
     assert_eq!(view!(farming.get_number_of_farms()).unwrap_json::<u64>(), 0);
     assert_eq!(view!(farming.get_number_of_outdated_farms()).unwrap_json::<u64>(), 1);
     let farm_info = show_outdated_farminfo(&farming, farm_id.clone(), true);
-    assert_farming(&farm_info, "Cleared".to_string(), to_yocto("10"), 10, 10, to_yocto("10"), to_yocto("0"), to_yocto("3") + 1);
+    assert_farming(&farm_info, "Cleared".to_string(), to_yocto("10"), 9, 9, to_yocto("10"), to_yocto("0"), to_yocto("3") + 1);
 }
 
 #[test]

@@ -13,7 +13,7 @@ use crate::farm::{Farm, FarmId};
 use crate::simple_farm::{RPS};
 use crate::farm_seed::{VersionedFarmSeed, SeedId};
 use crate::farmer::{VersionedFarmer, Farmer};
-use crate::utils::{STRATEGY_LIMIT, DENOM};
+use crate::utils::{STRATEGY_LIMIT, DENOM, DEFAULT_FARM_EXPIRE_SEC};
 use crate::errors::{ERR32_NOT_ENOUGH_SEED, ERR25_CALLBACK_POST_WITHDRAW_INVALID};
 
 // for simulator test
@@ -22,6 +22,8 @@ pub use crate::view::FarmInfo;
 pub use crate::view::CDAccountInfo;
 pub use crate::view::CDStrategyInfo;
 pub use crate::view::UserSeedInfo;
+
+use crate::legacy::ContractDataV200;
 
 
 mod utils;
@@ -105,12 +107,15 @@ pub struct ContractData {
 
     // strategy for farmer CDAccount
     cd_strategy: CDStrategy,
+
+    farm_expire_sec: u32,
 }
 
 /// Versioned contract data. Allows to easily upgrade contracts.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub enum VersionedContractData {
-    V200(ContractData),
+    V200(ContractDataV200),
+    V201(ContractData),
 }
 
 impl VersionedContractData {}
@@ -128,7 +133,7 @@ impl Contract {
     pub fn new(owner_id: ValidAccountId) -> Self {
         assert!(!env::state_exists(), "Already initialized");
         Self {
-            data: VersionedContractData::V200(ContractData {
+            data: VersionedContractData::V201(ContractData {
                 owner_id: owner_id.into(),
                 farmer_count: 0,
                 seeds: UnorderedMap::new(StorageKeys::Seed),
@@ -145,7 +150,8 @@ impl Contract {
                         enable: false
                     }; STRATEGY_LIMIT],
                     seed_slash_rate: 0,
-                }
+                },
+                farm_expire_sec: DEFAULT_FARM_EXPIRE_SEC,
             }),
         }
     }
@@ -262,13 +268,15 @@ impl Contract {
 impl Contract {
     fn data(&self) -> &ContractData {
         match &self.data {
-            VersionedContractData::V200(data) => data,
+            VersionedContractData::V201(data) => data,
+            _ => unimplemented!(),
         }
     }
 
     fn data_mut(&mut self) -> &mut ContractData {
         match &mut self.data {
-            VersionedContractData::V200(data) => data,
+            VersionedContractData::V201(data) => data,
+            _ => unimplemented!(),
         }
     }
 }
@@ -618,7 +626,7 @@ mod tests {
 
         // clean farm
         println!("----> clean farm");
-        remove_farm(&mut context, &mut contract, 750);
+        remove_farm(&mut context, &mut contract, 750 + DEFAULT_FARM_EXPIRE_SEC);
         assert!(contract.get_farm(farm_id.clone()).is_none());
 
         // remove user rps

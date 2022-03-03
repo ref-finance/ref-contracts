@@ -81,12 +81,12 @@ fn test_fuzzy(){
         }
         let farm_info = show_farminfo(&farming, FARM_ID.to_string(), false);
         assert_farming(&farm_info, "Ended".to_string(), to_yocto(&OPERATION_NUM.to_string()), ctx.cur_round, ctx.last_round, ctx.claimed_reward.0, ctx.unclaimed_reward.0, ctx.beneficiary_reward.0);
-        let out_come = call!(
-            owner,
-            farming.force_clean_farm(FARM_ID.to_string()),
-            deposit = 0
-        );
-        out_come.assert_success();
-        assert_farming(&farm_info, "Ended".to_string(), to_yocto(&OPERATION_NUM.to_string()), ctx.cur_round, ctx.last_round, ctx.claimed_reward.0, ctx.unclaimed_reward.0, ctx.beneficiary_reward.0);
+        // let out_come = call!(
+        //     owner,
+        //     farming.force_clean_farm(FARM_ID.to_string()),
+        //     deposit = 0
+        // );
+        // out_come.assert_success();
+        // assert_farming(&farm_info, "Ended".to_string(), to_yocto(&OPERATION_NUM.to_string()), ctx.cur_round, ctx.last_round, ctx.claimed_reward.0, ctx.unclaimed_reward.0, ctx.beneficiary_reward.0);
     }
 }
