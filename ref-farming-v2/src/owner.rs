@@ -7,6 +7,7 @@ use crate::utils::{
 use std::convert::TryInto;
 use near_sdk::Promise;
 use near_sdk::json_types::U128;
+use crate::legacy::*;
 
 #[near_bindgen]
 impl Contract {
@@ -161,13 +162,25 @@ impl Contract {
     #[init(ignore_state)]
     #[private]
     pub fn migrate() -> Self {
-        assert_eq!(
-            env::predecessor_account_id(),
-            env::current_account_id(),
-            "ERR_NOT_ALLOWED"
-        );
-        let contract: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
-        contract
+        let prev_contract: PrevContract = env::state_read().expect("ERR_NOT_INITIALIZED");
+        let prev_data = match prev_contract.data {
+            PrevVersionedContractData::Current(data) => data,
+        };
+
+        Contract {
+            data: VersionedContractData::V200(ContractData {
+                owner_id: prev_data.owner_id,
+                farmer_count: prev_data.farmer_count,
+                seeds: prev_data.seeds,
+                seeds_slashed: prev_data.seeds_slashed,
+                seeds_lostfound: prev_data.seeds_lostfound,
+                farmers: prev_data.farmers,
+                farms: prev_data.farms,
+                outdated_farms: prev_data.outdated_farms,
+                reward_info: prev_data.reward_info,
+                cd_strategy: prev_data.cd_strategy,
+            })
+        }
     }
 
     pub(crate) fn assert_owner(&self) {

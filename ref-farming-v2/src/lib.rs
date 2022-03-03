@@ -40,6 +40,7 @@ mod actions_of_reward;
 mod view;
 
 mod owner;
+mod legacy;
 
 near_sdk::setup_alloc!();
 
@@ -109,7 +110,7 @@ pub struct ContractData {
 /// Versioned contract data. Allows to easily upgrade contracts.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub enum VersionedContractData {
-    Current(ContractData),
+    V200(ContractData),
 }
 
 impl VersionedContractData {}
@@ -127,7 +128,7 @@ impl Contract {
     pub fn new(owner_id: ValidAccountId) -> Self {
         assert!(!env::state_exists(), "Already initialized");
         Self {
-            data: VersionedContractData::Current(ContractData {
+            data: VersionedContractData::V200(ContractData {
                 owner_id: owner_id.into(),
                 farmer_count: 0,
                 seeds: UnorderedMap::new(StorageKeys::Seed),
@@ -261,13 +262,13 @@ impl Contract {
 impl Contract {
     fn data(&self) -> &ContractData {
         match &self.data {
-            VersionedContractData::Current(data) => data,
+            VersionedContractData::V200(data) => data,
         }
     }
 
     fn data_mut(&mut self) -> &mut ContractData {
         match &mut self.data {
-            VersionedContractData::Current(data) => data,
+            VersionedContractData::V200(data) => data,
         }
     }
 }
