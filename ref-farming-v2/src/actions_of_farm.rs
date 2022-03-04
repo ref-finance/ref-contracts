@@ -14,13 +14,25 @@ impl Contract {
         terms: HRSimpleFarmTerms,
         min_deposit: Option<U128>,
     ) -> FarmId {
-        self.assert_owner();
+        assert!(self.is_owner_or_operators(), "ERR_NOT_ALLOWED");
 
         let min_deposit: u128 = min_deposit.unwrap_or(U128(MIN_SEED_DEPOSIT)).0;
 
         let farm_id = self.internal_add_farm(&terms, min_deposit);
 
         farm_id
+    }
+
+    /// force clean, only those farm_expire_sec after ended can be clean
+    pub fn force_clean_farm(&mut self, farm_id: String) {
+        assert!(self.is_owner_or_operators(), "ERR_NOT_ALLOWED");
+        self.internal_remove_farm_by_farm_id(&farm_id)
+    }
+
+    /// Only a farm without any reward deposited can be cancelled
+    pub fn cancel_farm(&mut self, farm_id: String) {
+        assert!(self.is_owner_or_operators(), "ERR_NOT_ALLOWED");
+        self.internal_cancel_farm(&farm_id)
     }
 }
 
@@ -74,7 +86,7 @@ impl Contract {
         farm_id
     }
 
-    pub(crate) fn internal_remove_farm_by_farm_id(&mut self, farm_id: &FarmId) {
+    fn internal_remove_farm_by_farm_id(&mut self, farm_id: &FarmId) {
         assert!(
             self.data()
                 .farms
@@ -91,6 +103,24 @@ impl Contract {
             .expect(ERR41_FARM_NOT_EXIST);
         farm.move_to_clear();
         self.data_mut().outdated_farms.insert(farm_id, &farm);
+
+        let (seed_id, _) = parse_farm_id(farm_id);
+        let mut farm_seed = self.get_seed_wrapped(&seed_id).expect(ERR31_SEED_NOT_EXIST);
+        farm_seed.get_ref_mut().farms.remove(farm_id);
+        self.data_mut().seeds.insert(&seed_id, &farm_seed);
+    }
+
+    fn internal_cancel_farm(&mut self, farm_id: &FarmId) {
+        assert!(
+            self.data()
+                .farms
+                .get(farm_id)
+                .expect(ERR41_FARM_NOT_EXIST)
+                .can_be_cancelled(),
+            "This farm can NOT be cancelled"
+        );
+
+        self.data_mut().farms.remove(farm_id).expect(ERR41_FARM_NOT_EXIST);
 
         let (seed_id, _) = parse_farm_id(farm_id);
         let mut farm_seed = self.get_seed_wrapped(&seed_id).expect(ERR31_SEED_NOT_EXIST);

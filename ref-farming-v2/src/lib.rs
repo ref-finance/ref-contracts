@@ -5,7 +5,7 @@
 */
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::collections::{LookupMap, UnorderedMap};
+use near_sdk::collections::{LookupMap, UnorderedMap, UnorderedSet};
 use near_sdk::{env, near_bindgen, Balance, AccountId, PanicOnDefault, PromiseResult};
 use near_sdk::BorshStorageKey;
 
@@ -48,7 +48,7 @@ near_sdk::setup_alloc!();
 
 
 #[derive(BorshStorageKey, BorshSerialize)]
-pub enum StorageKeys {
+pub(crate) enum StorageKeys {
     Seed,
     Farm,
     OutdatedFarm,
@@ -58,6 +58,7 @@ pub enum StorageKeys {
     CDAccount { account_id: AccountId },
     SeedSlashed,
     SeedLostfound,
+    Operator,
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
@@ -109,6 +110,9 @@ pub struct ContractData {
     cd_strategy: CDStrategy,
 
     farm_expire_sec: u32,
+
+    /// Set of guardians.
+    operators: UnorderedSet<AccountId>,
 }
 
 /// Versioned contract data. Allows to easily upgrade contracts.
@@ -152,6 +156,7 @@ impl Contract {
                     seed_slash_rate: 0,
                 },
                 farm_expire_sec: DEFAULT_FARM_EXPIRE_SEC,
+                operators: UnorderedSet::new(StorageKeys::Operator),
             }),
         }
     }
@@ -278,6 +283,11 @@ impl Contract {
             VersionedContractData::V201(data) => data,
             _ => unimplemented!(),
         }
+    }
+
+    fn is_owner_or_operators(&self) -> bool {
+        env::predecessor_account_id() == self.data().owner_id 
+            || self.data().operators.contains(&env::predecessor_account_id())
     }
 }
 

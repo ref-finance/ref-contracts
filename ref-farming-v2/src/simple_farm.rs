@@ -343,5 +343,9 @@ impl SimpleFarm {
         return ret;
     }
 
+    pub fn can_be_cancelled(&self) -> bool {
+        self.amount_of_reward == 0 
+    }
+
 }
 

@@ -85,6 +85,12 @@ impl Farm {
         }
     }
 
+    pub fn can_be_cancelled(&self) -> bool {
+        match self {
+            Farm::SimpleFarm(farm) => farm.can_be_cancelled(),
+        }
+    }
+
     pub fn move_to_clear(&mut self) {
         match self {
             Farm::SimpleFarm(farm) => farm.move_to_clear(),

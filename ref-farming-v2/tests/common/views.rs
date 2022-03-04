@@ -11,10 +11,12 @@ use std::collections::HashMap;
 pub struct Metadata {
     pub version: String,
     pub owner_id: String,
+    pub operators: Vec<String>,
     pub farmer_count: U64,
     pub farm_count: U64,
     pub seed_count: U64,
     pub reward_count: U64,
+    pub farm_expire_sec: u32,
 }
 
 

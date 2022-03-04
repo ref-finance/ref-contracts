@@ -7,6 +7,7 @@ use crate::utils::{
 use std::convert::TryInto;
 use near_sdk::Promise;
 use near_sdk::json_types::U128;
+use near_sdk::collections::UnorderedSet;
 
 #[near_bindgen]
 impl Contract {
@@ -15,10 +16,21 @@ impl Contract {
         self.data_mut().owner_id = owner_id.into();
     }
 
-    /// force clean, only those farm_expire_sec after ended can be clean
-    pub fn force_clean_farm(&mut self, farm_id: String) {
+    /// Extend operators. Only can be called by owner.
+    #[payable]
+    pub fn extend_operators(&mut self, operators: Vec<ValidAccountId>) {
         self.assert_owner();
-        self.internal_remove_farm_by_farm_id(&farm_id)
+        for operator in operators {
+            self.data_mut().operators.insert(operator.as_ref());
+        }
+    }
+
+    /// Remove operators. Only can be called by owner.
+    pub fn remove_operators(&mut self, operators: Vec<ValidAccountId>) {
+        self.assert_owner();
+        for operator in operators {
+            self.data_mut().operators.remove(operator.as_ref());
+        }
     }
 
     pub fn modify_default_farm_expire_sec(&mut self, farm_expire_sec: u32) {
@@ -27,14 +39,14 @@ impl Contract {
     }
 
     pub fn modify_seed_min_deposit(&mut self, seed_id: String, min_deposit: U128) {
-        self.assert_owner();
+        assert!(self.is_owner_or_operators(), "ERR_NOT_ALLOWED");
         let mut farm_seed = self.get_seed(&seed_id);
         farm_seed.get_ref_mut().min_deposit = min_deposit.into();
         self.data_mut().seeds.insert(&seed_id, &farm_seed);
     }
 
     pub fn modify_seed_slash_rate(&mut self, seed_id: String, slash_rate: u32) {
-        self.assert_owner();
+        assert!(self.is_owner_or_operators(), "ERR_NOT_ALLOWED");
         assert!(slash_rate as u128 <= DENOM, "INVALID_SLASH_RATE");
         let mut farm_seed = self.get_seed(&seed_id);
         farm_seed.get_ref_mut().slash_rate = slash_rate;
@@ -42,7 +54,7 @@ impl Contract {
     }
 
     pub fn modify_cd_strategy_item(&mut self, index: usize, lock_sec: u32, power_reward_rate: u32) {
-        self.assert_owner();
+        assert!(self.is_owner_or_operators(), "ERR_NOT_ALLOWED");
         assert!(index < STRATEGY_LIMIT, "{}", ERR62_INVALID_CD_STRATEGY_INDEX);
 
         if lock_sec == 0 {
@@ -61,13 +73,13 @@ impl Contract {
     }
 
     pub fn modify_default_seed_slash_rate(&mut self, slash_rate: u32) {
-        self.assert_owner();
+        assert!(self.is_owner_or_operators(), "ERR_NOT_ALLOWED");
         self.data_mut().cd_strategy.seed_slash_rate = slash_rate;
     }
 
     /// Owner retrieve those slashed seed
     pub fn withdraw_seed_slashed(&mut self, seed_id: SeedId) -> Promise {
-        assert_one_yocto();
+        assert!(self.is_owner_or_operators(), "ERR_NOT_ALLOWED");
         self.assert_owner();
         let sender_id = self.data().owner_id.clone();
         // update inner state
@@ -201,6 +213,7 @@ impl Contract {
                     reward_info: data.reward_info,
                     cd_strategy: data.cd_strategy,
                     farm_expire_sec: DEFAULT_FARM_EXPIRE_SEC,
+                    operators: UnorderedSet::new(StorageKeys::Operator),
                 }
             },
             VersionedContractData::V201(data) => data,
