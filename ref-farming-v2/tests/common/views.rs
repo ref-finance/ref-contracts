@@ -40,7 +40,7 @@ pub struct StorageBalance {
     pub available: U128,
 }
 
-
+#[allow(dead_code)]
 pub fn get_metadata(farming: &ContractAccount<Farming>) -> Metadata {
     view!(farming.get_metadata()).unwrap_json::<Metadata>()
 }

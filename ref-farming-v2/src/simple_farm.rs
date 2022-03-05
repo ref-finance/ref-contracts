@@ -21,6 +21,10 @@ construct_uint! {
     pub struct U256(4);
 }
 
+construct_uint! {
+	pub struct U512(8);
+}
+
 pub type RPS = [u8; 32];
 
 // to ensure precision, all reward_per_seed would be multiplied by this DENOM
@@ -301,9 +305,9 @@ impl SimpleFarm {
         // }
 
         let claimed = (
-            U256::from(*user_seeds) 
-            * (U256::from_little_endian(&self.last_distribution.rps) - U256::from_little_endian(user_rps))
-            / U256::from(DENOM)
+            U512::from(*user_seeds) 
+            * (U512::from_little_endian(&self.last_distribution.rps) - U512::from_little_endian(user_rps))
+            / U512::from(DENOM)
         ).as_u128();
 
         if claimed > 0 {

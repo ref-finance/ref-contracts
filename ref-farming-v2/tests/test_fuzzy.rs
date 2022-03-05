@@ -1,5 +1,5 @@
 use near_sdk_sim::{
-    view, call, ContractAccount, UserAccount,to_yocto
+    view, ContractAccount, UserAccount,to_yocto
 };
 use rand::{Rng, SeedableRng};
 use rand_pcg::Pcg32;
@@ -70,7 +70,7 @@ fn test_fuzzy(){
         println!("current seed : {}", seed);
         println!("*********************************************");
 
-        let (root, owner, farming, pool, users) = prepair_env();
+        let (root, _owner, farming, pool, users) = prepair_env();
 
         let mut rng = Pcg32::seed_from_u64(seed as u64);
         let mut ctx = view!(farming.get_farm(FARM_ID.to_string())).unwrap_json::<FarmInfo>().clone();
