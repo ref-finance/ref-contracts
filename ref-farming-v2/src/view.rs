@@ -24,10 +24,12 @@ construct_uint! {
 pub struct Metadata {
     pub version: String,
     pub owner_id: AccountId,
+    pub operators: Vec<AccountId>,
     pub farmer_count: U64,
     pub farm_count: U64,
     pub seed_count: U64,
     pub reward_count: U64,
+    pub farm_expire_sec: u32,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -169,11 +171,13 @@ impl Contract {
     pub fn get_metadata(&self) -> Metadata {
         Metadata {
             owner_id: self.data().owner_id.clone(),
+            operators: self.data().operators.to_vec(),
             version: env!("CARGO_PKG_VERSION").to_string(),
             farmer_count: self.data().farmer_count.into(),
             farm_count: self.data().farms.len().into(),
             seed_count: self.data().seeds.len().into(),
             reward_count: self.data().reward_info.len().into(),
+            farm_expire_sec: self.data().farm_expire_sec,
         }
     }
 

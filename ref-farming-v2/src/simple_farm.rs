@@ -320,39 +320,31 @@ impl SimpleFarm {
     }
 
     /// Move an Ended farm to Cleared, if any unclaimed reward exists, go to beneficiary
-    pub(crate) fn move_to_clear(&mut self, total_seeds: &Balance) -> bool {
-        if let SimpleFarmStatus::Running = self.status {
-            self.distribute(total_seeds, true);
+    pub(crate) fn move_to_clear(&mut self) {
+        self.last_distribution.unclaimed += self.last_distribution.undistributed;
+        if self.last_distribution.unclaimed > 0 {
+            self.amount_of_claimed += self.last_distribution.unclaimed;
+            self.amount_of_beneficiary += self.last_distribution.unclaimed;
+            self.last_distribution.unclaimed = 0;
         }
-        if let SimpleFarmStatus::Ended = self.status {
-            if self.last_distribution.unclaimed > 0 {
-                self.amount_of_claimed += self.last_distribution.unclaimed;
-                self.amount_of_beneficiary += self.last_distribution.unclaimed;
-                self.last_distribution.unclaimed = 0;
-            }
-            self.status = SimpleFarmStatus::Cleared;
-            true
-        } else {
-            false
-        }
+        self.status = SimpleFarmStatus::Cleared;
     }
 
-    pub fn can_be_removed(&self, total_seeds: &Balance) -> bool {
-        match self.status {
-            SimpleFarmStatus::Ended => true,
-            SimpleFarmStatus::Running => {
-                if let Some(dis) = self.try_distribute(total_seeds) {
-                    if dis.undistributed == 0 {
-                        true
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            },
-            _ => false,
+    /// farm_expire_sec after end_time
+    pub fn can_be_removed(&self, expire_sec: u32) -> bool {
+        let mut ret = false;
+        if self.amount_of_reward > 0 {
+            let duration = self.terms.session_interval * (1 + self.amount_of_reward / self.terms.reward_per_session) as u32;
+            let end_secs = self.terms.start_at + duration;
+            if to_sec(env::block_timestamp()) > end_secs + expire_sec {
+                ret = true;
+            }
         }
+        return ret;
+    }
+
+    pub fn can_be_cancelled(&self) -> bool {
+        self.amount_of_reward == 0 
     }
 
 }
