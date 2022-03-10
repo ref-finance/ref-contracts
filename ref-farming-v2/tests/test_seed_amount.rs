@@ -93,7 +93,7 @@ fn seed_amount_little() {
     assert_eq!(unclaim.0, 0_u128);
     let reward = show_reward(&farming, farmer1.account_id(), token1.account_id(), false);
     assert_eq!(reward.0, to_yocto("2000000000"));
-    let user_rps = view!(farming.get_user_rps(farmer1.valid_account_id(), farm_id)).unwrap_json::<String>();
+    let user_rps = view!(farming.get_user_rps(farmer1.valid_account_id(), farm_id)).unwrap_json::<Option<String>>().unwrap();
     assert_eq!(user_rps, String::from("2000000000000000000000000000000000000000000000000000000000"));
 }
 
@@ -226,7 +226,7 @@ fn seed_amount_huge() {
     let reward = show_reward(&farming, farmer1.account_id(), token3.account_id(), false);
     // println!("reward.0 {}", reward.0);
     assert!(reward.0 > 199000000000000000);
-    let user_rps = view!(farming.get_user_rps(farmer1.valid_account_id(), farm_id)).unwrap_json::<String>();
+    let user_rps = view!(farming.get_user_rps(farmer1.valid_account_id(), farm_id)).unwrap_json::<Option<String>>().unwrap();
     // println!("user_rps: {}", user_rps);
     assert_eq!(user_rps, String::from("587"));
 }

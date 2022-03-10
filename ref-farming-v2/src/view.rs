@@ -362,12 +362,12 @@ impl Contract {
             .collect()
     }
 
-    pub fn get_user_rps(&self, account_id: ValidAccountId, farm_id: FarmId) -> String {
+    pub fn get_user_rps(&self, account_id: ValidAccountId, farm_id: FarmId) -> Option<String> {
         let farmer = self.get_farmer(account_id.as_ref());
         if let Some(rps) = farmer.get().user_rps.get(&farm_id) {
-            format!("{}", U256::from_little_endian(&rps))
+            Some(format!("{}", U256::from_little_endian(&rps)))
         } else {
-            String::from("0")
+            None
         }
     }
 
