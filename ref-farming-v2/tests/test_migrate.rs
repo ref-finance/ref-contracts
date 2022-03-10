@@ -49,7 +49,7 @@ fn test_upgrade() {
     .assert_success();
     let metadata = get_metadata(&farming);
     // println!("{:#?}", metadata);
-    assert_eq!(metadata.version, "2.1.0".to_string());
+    assert_eq!(metadata.version, "2.1.2".to_string());
 
     // Upgrade to the same code without migration is successful.
     let out_come = root.call(
@@ -64,5 +64,5 @@ fn test_upgrade() {
     // println!("ex_status: {}", ex_status);
     // assert!(ex_status.contains("not implemented"));
     let metadata = get_metadata(&farming);
-    assert_eq!(metadata.version, "2.1.0".to_string());
+    assert_eq!(metadata.version, "2.1.2".to_string());
 }
