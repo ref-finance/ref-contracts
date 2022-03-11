@@ -125,6 +125,7 @@ pub struct UserSeedInfo {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct CDAccountInfo {
+    pub cd_account_id: u32,
     pub seed_id: SeedId,
     pub seed_amount: U128,
     pub seed_power: U128,
@@ -135,6 +136,7 @@ pub struct CDAccountInfo {
 impl From<CDAccount> for CDAccountInfo {
     fn from(cd_account: CDAccount) -> Self {
         CDAccountInfo{
+            cd_account_id: 0,
             seed_id: cd_account.seed_id.clone(),
             seed_amount: cd_account.seed_amount.into(),
             seed_power: cd_account.seed_power.into(),
@@ -393,8 +395,10 @@ impl Contract {
                     U128(v + cd_amount_total)
                 }),
                 power: farmer.get_ref().seed_powers.get(&seed_id).map_or(U128(0), |&v| U128(v)),
-                cds: farmer.get_ref().cd_accounts.iter().map(|cd_account| {
-                    cd_account.into()
+                cds: farmer.get_ref().cd_accounts.iter().enumerate().map(|(index, cd_account)| {
+                    let mut cd_account_info: CDAccountInfo = cd_account.into();
+                    cd_account_info.cd_account_id = index as u32;
+                    cd_account_info
                 }).collect()
             })
         }else{
@@ -436,8 +440,11 @@ impl Contract {
         let farmer = self.get_farmer(&account_id.into());
 
         (from_index..std::cmp::min(from_index + limit, farmer.get_ref().cd_accounts.len()))
-            .map(|index| 
-                farmer.get_ref().cd_accounts.get(index).unwrap().into()
+            .map(|index| {
+                    let mut cd_account_info: CDAccountInfo = farmer.get_ref().cd_accounts.get(index).unwrap().into();
+                    cd_account_info.cd_account_id = index as u32;
+                    cd_account_info
+                }
             )
             .collect()
     }

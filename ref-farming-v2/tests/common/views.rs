@@ -295,12 +295,6 @@ pub(crate) fn get_user_seed_info(
     view!(farming.get_user_seed_info(to_va(user_id), seed_id.clone())).unwrap_json::<UserSeedInfo>()
 }
 
-// use near_sdk::{AccountId};
-// use test_token::ContractContract as TestToken;
-// pub fn balance_of(token: &ContractAccount<TestToken>, account_id: &AccountId) -> u128 {
-//     view!(token.ft_balance_of(to_va(account_id.clone()))).unwrap_json::<U128>().0
-// }
-
 // =============  Assertions  ===============
 #[allow(dead_code)]
 pub(crate) fn assert_farming(
