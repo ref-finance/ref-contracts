@@ -344,7 +344,7 @@ mod tests {
             .block_timestamp(to_nano(time_stamp))
             .attached_deposit(1)
             .build());
-        contract.ft_on_transfer(accounts(0), U128(amount), format!("{{\"farm_id\": \"{}\"}}", "bob#0"));
+        contract.ft_on_transfer(accounts(0), U128(amount), format!("{{\"Reward\": {{\"farm_id\": \"{}\"}}}}", "bob#0"));
     }
 
     fn register_farmer(

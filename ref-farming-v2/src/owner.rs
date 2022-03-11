@@ -97,10 +97,9 @@ impl Contract {
     pub fn withdraw_seed_slashed(&mut self, seed_id: SeedId) -> Promise {
         assert_one_yocto();
         assert!(self.is_owner_or_operators(), "ERR_NOT_ALLOWED");
-        self.assert_owner();
         let sender_id = self.data().owner_id.clone();
         // update inner state
-        let amount = self.data_mut().seeds_slashed.remove(&seed_id).unwrap();
+        let amount = self.data_mut().seeds_slashed.remove(&seed_id).unwrap_or(0_u128);
         assert!(amount > 0, "{}", ERR32_NOT_ENOUGH_SEED);
 
         let (receiver_id, token_id) = parse_seed_id(&seed_id);
@@ -143,14 +142,14 @@ impl Contract {
     /// owner help to return those who lost seed when withdraw,
     /// It's owner's responsibility to verify amount and seed id before calling
     #[payable]
-    pub fn return_seed_lostfound(&mut self, sender_id: ValidAccountId, seed_id: SeedId, amount: Balance) -> Promise {
+    pub fn return_seed_lostfound(&mut self, sender_id: ValidAccountId, seed_id: SeedId, amount: U128) -> Promise {
         assert_one_yocto();
         self.assert_owner();
         let sender_id: AccountId = sender_id.into();
         // update inner state
         let max_amount = self.data().seeds_lostfound.get(&seed_id).unwrap();
-        assert!(amount <= max_amount, "{}", ERR32_NOT_ENOUGH_SEED);
-        self.data_mut().seeds_lostfound.insert(&seed_id, &(max_amount - amount));
+        assert!(amount.0 <= max_amount, "{}", ERR32_NOT_ENOUGH_SEED);
+        self.data_mut().seeds_lostfound.insert(&seed_id, &(max_amount - amount.0));
 
         let (receiver_id, token_id) = parse_seed_id(&seed_id);
         if receiver_id == token_id {

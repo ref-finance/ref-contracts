@@ -3,7 +3,7 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk_sim::{view, ContractAccount};
 
 use super::utils::to_va;
-use ref_farming_v2::{ContractContract as Farming, FarmInfo, CDStrategyInfo};
+use ref_farming_v2::{ContractContract as Farming, FarmInfo, CDStrategyInfo, UserSeedInfo};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -103,6 +103,36 @@ pub(crate) fn show_farminfo(
         );
     }
     farm_info
+}
+
+#[allow(dead_code)]
+pub(crate) fn show_outdated_farms(
+    farming: &ContractAccount<Farming>,
+    show_print: bool,
+) -> Vec<FarmInfo> {
+    let outdated_farms_info = view!(farming.list_outdated_farms(0, 100)).unwrap_json::<Vec<FarmInfo>>();
+    if show_print {
+        println!("Farms Info has {} farms ===>", outdated_farms_info.len());
+        for farm_info in outdated_farms_info.iter() {
+            println!(
+                "  ID:{}, Status:{}, Seed:{}, Reward:{}",
+                farm_info.farm_id, farm_info.farm_status, farm_info.seed_id, farm_info.reward_token
+            );
+            println!(
+                "  StartAt:{}, SessionReward:{}, SessionInterval:{}",
+                farm_info.start_at, farm_info.reward_per_session.0, farm_info.session_interval
+            );
+            println!(
+                "  TotalReward:{}, Claimed:{}, Unclaimed:{}, LastRound:{}, CurRound:{}",
+                farm_info.total_reward.0,
+                farm_info.claimed_reward.0,
+                farm_info.unclaimed_reward.0,
+                farm_info.last_round,
+                farm_info.cur_round
+            );
+        }
+    }
+    outdated_farms_info
 }
 
 #[allow(dead_code)]
@@ -246,6 +276,30 @@ pub(crate) fn show_shashed(
     }
     ret
 }
+
+#[allow(dead_code)]
+pub(crate) fn get_user_rps(
+    farming: &ContractAccount<Farming>,
+    user_id: String,
+    farm_id: String,
+) -> Option<String> {
+    view!(farming.get_user_rps(to_va(user_id), farm_id)).unwrap_json::<Option<String>>()
+}
+
+#[allow(dead_code)]
+pub(crate) fn get_user_seed_info(
+    farming: &ContractAccount<Farming>,
+    user_id: String,
+    seed_id: String,
+) -> UserSeedInfo {
+    view!(farming.get_user_seed_info(to_va(user_id), seed_id.clone())).unwrap_json::<UserSeedInfo>()
+}
+
+// use near_sdk::{AccountId};
+// use test_token::ContractContract as TestToken;
+// pub fn balance_of(token: &ContractAccount<TestToken>, account_id: &AccountId) -> u128 {
+//     view!(token.ft_balance_of(to_va(account_id.clone()))).unwrap_json::<U128>().0
+// }
 
 // =============  Assertions  ===============
 #[allow(dead_code)]

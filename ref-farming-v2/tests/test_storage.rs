@@ -8,15 +8,14 @@ mod common;
 
 #[test]
 fn storage_stake() {
-    let root = init_simulator(None);
-
-    let owner = root.create_user("owner".to_string(), to_yocto("100"));
-    let farmer1 = root.create_user("farmer1".to_string(), to_yocto("100"));
-    let farmer2 = root.create_user("farmer2".to_string(), to_yocto("100"));
+    generate_user_account!(root, owner, farmer1, farmer2);
 
     let farming = deploy_farming(&root, farming_id(), owner.account_id());
 
     // farmer1 register
+    assert_err!(call!(farmer1, farming.storage_deposit(None, None), deposit = to_yocto("0.01")),
+        "E11: insufficient $NEAR storage deposit");
+
     let orig_user_balance = farmer1.account().unwrap().amount;
     call!(farmer1, farming.storage_deposit(None, None), deposit = to_yocto("0.1")).assert_success();
     assert!(orig_user_balance - farmer1.account().unwrap().amount > to_yocto("0.1"));

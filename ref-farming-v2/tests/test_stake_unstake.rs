@@ -11,11 +11,8 @@ mod common;
 /// append staking
 #[test]
 fn lpt_stake_unstake() {
-    let root = init_simulator(None);
-
     // prepair users
-    let owner = root.create_user("owner".to_string(), to_yocto("100"));
-    let farmer1 = root.create_user("farmer1".to_string(), to_yocto("100"));
+    generate_user_account!(root, owner, farmer1);
 
     let (pool, token1, _) = prepair_pool_and_liquidity(&root, &owner, farming_id(), vec![&farmer1]);
 

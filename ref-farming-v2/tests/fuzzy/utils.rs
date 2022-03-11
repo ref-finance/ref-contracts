@@ -161,7 +161,7 @@ pub fn prepair_env(
     mint_token(&token1, &root, to_yocto(&OPERATION_NUM.to_string()));
     call!(
         root,
-        token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto(&OPERATION_NUM.to_string())), None, format!("{}{}{}", "{\"farm_id\": \"", farm_id.clone(), "\"}")),
+        token1.ft_transfer_call(to_va(farming_id()), U128(to_yocto(&OPERATION_NUM.to_string())), None, format!("{{\"Reward\": {{\"farm_id\": \"{}\"}}}}", farm_id.clone())),
         deposit = 1
     )
     .assert_success();

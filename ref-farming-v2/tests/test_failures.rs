@@ -1170,14 +1170,7 @@ fn failure_e62() {
 
     let out_come = call!(
         owner,
-        farming.modify_cd_strategy_item(33, 1000, 10_000)
-    );
-    let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
-    assert!(ex_status.contains("E62: invalid CDStrategy index"));
-
-    let out_come = call!(
-        farmer,
-        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, seed_id.clone(), 1)),
+        farming.modify_cd_strategy_item(33, 1000, 10_000),
         deposit = 1
     );
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
@@ -1185,7 +1178,15 @@ fn failure_e62() {
 
     let out_come = call!(
         farmer,
-        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, seed_id.clone(), 33)),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, 1)),
+        deposit = 1
+    );
+    let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
+    assert!(ex_status.contains("E62: invalid CDStrategy index"));
+
+    let out_come = call!(
+        farmer,
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, 33)),
         deposit = 1
     );
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
@@ -1235,12 +1236,13 @@ fn failure_e63() {
 
     call!(
         owner,
-        farming.modify_cd_strategy_item(0, 1000, 10_000)
+        farming.modify_cd_strategy_item(0, 1000, 10_000),
+        deposit = 1
     ).assert_success();
 
     let out_come = call!(
         farmer,
-        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(16, seed_id.clone(), 0)),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(16, 0)),
         deposit = 1
     );
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
@@ -1248,7 +1250,7 @@ fn failure_e63() {
 
     let out_come = call!(
         farmer,
-        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(1, seed_id.clone(), 0)),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(1, 0)),
         deposit = 1
     );
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
@@ -1256,7 +1258,7 @@ fn failure_e63() {
 
     let out_come = call!(
         farmer,
-        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, append_cd_account_msg(0, seed_id.clone())),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, append_cd_account_msg(0)),
         deposit = 1
     );
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
@@ -1264,7 +1266,7 @@ fn failure_e63() {
 
     call!(
         farmer,
-        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, seed_id.clone(), 0)),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, 0)),
         deposit = 1
     ).assert_success();
 
@@ -1320,18 +1322,19 @@ fn failure_e65() {
 
     call!(
         owner,
-        farming.modify_cd_strategy_item(0, 1000, 10_000)
+        farming.modify_cd_strategy_item(0, 1000, 10_000),
+        deposit = 1
     ).assert_success();
 
     call!(
         farmer,
-        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, seed_id.clone(), 0)),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, 0)),
         deposit = 1
     ).assert_success();
 
     let out_come = call!(
         farmer,
-        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, seed_id.clone(), 0)),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, 0)),
         deposit = 1
     );
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
@@ -1381,12 +1384,13 @@ fn failure_e66() {
 
     call!(
         owner,
-        farming.modify_cd_strategy_item(0, 1000, 10_000)
+        farming.modify_cd_strategy_item(0, 1000, 10_000),
+        deposit = 1
     ).assert_success();
 
     call!(
         farmer,
-        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, seed_id.clone(), 0)),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, 0)),
         deposit = 1
     ).assert_success();
 
@@ -1398,7 +1402,7 @@ fn failure_e66() {
 
     let out_come = call!(
         farmer,
-        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, append_cd_account_msg(0, seed_id.clone())),
+        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, append_cd_account_msg(0)),
         deposit = 1
     );
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
@@ -1411,78 +1415,4 @@ fn failure_e66() {
     );
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
     assert!(ex_status.contains("E66: Empty CDAccount"));
-}
-
-#[test]
-fn failure_e67() {
-    let root = init_simulator(None);
-
-    println!("----->> Prepare accounts.");
-    let owner = root.create_user("owner".to_string(), to_yocto("100"));
-    let farmer = root.create_user("farmer1".to_string(), to_yocto("100"));
-    println!("<<----- owner and farmer prepared.");
-
-    println!("----->> Prepare ref-exchange and swap pool.");
-    let (pool, token1, _) = prepair_pool_and_liquidity(
-        &root, &owner, farming_id(), vec![&farmer]);
-    println!("<<----- The pool prepaired.");
-
-    // deploy farming contract and register user
-    println!("----->> Deploy farming and register farmers.");
-    let farming = deploy_farming(&root, farming_id(), owner.account_id());
-    call!(farmer, farming.storage_deposit(None, None), deposit = to_yocto("1")).assert_success();
-    println!("<<----- farming deployed, farmers registered.");
-
-    // create farm
-    println!("----->> Create farm.");
-    let farm_id = "swap@0#0".to_string();
-    let seed_id = format!("{}@0", pool.account_id());
-    let seed_id1 = format!("{}@1", pool.account_id());
-    let out_come = call!(
-        owner,
-        farming.create_simple_farm(HRSimpleFarmTerms{
-            seed_id: seed_id.clone(),
-            reward_token: token1.valid_account_id(),
-            start_at: 0,
-            reward_per_session: to_yocto("1").into(),
-            session_interval: 60,
-        }, None),
-        deposit = to_yocto("1")
-    );
-    out_come.assert_success();
-    let out_come = call!(
-        owner,
-        farming.create_simple_farm(HRSimpleFarmTerms{
-            seed_id: seed_id1.clone(),
-            reward_token: token1.valid_account_id(),
-            start_at: 0,
-            reward_per_session: to_yocto("1").into(),
-            session_interval: 60,
-        }, None),
-        deposit = to_yocto("1")
-    );
-    out_come.assert_success();
-    println!("<<----- Farm {} created at #{}, ts:{}.", 
-    farm_id,
-    root.borrow_runtime().current_block().block_height, 
-    root.borrow_runtime().current_block().block_timestamp);
-
-    call!(
-        owner,
-        farming.modify_cd_strategy_item(0, 1000, 10_000)
-    ).assert_success();
-
-    call!(
-        farmer,
-        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, generate_cd_account_msg(0, seed_id.clone(), 0)),
-        deposit = 1
-    ).assert_success();
-
-    let out_come = call!(
-        farmer,
-        pool.mft_transfer_call(":0".to_string(), to_va(farming_id()), to_yocto("0.01").into(), None, append_cd_account_msg(0, seed_id1.clone())),
-        deposit = 1
-    );
-    let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
-    assert!(ex_status.contains("E67: Unmatched SeedId"));
 }
