@@ -12,16 +12,13 @@ use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 /// Message parameters to receive via token function call.
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
-#[serde(untagged)]
 enum TokenReceiverMessage {
     NewCDAccount {
-        index: u64,
-        seed_id: SeedId,
-        cd_strategy: usize,
+        index: u32,
+        cd_strategy: u32,
     },
     AppendCDAccount {
-        index: u64,
-        seed_id: SeedId,
+        index: u32,
     },
     Reward {
         farm_id: FarmId,
@@ -44,7 +41,6 @@ impl FungibleTokenReceiver for Contract {
         let amount: u128 = amount.into();
         if msg.is_empty() {
             // ****** seed Token deposit in ********
-
             // if seed not exist, it will panic
             let seed_farm = self.get_seed(&env::predecessor_account_id());
             if amount < seed_farm.get_ref().min_deposit {
@@ -82,9 +78,9 @@ impl FungibleTokenReceiver for Contract {
             match message {
                 TokenReceiverMessage::NewCDAccount {
                     index,
-                    seed_id,
                     cd_strategy,
                 } => {
+                    let seed_id = env::predecessor_account_id();
                     if let Some(seed_farm) = self.get_seed_wrapped(&seed_id) {
                         if amount < seed_farm.get_ref().min_deposit {
                             env::panic(
@@ -97,7 +93,7 @@ impl FungibleTokenReceiver for Contract {
                             )
                         }
 
-                        let seed_power = self.generate_cd_account(&sender, seed_id, index, cd_strategy, amount.into());
+                        let seed_power = self.generate_cd_account(&sender, seed_id.clone(), index.into(), cd_strategy as usize, amount);
 
                         self.internal_seed_deposit(
                             &env::predecessor_account_id(), 
@@ -125,8 +121,8 @@ impl FungibleTokenReceiver for Contract {
                 },
                 TokenReceiverMessage::AppendCDAccount {
                     index,
-                    seed_id,
                 } => {
+                    let seed_id = env::predecessor_account_id();
                     if let Some(seed_farm) = self.get_seed_wrapped(&seed_id) {
                         if amount < seed_farm.get_ref().min_deposit {
                             env::panic(
@@ -139,7 +135,7 @@ impl FungibleTokenReceiver for Contract {
                             )
                         }
 
-                        let seed_power = self.append_cd_account(&sender, seed_id, index, amount.into());
+                        let seed_power = self.append_cd_account(&sender, seed_id.clone(), index.into(), amount);
 
                         self.internal_seed_deposit(
                             &env::predecessor_account_id(), 
@@ -246,18 +242,17 @@ impl MFTTokenReceiver for Contract {
         msg: String,
     ) -> PromiseOrValue<U128> {
         let amount: u128 = amount.into();
-        if msg.is_empty() {
-            let seed_id: String;
-            match parse_token_id(token_id.clone()) {
-                TokenOrPool::Pool(pool_id) => {
-                    seed_id = format!("{}{}{}", env::predecessor_account_id(), MFT_TAG, pool_id);
-                }
-                TokenOrPool::Token(_) => {
-                    // for seed deposit, using mft to transfer 'root' token is not supported.
-                    env::panic(ERR35_ILLEGAL_TOKEN_ID.as_bytes());
-                }
+        let seed_id: String;
+        match parse_token_id(token_id.clone()) {
+            TokenOrPool::Pool(pool_id) => {
+                seed_id = format!("{}{}{}", env::predecessor_account_id(), MFT_TAG, pool_id);
             }
-
+            TokenOrPool::Token(_) => {
+                // for seed deposit, using mft to transfer 'root' token is not supported.
+                env::panic(ERR35_ILLEGAL_TOKEN_ID.as_bytes());
+            }
+        }
+        if msg.is_empty() {
             // if seed not exist, it will panic
             let seed_farm = self.get_seed(&seed_id);
             if amount < seed_farm.get_ref().min_deposit {
@@ -288,7 +283,6 @@ impl MFTTokenReceiver for Contract {
             match message {
                 TokenReceiverMessage::NewCDAccount {
                     index,
-                    seed_id,
                     cd_strategy,
                 } => {
                     let seed_farm = self.get_seed(&seed_id);
@@ -303,7 +297,7 @@ impl MFTTokenReceiver for Contract {
                         )
                     }
                     
-                    let seed_power = self.generate_cd_account(&sender_id, seed_id.clone(), index, cd_strategy, amount.into());
+                    let seed_power = self.generate_cd_account(&sender_id, seed_id.clone(), index.into(), cd_strategy as usize, amount);
                     
                     self.internal_seed_deposit(
                         &seed_id, 
@@ -323,12 +317,10 @@ impl MFTTokenReceiver for Contract {
                         )
                         .as_bytes(),
                     );
-
                     PromiseOrValue::Value(U128(0))
                 },
                 TokenReceiverMessage::AppendCDAccount {
                     index,
-                    seed_id,
                 } => {
                     let seed_farm = self.get_seed(&seed_id);
                     if amount < seed_farm.get_ref().min_deposit {
@@ -342,7 +334,7 @@ impl MFTTokenReceiver for Contract {
                         )
                     }
                     
-                    let seed_power = self.append_cd_account(&sender_id, seed_id.clone(), index, amount.into());
+                    let seed_power = self.append_cd_account(&sender_id, seed_id.clone(), index.into(), amount);
                     
                     self.internal_seed_deposit(
                         &seed_id, 
