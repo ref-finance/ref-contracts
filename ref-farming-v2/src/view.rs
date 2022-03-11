@@ -32,6 +32,13 @@ pub struct Metadata {
     pub farm_expire_sec: u32,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub struct StorageReport {
+    pub storage: U64,
+    pub locking_near: U128,
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct FarmInfo {
@@ -181,6 +188,14 @@ impl Contract {
         }
     }
 
+    pub fn get_contract_storage_report(&self) -> StorageReport {
+        let su = env::storage_usage();
+        StorageReport {
+            storage: U64(su),
+            locking_near: U128(su as Balance * env::storage_byte_cost()),
+        }
+    }
+
     /// Returns number of farms.
     pub fn get_number_of_farms(&self) -> u64 {
         self.data().farms.len()
@@ -280,11 +295,6 @@ impl Contract {
             self.get_seed_wrapped(&seed_id),
         ) {
             if let Some(farm) = self.data().farms.get(&farm_id) {
-                // let reward_amount = farm.view_farmer_unclaimed_reward(
-                //     &farmer.get_ref().get_rps(&farm.get_farm_id()),
-                //     farmer.get_ref().seed_amounts.get(&seed_id).unwrap_or(&0_u128),//TODO power
-                //     &farm_seed.get_ref().total_seed_amount,//TODO power
-                // );
                 let reward_amount = farm.view_farmer_unclaimed_reward(
                     &farmer.get_ref().get_rps(&farm.get_farm_id()),
                     farmer.get_ref().seed_powers.get(&seed_id).unwrap_or(&0_u128),

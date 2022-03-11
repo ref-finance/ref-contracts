@@ -119,7 +119,6 @@ fn claim_user_reward_from_farm(
     total_seeds: &Balance,
     silent: bool,
 ) {
-    // let user_seeds = farmer.seed_amounts.get(&farm.get_seed_id()).unwrap_or(&0_u128);//TODO power
     let user_seeds = farmer.seed_powers.get(&farm.get_seed_id()).unwrap_or(&0_u128);
     let user_rps = farmer.get_rps(&farm.get_farm_id());
     let (new_user_rps, reward_amount) = farm.claim_user_reward(&user_rps, user_seeds, total_seeds, silent);
@@ -156,7 +155,6 @@ impl Contract {
         seed_id: &SeedId) {
         let mut farmer = self.get_farmer(sender_id);
         if let Some(mut farm_seed) = self.get_seed_wrapped(seed_id) {
-            // let amount = farm_seed.get_ref().total_seed_amount;// TODO power
             let amount = farm_seed.get_ref().total_seed_power;
             for farm_id in &mut farm_seed.get_ref_mut().farms.iter() {
                 let mut farm = self.data().farms.get(farm_id).unwrap();
@@ -182,7 +180,6 @@ impl Contract {
         let (seed_id, _) = parse_farm_id(farm_id);
 
         if let Some(farm_seed) = self.get_seed_wrapped(&seed_id) {
-            // let amount = farm_seed.get_ref().total_seed_amount;// TODO power
             let amount = farm_seed.get_ref().total_seed_power;
             if let Some(mut farm) = self.data().farms.get(farm_id) {
                 claim_user_reward_from_farm(

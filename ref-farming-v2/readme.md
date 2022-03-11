@@ -1,4 +1,85 @@
-# ref-farming
+# ref-v2-farming
+This is an improved version of ref-farming contract.  
+Compare to ref-farming contract, it has following new features:
+- Multi-farming ability upgraded from 16 to 32 farms in one seed,
+- Support locking liquidity (CD Account) when farming,
+- Support farm expire to enable new farm even the seed has reached 32 farms limit,
+- Simplified storage fee strategy to improve user experience.
+
+## User Manual
+---
+
+### User Roles
+There are three user roles:
+- Farmer  
+    * Can stake/unstake seed to participate in farming,
+    * Can claim farming reward to inner account,
+    * Can withdraw assets from inner account to user wallet,
+- Operator (also can be a farmer)  
+    * create new farming,
+    * adjust CD Account strategy,
+    * adjust full slash rate per seed,
+    * adjust minimum deposit per seed,
+- Owner (mostly be a DAO)  
+    * set owner to another account,
+    * manage operators,
+    * upgrade the contract,
+
+### User Register
+```bash
+near call $REF_V2FARM storage_deposit '{"account_id": "farmer.testnet", "registration_only": true}' --account_id=farmer.testnet --deposit=1
+```
+note:
+- Each farmer would lock 0.1 near for their storage when register,
+- Use registration_only=true, the unused deposited near would refund,
+
+To check a user's register status:
+```bash
+near view $REF_V2FARM storage_balance_of '{"account_id": "farmer.testnet"}'
+```
+
+### Stake/Unstake Seed
+
+**Stake Non-CD-Account seed**
+```bash
+near call $REF_EX mft_transfer_call '{"receiver_id": "'$REF_V2FARM'", "token_id": ":0", "amount": "xxxx", "msg": ""}' --account_id=farmer.testnet --depositYocto=1 --gas=150$TGAS
+```
+
+**Stake seed into a new CD-Account**
+```bash
+near call $REF_EX mft_transfer_call '{"receiver_id": "'$REF_V2FARM'", "token_id": ":0", "amount": "xxxx", "msg": "{\"index\":0,\"seed_id\":\"xxxx\",\"cd_strategy\":0}"}' --account_id=farmer.testnet --depositYocto=1 --gas=150$TGAS
+```
+note:  
+- index in msg: CD-Account index,
+- seed_id in msg: seed in this CD-Account,
+- cd_strategy in msg: the cd_strategy index this CD-Account applied,
+- if CD-Account index is occupied, the TX succeed but refund seed token; 
+- if cd_strategy doesn't exist, the TX succeed but refund seed token; 
+- if seed_id is incorrect, the TX succeed but refund seed token; 
+
+**Append seed into an existing CD-Account**
+```bash
+near call $REF_EX mft_transfer_call '{"receiver_id": "'$REF_V2FARM'", "token_id": ":0", "amount": "xxxx", "msg": "{\"index\":0,\"seed_id\":\"xxxx\"}"}' --account_id=farmer.testnet --depositYocto=1 --gas=150$TGAS
+```
+note:  
+- index in msg: CD-Account index,
+- seed_id in msg: seed in this CD-Account,
+- if CD-Account not exist, the TX succeed but refund seed token; 
+- if seed in CD-Account doesn't match, the TX succeed but refund seed token; 
+
+**Unstake Non-CD-Account seed**
+```bash
+near call $REF_V2FARM withdraw_seed '{"seed_id": "xxxx", "amount": "xxxx"}' --account_id=farmer.testnet --depositYocto=1 --gas=100$TGAS
+```
+**Unstake CD-Account seed**
+```bash
+near call $REF_V2FARM withdraw_seed_from_cd_account '{"index": 0, "amount": "xxxx"}' --account_id=farmer.testnet --depositYocto=1 --gas=100$TGAS
+```
+note:  
+- index: CD-Account index, from 0-15 for each farmer.
+
+## Developer Manual
+---
 
 ## Interface Structure
 
