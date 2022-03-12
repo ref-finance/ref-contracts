@@ -18,11 +18,14 @@ There are three user roles:
 - Operator (also can be a farmer)  
     * create new farming,
     * adjust CD Account strategy,
-    * adjust full slash rate per seed,
+    * adjust full slash per seed rate and default rate,
     * adjust minimum deposit per seed,
+    * withdraw slashed seed to owner account,
 - Owner (mostly be a DAO)  
     * set owner to another account,
     * manage operators,
+    * adjust farm expire time,
+    * refund from seed lostfound,
     * upgrade the contract,
 
 ### User Register
@@ -44,39 +47,164 @@ near view $REF_V2FARM storage_balance_of '{"account_id": "farmer.testnet"}'
 ```bash
 near call $REF_EX mft_transfer_call '{"receiver_id": "'$REF_V2FARM'", "token_id": ":0", "amount": "xxxx", "msg": ""}' --account_id=farmer.testnet --depositYocto=1 --gas=150$TGAS
 ```
-
-**Stake seed into a new CD-Account**
-```bash
-near call $REF_EX mft_transfer_call '{"receiver_id": "'$REF_V2FARM'", "token_id": ":0", "amount": "xxxx", "msg": "{\"index\":0,\"seed_id\":\"xxxx\",\"cd_strategy\":0}"}' --account_id=farmer.testnet --depositYocto=1 --gas=150$TGAS
-```
 note:  
-- index in msg: CD-Account index,
-- seed_id in msg: seed in this CD-Account,
-- cd_strategy in msg: the cd_strategy index this CD-Account applied,
-- if CD-Account index is occupied, the TX succeed but refund seed token; 
-- if cd_strategy doesn't exist, the TX succeed but refund seed token; 
-- if seed_id is incorrect, the TX succeed but refund seed token; 
-
-**Append seed into an existing CD-Account**
-```bash
-near call $REF_EX mft_transfer_call '{"receiver_id": "'$REF_V2FARM'", "token_id": ":0", "amount": "xxxx", "msg": "{\"index\":0,\"seed_id\":\"xxxx\"}"}' --account_id=farmer.testnet --depositYocto=1 --gas=150$TGAS
-```
-note:  
-- index in msg: CD-Account index,
-- seed_id in msg: seed in this CD-Account,
-- if CD-Account not exist, the TX succeed but refund seed token; 
-- if seed in CD-Account doesn't match, the TX succeed but refund seed token; 
+- with empty msg, user got same amount of seed power in reward distribution,
+- with empty msg, user can unstake those seed at any time,
 
 **Unstake Non-CD-Account seed**
 ```bash
 near call $REF_V2FARM withdraw_seed '{"seed_id": "xxxx", "amount": "xxxx"}' --account_id=farmer.testnet --depositYocto=1 --gas=100$TGAS
 ```
+
+**View CD-Account Policy**
+```bash
+near view $REF_V2FARM get_cd_strategy
+```
+response is like:
+```bash
+{
+  stake_strategy: [
+    { enable: true, lock_sec: 2592000, power_reward_rate: 1000 },
+    { enable: true, lock_sec: 7776000, power_reward_rate: 3000 },
+    { enable: true, lock_sec: 15552000, power_reward_rate: 5000 },
+    { enable: false, lock_sec: 0, power_reward_rate: 0 },
+    { enable: false, lock_sec: 0, power_reward_rate: 0 },
+    ...
+  ]
+}
+```
+note:  
+- `enable` indicates this item is valid or not,
+- `lock_sec` means the minimum locking period (in sec) without slash,
+- `power_reward_rate` means the addtional power rate in bps,
+
+**Stake seed into a new CD-Account**
+```bash
+near call $REF_EX mft_transfer_call '{"receiver_id": "'$REF_V2FARM'", "token_id": ":0", "amount": "xxxx", "msg": "{\"NewCDAccount\":{\"index\":0,\"cd_strategy\":0}}"}' --account_id=farmer.testnet --depositYocto=1 --gas=150$TGAS
+```
+note:  
+- index in msg: CD-Account index,
+- cd_strategy in msg: the cd_strategy index this CD-Account applied,
+- if CD-Account index is occupied, the TX succeed but refund seed token; 
+- if cd_strategy doesn't exist, the TX succeed but refund seed token; 
+
+
+**Append seed into an existing CD-Account**
+```bash
+near call $REF_EX mft_transfer_call '{"receiver_id": "'$REF_V2FARM'", "token_id": ":0", "amount": "xxxx", "msg": "{\"AppendCDAccount\":{\"index\":0}}"}' --account_id=farmer.testnet --depositYocto=1 --gas=150$TGAS
+```
+note:  
+- index in msg: CD-Account index,
+- if CD-Account not exist, the TX succeed but refund seed token; 
+- if seed in CD-Account doesn't match, the TX succeed but refund seed token; 
+
+
 **Unstake CD-Account seed**
 ```bash
 near call $REF_V2FARM withdraw_seed_from_cd_account '{"index": 0, "amount": "xxxx"}' --account_id=farmer.testnet --depositYocto=1 --gas=100$TGAS
 ```
 note:  
 - index: CD-Account index, from 0-15 for each farmer.
+
+**View User Seed Info**
+```bash
+# show users whole seed info
+near view $REF_V2FARM list_user_seed_info '{"account_id": "farmer.testnet", "from_index": 0, "limit": 100}'
+# or to show only cd account info
+near view $REF_V2FARM list_user_cd_account '{"account_id": "farmer.testnet", "from_index": 0, "limit": 100}'
+```
+The response is like:
+```bash
+{
+  'exchange.ref-dev.testnet@5': {
+    seed_id: 'exchange.ref-dev.testnet@5',
+    amount: '11100000000000000000000',
+    power: '11209999756944444444444',
+    cds: [
+      {
+        cd_account_id: 0,
+        seed_id: 'exchange.ref-dev.testnet@5',
+        seed_amount: '500000000000000000000',
+        seed_power: '550000000000000000000',
+        begin_sec: 1646919954,
+        end_sec: 1649511954
+      },
+      {
+        cd_account_id: 1,
+        seed_id: 'exchange.ref-dev.testnet@5',
+        seed_amount: '600000000000000000000',
+        seed_power: '659999756944444444444',
+        begin_sec: 1646966105,
+        end_sec: 1649558105
+      }
+    ]
+  }
+}
+
+```
+Note:
+- `end_sec` means the ealiest timestamp (in sec) that farmer unstake at without slash.
+
+### Claim and Withdraw Reward
+
+**show unclaimed reward of a farm**
+```bash
+near view $REF_V2FARM get_unclaimed_reward '{"account_id": "farmer.testnet", "farm_id": "xxx@5#2"}'
+```
+
+**claim per farm**
+```bash
+near call $REF_V2FARM claim_reward_by_farm '{"farm_id": "xxx@5#2"}' --account_id=farmer.testnet --gas=150$TGAS
+```
+
+**claim per seed**
+```bash
+near call $REF_V2FARM claim_reward_by_seed '{"seed_id": "xxx@5"}' --account_id=farmer.testnet --gas=150$TGAS
+```
+
+**withdraw reward**
+```bash
+# withdraw all amount of given token
+near call $REF_V2FARM withdraw_reward '{"token_id": "xxx"}' --account_id=farmer.testnet --depositYocto=1 --gas=$GAS100
+# or withdraw given amount of given token
+near call $REF_FARM withdraw_reward '{"token_id": "xxx", "amount": "100"}' --account_id=farmer.testnet --depositYocto=1 --gas=$GAS100
+```
+
+### Operator Actions
+
+**Create New Farm**
+```bash
+near call $REF_V2FARM create_simple_farm '{"terms": {"seed_id": "xxx", "reward_token": "xxx", "start_at": 0, "reward_per_session": "nnn", "session_interval": 60}}' --account_id=op.testnet --deposit=0.01 || true
+```
+Note:  
+- `start_at` the distribution start timestamp or 0 means to start distribute as long as the reward token is deposited into the farm,
+- `session_interval` the interval secs between distribution,
+- will return farm_id of the created farm,
+
+**Modify Seed Minimum Amount of Deposit**
+```bash
+near call $REF_V2FARM modify_seed_min_deposit '{"seed_id": "xxx", "min_deposit": "nnn"}' --account_id=op.testnet --depositYocto=1
+```
+
+**Modify Default Seed Slash Rate**
+```bash
+near call $REF_V2FARM modify_seed_slash_rate '{"slash_rate": nnn}' --account_id=op.testnet --depositYocto=1
+```
+
+**Modify Seed Slash Rate**
+```bash
+near call $REF_V2FARM modify_seed_slash_rate '{"seed_id": "xxx", "slash_rate": nnn}' --account_id=op.testnet --depositYocto=1
+```
+
+**Modify CD Account Policy**
+```bash
+near call $REF_V2FARM modify_cd_strategy_item '{"index": n, "lock_sec": nnn, "power_reward_rate": nnn}' --account_id=op.testnet --depositYocto=1
+```
+
+**Withdraw Slashed Seed to Owner Account**
+```bash
+near call $REF_V2FARM withdraw_seed_slashed '{"seed_id": "xxx"}' --account_id=op.testnet --depositYocto=1
+```
 
 ## Developer Manual
 ---
