@@ -175,6 +175,27 @@ impl From<&CDStrategy> for CDStrategyInfo {
     }
 }
 
+impl Contract {
+    fn user_seed_info(&self, farmer: &VersionedFarmer, seed_id: &SeedId) -> UserSeedInfo {
+        UserSeedInfo{
+            seed_id: seed_id.clone(),
+            amount: farmer.get_ref().seed_amounts.get(seed_id).map_or(U128(0), |&v| {
+                let mut cd_amount_total = 0;
+                for f in farmer.get_ref().cd_accounts.iter(){
+                    cd_amount_total += f.seed_amount;
+                }
+                U128(v + cd_amount_total)
+            }),
+            power: farmer.get_ref().seed_powers.get(seed_id).map_or(U128(0), |&v| U128(v)),
+            cds: farmer.get_ref().cd_accounts.iter().enumerate().map(|(index, cd_account)| {
+                let mut cd_account_info: CDAccountInfo = cd_account.into();
+                cd_account_info.cd_account_id = index as u32;
+                cd_account_info
+            }).collect()
+        }
+    }
+}
+
 #[near_bindgen]
 impl Contract {
     pub fn get_metadata(&self) -> Metadata {
@@ -385,22 +406,7 @@ impl Contract {
 
     pub fn get_user_seed_info(&self, account_id: ValidAccountId, seed_id: SeedId) -> Option<UserSeedInfo> {
         if let Some(farmer) = self.get_farmer_wrapped(account_id.as_ref()){
-            Some(UserSeedInfo{
-                seed_id: seed_id.clone(),
-                amount: farmer.get_ref().seed_amounts.get(&seed_id).map_or(U128(0), |&v| {
-                    let mut cd_amount_total = 0;
-                    for f in farmer.get_ref().cd_accounts.iter(){
-                        cd_amount_total += f.seed_amount;
-                    }
-                    U128(v + cd_amount_total)
-                }),
-                power: farmer.get_ref().seed_powers.get(&seed_id).map_or(U128(0), |&v| U128(v)),
-                cds: farmer.get_ref().cd_accounts.iter().enumerate().map(|(index, cd_account)| {
-                    let mut cd_account_info: CDAccountInfo = cd_account.into();
-                    cd_account_info.cd_account_id = index as u32;
-                    cd_account_info
-                }).collect()
-            })
+            Some(self.user_seed_info(&farmer, &seed_id))
         }else{
             None
         }
@@ -414,20 +420,7 @@ impl Contract {
                 let seed_id = keys.get(index).unwrap();
                 (
                     seed_id.clone(),
-                    UserSeedInfo{
-                        seed_id: seed_id.clone(),
-                        amount: farmer.get_ref().seed_amounts.get(&seed_id).map_or(U128(0), |&v| {
-                            let mut cd_amount_total = 0;
-                            for f in farmer.get_ref().cd_accounts.iter(){
-                                cd_amount_total += f.seed_amount;
-                            }
-                            U128(v + cd_amount_total)
-                        }),
-                        power: farmer.get_ref().seed_powers.get(&seed_id).map_or(U128(0), |&v| U128(v)),
-                        cds: farmer.get_ref().cd_accounts.iter().map(|cd_account| {
-                            cd_account.into()
-                        }).collect()
-                    },
+                    self.user_seed_info(&farmer, &seed_id),
                 )
             })
             .collect()
