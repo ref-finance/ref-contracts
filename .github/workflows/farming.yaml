@@ -1,0 +1,24 @@
+name: Test ref-farming-v2
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  test_ref_farming:
+    runs-on: ubuntu-latest 
+    container:
+      image: nearprotocol/contract-builder:latest
+      env:
+        RUSTFLAGS: -C link-arg=-s
+    steps:
+      - uses: actions/checkout@v2
+      - run: |
+          rustup toolchain install stable-2021-11-01 && \
+          rustup default stable-2021-11-01 && \
+          rustup target add wasm32-unknown-unknown && \
+          cd ref-farming-v2 && \
+          cargo build --target wasm32-unknown-unknown --release
+      - run: |
+          cd ref-farming-v2 && \
+          cargo test -- --skip fuzzy
