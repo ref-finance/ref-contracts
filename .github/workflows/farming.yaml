@@ -14,9 +14,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: |
-          cd ref-farming-v2 && \
           rustup toolchain install stable-2021-11-01 && \
           rustup default stable-2021-11-01 && \
           rustup target add wasm32-unknown-unknown && \
-          ./build_local.sh && \
-          cargo test -- --skip fuzzy
+          cd ref-farming-v2 && \
+          cargo build --target wasm32-unknown-unknown --release
+      - run: |
+          cd ref-farming && \
+          cargo test
