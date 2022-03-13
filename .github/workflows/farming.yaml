@@ -20,5 +20,5 @@ jobs:
           cd ref-farming-v2 && \
           cargo build --target wasm32-unknown-unknown --release
       - run: |
-          cd ref-farming && \
-          cargo test
+          cd ref-farming-v2 && \
+          cargo test -- --skip fuzzy
