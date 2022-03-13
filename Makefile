@@ -1,8 +1,8 @@
 NEAR_CONTRACT_BUILDER_IMAGE=nearprotocol/contract-builder
 
-FARMING_DIR=ref-farming
-FARMING_BUILDER_NAME=build_ref_farming
-FARMING_RELEASE=ref_farming
+FARMING_DIR=ref-farming-v2
+FARMING_BUILDER_NAME=build_v2_ref_farming
+FARMING_RELEASE=ref_farming_v2
 
 EXCHANGE_DIR=ref-exchange
 EXCHANGE_BUILDER_NAME=build_ref_exchange
@@ -14,10 +14,10 @@ build-farming:
 	$(call create_builder,${FARMING_BUILDER_NAME},${FARMING_DIR})
 	$(call start_builder,${FARMING_BUILDER_NAME})
 	$(call setup_builder,${FARMING_BUILDER_NAME})
-	docker exec ${FARMING_BUILDER_NAME} /bin/bash build_local.sh
 	
 test-farming: build-farming
-	docker exec ${FARMING_BUILDER_NAME} cargo test 
+	cd ${FARMING_DIR}
+	RUSTFLAGS='-C link-arg=-s' cargo test
 
 build-exchange:
 	$(call create_builder,${EXCHANGE_BUILDER_NAME},${EXCHANGE_DIR})
@@ -25,7 +25,8 @@ build-exchange:
 	$(call setup_builder,${EXCHANGE_BUILDER_NAME})
 	
 test-exchange: build-exchange
-	docker exec ${EXCHANGE_BUILDER_NAME} cargo test 
+	cd ${EXCHANGE_DIR}
+	RUSTFLAGS='-C link-arg=-s' cargo test
 
 res:
 	mkdir -p res
@@ -57,7 +58,7 @@ define start_builder
 endef
 
 define setup_builder
-	docker exec $(1) /bin/bash rust_setup.sh 
+	docker exec $(1) /bin/bash _rust_setup.sh 
 endef
 
 define remove_builder
