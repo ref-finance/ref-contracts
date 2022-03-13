@@ -11,8 +11,10 @@ Cargo.lock
 
 .idea
 .DS_Store
+.vscode
 
 neardev
 
 res/ref_exchange_local.wasm
 res/ref_farming_local.wasm
+res/ref_farming_v2_local.wasm
