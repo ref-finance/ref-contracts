@@ -53,8 +53,8 @@ impl SimplePool {
         assert_eq!(token_account_ids.len(), NUM_TOKENS, "{}", ERR89_WRONG_TOKEN_COUNT);
         Self {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
-            amounts: vec![0u128; token_account_ids.len()],
-            volumes: vec![SwapVolume::default(); token_account_ids.len()],
+            amounts: vec![0u128; NUM_TOKENS],
+            volumes: vec![SwapVolume::default(); NUM_TOKENS],
             total_fee,
             exchange_fee,
             referral_fee,
@@ -110,8 +110,8 @@ impl SimplePool {
     pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>) -> Balance {
         assert_eq!(
             amounts.len(),
-            self.token_account_ids.len(),
-            "{}", ERR89_WRONG_TOKEN_COUNT
+            NUM_TOKENS,
+            "{}", ERR89_WRONG_AMOUNT_COUNT
         );
         let shares = if self.shares_total_supply > 0 {
             let mut fair_supply = U256::max_value();
@@ -172,8 +172,8 @@ impl SimplePool {
     ) -> Vec<Balance> {
         assert_eq!(
             min_amounts.len(),
-            self.token_account_ids.len(),
-            "{}", ERR89_WRONG_TOKEN_COUNT
+            NUM_TOKENS,
+            "{}", ERR89_WRONG_AMOUNT_COUNT
         );
         let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
         assert!(prev_shares_amount >= shares, "{}", ERR91_NOT_ENOUGH_SHARES);

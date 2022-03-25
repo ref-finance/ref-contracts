@@ -75,6 +75,8 @@ pub const ERR89_WRONG_TOKEN_COUNT: &str = "E89: wrong token count";
 pub const ERR90_FEE_TOO_LARGE: &str = "E90: fee too large";
 pub const ERR91_NOT_ENOUGH_SHARES: &str = "E91: not enough shares";
 pub const ERR92_TOKEN_DUPLICATES: &str = "E92: token duplicated";
+pub const ERR89_WRONG_AMOUNT_COUNT: &str = "E89: wrong amount count";
+
 
 // owner
 pub const ERR100_NOT_ALLOWED: &str = "E100: no permission to invoke this";
