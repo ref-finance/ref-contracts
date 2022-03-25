@@ -529,7 +529,7 @@ mod tests {
             .iter()
             .map(|(x, _)| x.clone())
             .collect::<Vec<_>>();
-        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
         contract.extend_whitelisted_tokens(tokens.clone());
         testing_env!(context
             .predecessor_account_id(account_id.clone())
@@ -852,6 +852,7 @@ mod tests {
             accounts(0),
             vec![(accounts(1), 1_000_000), (accounts(2), 1_000_000)],
         );
+        testing_env!(context.attached_deposit(1).build());
         contract.remove_whitelisted_tokens(vec![accounts(2)]);
         testing_env!(context.attached_deposit(1).build());
         contract.unregister_tokens(vec![accounts(2)]);

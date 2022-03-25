@@ -9,7 +9,9 @@ use crate::utils::{FEE_DIVISOR, GAS_FOR_BASIC_OP};
 #[near_bindgen]
 impl Contract {
     /// Change owner. Only can be called by owner.
+    #[payable]
     pub fn set_owner(&mut self, owner_id: ValidAccountId) {
+        assert_one_yocto();
         self.assert_owner();
         self.owner_id = owner_id.as_ref().clone();
     }
@@ -49,6 +51,7 @@ impl Contract {
     /// Extend guardians. Only can be called by owner.
     #[payable]
     pub fn extend_guardians(&mut self, guardians: Vec<ValidAccountId>) {
+        assert_one_yocto();
         self.assert_owner();
         for guardian in guardians {
             self.guardians.insert(guardian.as_ref());
@@ -56,7 +59,9 @@ impl Contract {
     }
 
     /// Remove guardians. Only can be called by owner.
+    #[payable]
     pub fn remove_guardians(&mut self, guardians: Vec<ValidAccountId>) {
+        assert_one_yocto();
         self.assert_owner();
         for guardian in guardians {
             self.guardians.remove(guardian.as_ref());
@@ -88,6 +93,7 @@ impl Contract {
     /// Extend whitelisted tokens with new tokens. Only can be called by owner.
     #[payable]
     pub fn extend_whitelisted_tokens(&mut self, tokens: Vec<ValidAccountId>) {
+        assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         for token in tokens {
             self.whitelisted_tokens.insert(token.as_ref());
@@ -95,14 +101,18 @@ impl Contract {
     }
 
     /// Remove whitelisted token. Only can be called by owner.
+    #[payable]
     pub fn remove_whitelisted_tokens(&mut self, tokens: Vec<ValidAccountId>) {
+        assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         for token in tokens {
             self.whitelisted_tokens.remove(token.as_ref());
         }
     }
 
+    #[payable]
     pub fn modify_admin_fee(&mut self, exchange_fee: u32, referral_fee: u32) {
+        assert_one_yocto();
         self.assert_owner();
         assert!(exchange_fee + referral_fee <= FEE_DIVISOR, "{}", ERR101_ILLEGAL_FEE);
         self.exchange_fee = exchange_fee;
@@ -140,12 +150,14 @@ impl Contract {
     /// pool_id: the target stable pool;
     /// future_amp_factor: the target amp factor, could be less or more than current one;
     /// future_amp_time: the endtime of the increasing or decreasing process;
+    #[payable]
     pub fn stable_swap_ramp_amp(
         &mut self,
         pool_id: u64,
         future_amp_factor: u64,
         future_amp_time: WrappedTimestamp,
     ) {
+        assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         match &mut pool {
@@ -157,7 +169,9 @@ impl Contract {
         self.pools.replace(pool_id, &pool);
     }
 
+    #[payable]
     pub fn stable_swap_stop_ramp_amp(&mut self, pool_id: u64) {
+        assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         match &mut pool {

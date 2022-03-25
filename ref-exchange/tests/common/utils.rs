@@ -260,7 +260,8 @@ pub fn setup_pool_with_liquidity() -> (
     let token3 = test_token(&root, usdt(), vec![swap()]);
     call!(
         owner,
-        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth()), to_va(usdt())])
+        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth()), to_va(usdt())]),
+        deposit = 1
     );
     call!(
         root,
@@ -365,7 +366,8 @@ pub fn setup_stable_pool_with_liquidity(
         owner,
         pool.extend_whitelisted_tokens(
             (&token_contracts).into_iter().map(|x| x.valid_account_id()).collect()
-        )
+        ),
+        deposit=1
     );
     call!(
         owner,
@@ -468,7 +470,8 @@ pub fn whitelist_token(
 ) {
     call!(
         owner,
-        ex.extend_whitelisted_tokens(tokens)
+        ex.extend_whitelisted_tokens(tokens),
+        deposit=1
     ).assert_success();
 }
 

@@ -15,7 +15,8 @@ fn guardians_scenario_01() {
     println!("Guardians Case 0101: only owner can add guardians");
     let out_come = call!(
         root,
-        pool.extend_guardians(vec![guard1.valid_account_id(), guard2.valid_account_id()])
+        pool.extend_guardians(vec![guard1.valid_account_id(), guard2.valid_account_id()]),
+        deposit=1
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
@@ -25,7 +26,8 @@ fn guardians_scenario_01() {
 
     let out_come = call!(
         owner,
-        pool.extend_guardians(vec![guard1.valid_account_id(), guard2.valid_account_id()])
+        pool.extend_guardians(vec![guard1.valid_account_id(), guard2.valid_account_id()]),
+        deposit=1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
@@ -37,7 +39,8 @@ fn guardians_scenario_01() {
     println!("Guardians Case 0102: only owner and guardians can manage global whitelists");
     let out_come = call!(
         root,
-        pool.remove_whitelisted_tokens(vec![to_va(eth()), to_va(dai())])
+        pool.remove_whitelisted_tokens(vec![to_va(eth()), to_va(dai())]),
+        deposit=1
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
@@ -50,7 +53,8 @@ fn guardians_scenario_01() {
 
     let out_come = call!(
         owner,
-        pool.remove_whitelisted_tokens(vec![to_va(usdt()), to_va(eth()), to_va(dai())])
+        pool.remove_whitelisted_tokens(vec![to_va(usdt()), to_va(eth()), to_va(dai())]),
+        deposit=1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
@@ -59,7 +63,8 @@ fn guardians_scenario_01() {
 
     let out_come = call!(
         owner,
-        pool.extend_whitelisted_tokens(vec![to_va(dai())])
+        pool.extend_whitelisted_tokens(vec![to_va(dai())]),
+        deposit=1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
@@ -69,7 +74,8 @@ fn guardians_scenario_01() {
 
     let out_come = call!(
         guard1,
-        pool.extend_whitelisted_tokens(vec![to_va(eth())])
+        pool.extend_whitelisted_tokens(vec![to_va(eth())]),
+        deposit=1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
@@ -80,7 +86,8 @@ fn guardians_scenario_01() {
 
     let out_come = call!(
         guard2,
-        pool.extend_whitelisted_tokens(vec![to_va(usdt())])
+        pool.extend_whitelisted_tokens(vec![to_va(usdt())]),
+        deposit=1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
