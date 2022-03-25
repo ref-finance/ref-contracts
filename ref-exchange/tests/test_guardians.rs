@@ -19,7 +19,7 @@ fn guardians_scenario_01() {
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
     let metadata = get_metadata(&pool);
     assert_eq!(metadata.guardians.len(), 0);
 
@@ -41,7 +41,7 @@ fn guardians_scenario_01() {
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
     let wl = get_whitelist(&pool);
     assert_eq!(wl.len(), 3);
     assert_eq!(wl.get(0).unwrap().clone(), dai());
@@ -98,7 +98,7 @@ fn guardians_scenario_01() {
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
     let metadata = get_metadata(&pool);
     assert_eq!(metadata.state, RunningState::Running);
 
@@ -209,7 +209,7 @@ fn guardians_scenario_01() {
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
     let metadata = get_metadata(&pool);
     assert_eq!(metadata.state, RunningState::Paused);
 
@@ -220,7 +220,7 @@ fn guardians_scenario_01() {
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
     let metadata = get_metadata(&pool);
     assert_eq!(metadata.state, RunningState::Paused);
 

@@ -185,7 +185,7 @@ impl Contract {
     #[payable]
     pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
         self.assert_contract_running();
-        assert_ne!(actions.len(), 0, "ERR_AT_LEAST_ONE_SWAP");
+        assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
         U128(
             self.execute_actions(
                 actions
@@ -209,12 +209,12 @@ impl Contract {
         self.assert_contract_running();
         assert!(
             env::attached_deposit() > 0,
-            "Requires attached deposit of at least 1 yoctoNEAR"
+            "{}", ERR35_AT_LEAST_ONE_YOCTO
         );
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
-        let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         // Add amounts given to liquidity first. It will return the balanced amounts.
         pool.add_liquidity(
             &sender_id,
@@ -223,7 +223,7 @@ impl Contract {
         if let Some(min_amounts) = min_amounts {
             // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
             for (amount, min_amount) in amounts.iter().zip(min_amounts.iter()) {
-                assert!(amount >= &min_amount.0, "ERR_MIN_AMOUNT");
+                assert!(amount >= &min_amount.0, "{}", ERR86_MIN_AMOUNT);
             }
         }
         let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
@@ -252,12 +252,12 @@ impl Contract {
         self.assert_contract_running();
         assert!(
             env::attached_deposit() > 0,
-            "Requires attached deposit of at least 1 yoctoNEAR"
+            "{}", ERR35_AT_LEAST_ONE_YOCTO
         );
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
-        let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         // Add amounts given to liquidity first. It will return the balanced amounts.
         let mint_shares = pool.add_stable_liquidity(
             &sender_id,
@@ -285,7 +285,7 @@ impl Contract {
         self.assert_contract_running();
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
-        let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         let amounts = pool.remove_liquidity(
             &sender_id,
             shares.into(),
@@ -322,7 +322,7 @@ impl Contract {
         self.assert_contract_running();
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
-        let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         let burn_shares = pool.remove_liquidity_by_tokens(
             &sender_id,
             amounts
@@ -450,7 +450,7 @@ impl Contract {
         min_amount_out: u128,
         referral_id: &Option<AccountId>,
     ) -> u128 {
-        let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         let amount_out = pool.swap(
             token_in,
             amount_in,
@@ -699,7 +699,7 @@ mod tests {
 
     /// Should deny creating a pool with duplicate tokens.
     #[test]
-    #[should_panic(expected = "ERR_TOKEN_DUPLICATES")]
+    #[should_panic(expected = "E92: token duplicated")]
     fn test_deny_duplicate_tokens_pool() {
         let (mut context, mut contract) = setup_contract();
         create_pool_with_liquidity(
@@ -712,7 +712,7 @@ mod tests {
 
     /// Deny pool with a single token
     #[test]
-    #[should_panic(expected = "ERR_SHOULD_HAVE_2_TOKENS")]
+    #[should_panic(expected = "E89: wrong token count")]
     fn test_deny_single_token_pool() {
         let (mut context, mut contract) = setup_contract();
         create_pool_with_liquidity(
@@ -725,7 +725,7 @@ mod tests {
 
     /// Deny pool with a single token
     #[test]
-    #[should_panic(expected = "ERR_SHOULD_HAVE_2_TOKENS")]
+    #[should_panic(expected = "E89: wrong token count")]
     fn test_deny_too_many_tokens_pool() {
         let (mut context, mut contract) = setup_contract();
         create_pool_with_liquidity(
@@ -782,7 +782,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "ERR_MIN_AMOUNT")]
+    #[should_panic(expected = "E74: swap out amount less than min amount")]
     fn test_deny_min_amount() {
         let (mut context, mut contract) = setup_contract();
         create_pool_with_liquidity(
@@ -826,7 +826,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "ERR_AT_LEAST_ONE_SWAP")]
+    #[should_panic(expected = "E72: at least one swap")]
     fn test_fail_swap_no_actions() {
         let (mut context, mut contract) = setup_contract();
         testing_env!(context.attached_deposit(to_yocto("1")).build());

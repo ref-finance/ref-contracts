@@ -28,7 +28,7 @@ fn owner_scenario_01() {
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
     // println!("{}", get_error_status(&out_come));
 
     println!("Owner Case 0102: owner retrieve unmanaged token but unregstered");

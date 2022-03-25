@@ -115,7 +115,7 @@ pub fn do_direct_swap(ctx: &mut OperationContext, rng: &mut Pcg32, root: &UserAc
 
                 if swap_amount_budget < min_amount_out {
                     assert_eq!(get_error_count(&out_come), 1);
-                    assert!(get_error_status(&out_come).contains("ERR_MIN_AMOUNT"));
+                    assert!(get_error_status(&out_come).contains("E74: swap out amount less than min amount"));
                     assert_eq!(test_token_in_amount, test_token_in_amount_new);
                     assert_eq!(test_token_out_amount, test_token_out_amount_new);
                 }else{
@@ -134,7 +134,7 @@ pub fn do_direct_swap(ctx: &mut OperationContext, rng: &mut Pcg32, root: &UserAc
                     assert!(get_error_status(&out_come).contains("E22: not enough tokens in deposit"));
                 } else {
                     assert_eq!(get_error_count(&out_come), 1);
-                    assert!(get_error_status(&out_come).contains("Smart contract panicked: panicked at 'ERR_INVALID'"));
+                    assert!(get_error_status(&out_come).contains("E76: invalid params"));
                 }
                 do_add_liquidity(ctx, rng, root, operator, pool, simple_pool_count, Some(simple_pool_id));
             },

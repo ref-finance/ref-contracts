@@ -75,7 +75,7 @@ pub fn do_pool_swap(ctx: &mut OperationContext, rng: &mut Pcg32, root: &UserAcco
                     if amount_in > token_in_deposit { 
                         assert!(get_error_status(&out_come).contains("E22: not enough tokens in deposit"));
                     }else {
-                        assert!(get_error_status(&out_come).contains("Smart contract panicked: panicked at 'ERR_INVALID'"));
+                        assert!(get_error_status(&out_come).contains("E76: invalid params"));
                     }
                     do_add_liquidity(ctx, rng, root, operator, pool, simple_pool_count, Some(simple_pool_id));
                 }
@@ -112,6 +112,7 @@ pub fn do_pool_swap(ctx: &mut OperationContext, rng: &mut Pcg32, root: &UserAcco
                     let out_come = swap_action(pool, operator, token_in.clone(), token_out.clone(), amount_in, simple_pool_id);
                     if account_tokens.contains(token_in) {
                         assert_eq!(get_error_count(&out_come), 1);
+                        println!("{}", get_error_status(&out_come));
                         assert!(get_error_status(&out_come).contains("Smart contract panicked: panicked at 'ERR_INVALID'"));
                     }else {
                         assert_eq!(get_error_count(&out_come), 1);
@@ -126,6 +127,7 @@ pub fn do_pool_swap(ctx: &mut OperationContext, rng: &mut Pcg32, root: &UserAcco
                 let out_come = swap_action(pool, operator, token_in.clone(), token_out.clone(), amount_in, simple_pool_id);
                 if account_tokens.contains(token_in) {
                     assert_eq!(get_error_count(&out_come), 1);
+                    println!("{}", get_error_status(&out_come));
                     assert!(get_error_status(&out_come).contains("Smart contract panicked: panicked at 'ERR_INVALID'"));
                 }else {
                     assert_eq!(get_error_count(&out_come), 1);
@@ -140,7 +142,7 @@ pub fn do_pool_swap(ctx: &mut OperationContext, rng: &mut Pcg32, root: &UserAcco
                     let out_come = swap_action(pool, operator, token_in.clone(), token_out.clone(), amount_in, simple_pool_id);
                     if account_tokens.contains(token_in) {
                         assert_eq!(get_error_count(&out_come), 1);
-                        assert!(get_error_status(&out_come).contains("Smart contract panicked: panicked at 'ERR_INVALID'"));
+                        assert!(get_error_status(&out_come).contains("E76: invalid params"));
                     }else {
                         assert_eq!(get_error_count(&out_come), 1);
                         assert!(get_error_status(&out_come).contains("token not registered"));
@@ -155,7 +157,7 @@ pub fn do_pool_swap(ctx: &mut OperationContext, rng: &mut Pcg32, root: &UserAcco
                     let out_come = swap_action(pool, operator, token_in.clone(), token_out.clone(), amount_in, simple_pool_id);
                     if account_tokens.contains(token_in) {
                         assert_eq!(get_error_count(&out_come), 1);
-                        assert!(get_error_status(&out_come).contains("Smart contract panicked: panicked at 'ERR_INVALID'"));
+                        assert!(get_error_status(&out_come).contains("E76: invalid params"));
                     }else {
                         assert_eq!(get_error_count(&out_come), 1);
                         assert!(get_error_status(&out_come).contains("token not registered"));

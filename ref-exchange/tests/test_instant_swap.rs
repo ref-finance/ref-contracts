@@ -76,7 +76,7 @@ fn instant_swap_scenario_01() {
     // println!("{:#?}", out_come.promise_results());
     assert_eq!(get_error_count(&out_come), 1);
     assert!(get_error_status(&out_come)
-        .contains("Smart contract panicked: panicked at 'ERR_MIN_AMOUNT'"));
+        .contains("E74: swap out amount less than min amount"));
     assert!(get_storage_balance(&pool, new_user.valid_account_id()).is_none());
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("10"));
     assert_eq!(balance_of(&token2, &new_user.account_id), to_yocto("0"));
