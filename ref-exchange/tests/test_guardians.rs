@@ -257,15 +257,18 @@ fn guardians_scenario_02() {
     let owner = root.create_user("owner2".to_string(), to_yocto("100"));
     call!(
         old_owner,
-        pool.set_owner(owner.valid_account_id())
+        pool.set_owner(owner.valid_account_id()),
+        deposit=1
     ).assert_success();
     call!(
         owner,
-        pool.extend_guardians(vec![guard1.valid_account_id()])
+        pool.extend_guardians(vec![guard1.valid_account_id()]),
+        deposit=1
     ).assert_success();
     call!(
         owner,
-        pool.modify_admin_fee(1600, 400)
+        pool.modify_admin_fee(1600, 400),
+        deposit=1
     ).assert_success();
     call!(
         root,

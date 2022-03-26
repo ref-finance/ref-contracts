@@ -1057,4 +1057,161 @@ mod tests {
             .build());
         contract.mft_transfer(":0".to_string(), accounts(3), U128(to_yocto("1")), None);
     }
+
+    #[test]
+    fn test_storage() {
+        let (mut context, mut contract) = setup_contract();
+        testing_env!(context
+            .predecessor_account_id(accounts(1))
+            .attached_deposit(to_yocto("1"))
+            .build());
+        contract.storage_deposit(Some(accounts(1)), None);
+        testing_env!(context
+            .predecessor_account_id(accounts(1))
+            .attached_deposit(1)
+            .build());
+        assert_eq!(contract.storage_withdraw(None).available.0, 0);
+        testing_env!(context
+            .predecessor_account_id(accounts(1))
+            .attached_deposit(1)
+            .build());
+        assert!(contract.storage_unregister(None));
+    }
+
+    #[test]
+    fn test_storage_registration_only() {
+        let (mut context, mut contract) = setup_contract();
+        testing_env!(context
+            .predecessor_account_id(accounts(1))
+            .attached_deposit(to_yocto("1"))
+            .build());
+        let deposit1 = contract.storage_deposit(Some(accounts(1)), Some(true));
+        testing_env!(context
+            .predecessor_account_id(accounts(1))
+            .attached_deposit(to_yocto("1"))
+            .build());
+        let deposit2 = contract.storage_deposit(Some(accounts(1)), Some(true));
+        assert_eq!(deposit1.total, deposit2.total);
+    }
+
+    #[test]
+    #[should_panic(expected = "E17: deposit less than min storage")]
+    fn test_storage_deposit_less_then_min_storage() {
+        let (mut context, mut contract) = setup_contract();
+        testing_env!(context
+            .predecessor_account_id(accounts(1))
+            .attached_deposit(1)
+            .build());
+        contract.storage_deposit(Some(accounts(1)), Some(true));
+    }
+
+    #[test]
+    fn test_instant_swap() {
+        let (mut context, mut contract) = setup_contract();
+        // add liquidity of (1,2) tokens
+        create_pool_with_liquidity(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![(accounts(1), to_yocto("5")), (accounts(2), to_yocto("10"))],
+        );
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![
+                (accounts(1), to_yocto("100")),
+                (accounts(2), to_yocto("100")),
+            ],
+        );
+
+        assert_eq!(
+            contract.get_deposit(accounts(3), accounts(1)),
+            to_yocto("100").into()
+        );
+        assert_eq!(
+            contract.get_deposit(accounts(3), accounts(2)),
+            to_yocto("100").into()
+        );
+        assert_eq!(
+            contract.get_pool_total_shares(0).0,
+            crate::utils::INIT_SHARES_SUPPLY
+        );
+
+        // Get price from pool :0 1 -> 2 tokens.
+        let expected_out = contract.get_return(0, accounts(1), to_yocto("1").into(), accounts(2));
+        assert_eq!(expected_out.0, 1663192997082117548978741);
+
+        let actions_str = format!(
+            "{{\"pool_id\": {}, \"token_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
+            0, accounts(1), accounts(2), 1
+        );
+
+        let msg_str = format!("{{\"actions\": [{}]}}", actions_str);
+        testing_env!(context
+            .predecessor_account_id(accounts(1))
+            .attached_deposit(1)
+            .build());
+        contract.ft_on_transfer(accounts(3), to_yocto("1").into(), msg_str);
+    }
+
+    #[test]
+    fn test_mft_transfer_call() {
+        let one_near = 10u128.pow(24);
+        let (mut context, mut contract) = setup_contract();
+        // add liquidity of (1,2) tokens
+        create_pool_with_liquidity(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![(accounts(1), to_yocto("5")), (accounts(2), to_yocto("10"))],
+        );
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![
+                (accounts(1), to_yocto("100")),
+                (accounts(2), to_yocto("100")),
+            ],
+        );
+        deposit_tokens(&mut context, &mut contract, accounts(1), vec![]);
+
+        assert_eq!(
+            contract.get_deposit(accounts(3), accounts(1)),
+            to_yocto("100").into()
+        );
+        assert_eq!(
+            contract.get_deposit(accounts(3), accounts(2)),
+            to_yocto("100").into()
+        );
+        assert_eq!(
+            contract.get_pool_total_shares(0).0,
+            crate::utils::INIT_SHARES_SUPPLY
+        );
+
+        // Get price from pool :0 1 -> 2 tokens.
+        let expected_out = contract.get_return(0, accounts(1), one_near.into(), accounts(2));
+        assert_eq!(expected_out.0, 1663192997082117548978741);
+
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(1)
+            .build());
+        let amount_out = swap(&mut contract, 0, accounts(1), one_near, accounts(2));
+        assert_eq!(amount_out, expected_out.0);
+        assert_eq!(
+            contract.get_deposit(accounts(3), accounts(1)).0,
+            99 * one_near
+        );
+        assert_eq!("ref-pool-0".to_string(), contract.mft_metadata(":0".to_string()).name);
+        // transfer some of token_id 2 from acc 3 to acc 1.
+        testing_env!(context.predecessor_account_id(accounts(3)).build());
+        contract.mft_transfer_call(accounts(2).to_string(), accounts(1), U128(one_near), None, "".to_string());
+        assert_eq!(
+            contract.get_deposit(accounts(3), accounts(2)).0,
+            99 * one_near + amount_out
+        );
+    }
+
 }
