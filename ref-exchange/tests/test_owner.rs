@@ -1,4 +1,3 @@
-use near_sdk::json_types::{U128};
 use near_sdk_sim::{call, to_yocto};
 
 use crate::common::utils::*;
@@ -7,7 +6,6 @@ pub mod common;
 #[test]
 fn owner_scenario_01() {
     let (root, owner, pool, token1, _, _) = setup_pool_with_liquidity();
-    let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
 
     assert_eq!(balance_of(&token1, &pool.account_id()), to_yocto("105"));
 
