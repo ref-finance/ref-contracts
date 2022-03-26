@@ -1,5 +1,9 @@
 # Release Notes
 
+### Version 1.4.3
+1. Let both guardians and owner can remove exchange liquidity to owner inner account by remove_exchange_fee_liquidity;
+2. Let both guardians and owner can withdraw owner token to owner wallet by withdraw_owner_token;
+
 ### Version 1.4.2
 1. Let owner can retrieve unmanaged NEP-141 tokens in contract account;
 2. support withdraw token's full amount in inner-account with 0 in amount parameter;

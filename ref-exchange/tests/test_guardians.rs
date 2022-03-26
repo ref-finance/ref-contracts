@@ -1,5 +1,5 @@
 use near_sdk::json_types::{U128};
-use near_sdk_sim::{call, to_yocto};
+use near_sdk_sim::{call, view, to_yocto};
 
 use ref_exchange::{RunningState, SwapAction};
 use crate::common::utils::*;
@@ -7,7 +7,7 @@ pub mod common;
 
 #[test]
 fn guardians_scenario_01() {
-    let (root, owner, pool, token1, _, _) = setup_pool_with_liquidity();
+    let (root, owner, pool, token1, token2, _) = setup_pool_with_liquidity();
     let guard1 = root.create_user("guard1".to_string(), to_yocto("100"));
     let guard2 = root.create_user("guard2".to_string(), to_yocto("100"));
     let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
@@ -171,25 +171,25 @@ fn guardians_scenario_01() {
     assert_eq!(get_error_count(&out_come), 1);
     assert!(get_error_status(&out_come).contains("E51: contract paused"));
 
-    // // instant swap would fail
-    // call!(
-    //     new_user,
-    //     token2.mint(to_va(new_user.account_id.clone()), U128(to_yocto("10")))
-    // )
-    // .assert_success();
-    // let msg = format!(
-    //     "{{\"pool_id\": {}, \"token_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
-    //     0, token2.account_id(), token1.account_id(), 1
-    // );
-    // let msg_str = format!("{{\"force\": 0, \"actions\": [{}]}}", msg);
-    // let out_come = call!(
-    //     new_user,
-    //     token2.ft_transfer_call(to_va(swap()), to_yocto("1").into(), None, msg_str.clone()),
-    //     deposit = 1
-    // );
-    // out_come.assert_success();
-    // assert_eq!(get_error_count(&out_come), 1);
-    // assert!(get_error_status(&out_come).contains("E51: contract paused"));
+    // instant swap would fail
+    call!(
+        new_user,
+        token2.mint(to_va(new_user.account_id.clone()), U128(to_yocto("10")))
+    )
+    .assert_success();
+    let msg = format!(
+        "{{\"pool_id\": {}, \"token_in\": \"{}\", \"token_out\": \"{}\", \"min_amount_out\": \"{}\"}}",
+        0, token2.account_id(), token1.account_id(), 1
+    );
+    let msg_str = format!("{{\"force\": 0, \"actions\": [{}]}}", msg);
+    let out_come = call!(
+        new_user,
+        token2.ft_transfer_call(to_va(swap()), to_yocto("1").into(), None, msg_str.clone()),
+        deposit = 1
+    );
+    out_come.assert_success();
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E51: contract paused"));
 
     // withdraw token would fail
     let out_come = call!(
@@ -242,3 +242,102 @@ fn guardians_scenario_01() {
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
 } 
+
+#[test]
+fn guardians_scenario_02() {
+    let (root, old_owner, pool, _, token2, token3) = setup_pool_with_liquidity();
+    let guard1 = root.create_user("guard1".to_string(), to_yocto("100"));
+    let owner = root.create_user("owner2".to_string(), to_yocto("100"));
+    call!(
+        old_owner,
+        pool.set_owner(owner.valid_account_id())
+    ).assert_success();
+    call!(
+        owner,
+        pool.extend_guardians(vec![guard1.valid_account_id()])
+    ).assert_success();
+    call!(
+        owner,
+        pool.modify_admin_fee(1600, 400)
+    ).assert_success();
+    call!(
+        root,
+        pool.swap(
+            vec![SwapAction {
+                pool_id: 1,
+                token_in: usdt(),
+                amount_in: Some(U128(to_yocto("1"))),
+                token_out: eth(),
+                min_amount_out: U128(1)
+            }],
+            None
+        ),
+        deposit = 1
+    ).assert_success();
+    assert_eq!(mft_balance_of(&pool, ":1", &pool.account_id()), 18182851357079036914);
+    
+    // guardians remove liquidity but owner account not ready
+    println!("Guardians Case 0201: remove liquidity fail if owner account is not ready");
+    let out_come = call!(
+        guard1,
+        pool.remove_exchange_fee_liquidity(1, U128(18182851357079036914), vec![U128(1), U128(1)]),
+        deposit = 1
+    );
+    // println!("{:#?}", out_come.promise_results());
+    assert!(!out_come.is_ok());
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E10: account not registered"));
+    assert_eq!(mft_balance_of(&pool, ":1", &pool.account_id()), 18182851357079036914);
+
+    // guardians remove liquidity
+    println!("Guardians Case 0202: remove liquidity success");
+    call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    let out_come = call!(
+        guard1,
+        pool.remove_exchange_fee_liquidity(1, U128(18182851357079036914), vec![U128(1), U128(1)]),
+        deposit = 1
+    );
+    out_come.assert_success();
+    assert_eq!(mft_balance_of(&pool, ":1", &pool.account_id()), 0);
+    let owner_deposits = get_deposits(&pool, owner.valid_account_id());
+    assert_eq!(owner_deposits.get(&token2.account_id()).unwrap().0, 330666437772348207866);
+    assert_eq!(owner_deposits.get(&token3.account_id()).unwrap().0, 200007728217076967880);
+
+    // guardians withdraw owner token but owner not registered on token
+    println!("Guardians Case 0203: withdraw owner token fail if owner not registered on token");
+    let out_come = call!(
+        guard1,
+        pool.withdraw_owner_token(token2.valid_account_id(), U128(330666437772348207866)),
+        deposit = 1
+    );
+    out_come.assert_success();
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("The account owner2 is not registered"));
+    let owner_deposits = get_deposits(&pool, owner.valid_account_id());
+    assert_eq!(owner_deposits.get(&token2.account_id()).unwrap().0, 330666437772348207866);
+    assert_eq!(balance_of(&token2, &owner.account_id()), 0);
+
+    // guardians withdraw owner token
+    println!("Guardians Case 0204: withdraw owner token success");
+    call!(
+        owner,
+        token2.storage_deposit(None, Some(true)),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    let out_come = call!(
+        guard1,
+        pool.withdraw_owner_token(token2.valid_account_id(), U128(330666437772348207866)),
+        deposit = 1
+    );
+    out_come.assert_success();
+    assert_eq!(get_error_count(&out_come), 0);
+    let owner_deposits = get_deposits(&pool, owner.valid_account_id());
+    assert_eq!(owner_deposits.get(&token2.account_id()).unwrap().0, 0);
+    assert_eq!(balance_of(&token2, &owner.account_id()), 330666437772348207866);
+}
