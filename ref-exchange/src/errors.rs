@@ -34,7 +34,6 @@ pub const ERR32_ZERO_SHARES: &str = "E32: minting zero shares";
 pub const ERR33_TRANSFER_TO_SELF: &str = "E33: transfer to self";
 pub const ERR34_INSUFFICIENT_LP_SHARES: &str = "E34: insufficient lp shares";
 pub const ERR35_AT_LEAST_ONE_YOCTO: &str = "E35: requires attached deposit of at least 1 yoctoNEAR";
-pub const ERR36_REMOVE_MIN_AMOUNT: &str = "E36: amount less than min amount";
 
 // Action result.
 
@@ -58,7 +57,6 @@ pub const ERR70_SWAP_OUT_CALC_ERR: &str = "E70: encounter err when calc swap out
 pub const ERR71_SWAP_DUP_TOKENS: &str = "E71: illegal swap with duplicated tokens";
 pub const ERR72_AT_LEAST_ONE_SWAP: &str = "E72: at least one swap";
 pub const ERR73_SAME_TOKEN: &str = "E73: same token swap";
-pub const ERR74_SWAP_MIN_AMOUNT: &str = "E74: swap out amount less than min amount";
 pub const ERR75_INVARIANT_REDUCE: &str = "E75: invariant can not reduce ";
 pub const ERR76_INVALID_PARAMS: &str = "E76: invalid params";
 

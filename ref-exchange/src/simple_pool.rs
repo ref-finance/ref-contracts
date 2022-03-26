@@ -182,7 +182,7 @@ impl SimplePool {
             let amount = (U256::from(self.amounts[i]) * U256::from(shares)
                 / U256::from(self.shares_total_supply))
             .as_u128();
-            assert!(amount >= min_amounts[i], "{}", ERR36_REMOVE_MIN_AMOUNT);
+            assert!(amount >= min_amounts[i], "{}", ERR68_SLIPPAGE);
             self.amounts[i] -= amount;
             result.push(amount);
         }
@@ -277,7 +277,7 @@ impl SimplePool {
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
         let amount_out = self.internal_get_return(in_idx, amount_in, out_idx);
-        assert!(amount_out >= min_amount_out, "{}", ERR74_SWAP_MIN_AMOUNT);
+        assert!(amount_out >= min_amount_out, "{}", ERR68_SLIPPAGE);
         env::log(
             format!(
                 "Swapped {} {} for {} {}",

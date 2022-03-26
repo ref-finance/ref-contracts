@@ -789,7 +789,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "E74: swap out amount less than min amount")]
+    #[should_panic(expected = "E68: slippage error")]
     fn test_deny_min_amount() {
         let (mut context, mut contract) = setup_contract();
         create_pool_with_liquidity(
