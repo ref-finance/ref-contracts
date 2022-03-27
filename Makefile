@@ -16,8 +16,7 @@ build-farming:
 	$(call setup_builder,${FARMING_BUILDER_NAME})
 	
 test-farming: build-farming
-	cd ${FARMING_DIR}
-	RUSTFLAGS='-C link-arg=-s' cargo test
+	cd ${FARMING_DIR} && RUSTFLAGS='-C link-arg=-s' cargo test
 
 build-exchange:
 	$(call create_builder,${EXCHANGE_BUILDER_NAME},${EXCHANGE_DIR})
@@ -25,8 +24,7 @@ build-exchange:
 	$(call setup_builder,${EXCHANGE_BUILDER_NAME})
 	
 test-exchange: build-exchange
-	cd ${EXCHANGE_DIR}
-	RUSTFLAGS='-C link-arg=-s' cargo test
+	cd ${EXCHANGE_DIR} && RUSTFLAGS='-C link-arg=-s' cargo test
 
 res:
 	mkdir -p res
