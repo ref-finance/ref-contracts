@@ -345,7 +345,7 @@ impl Contract {
             lostfound.deposit(token_id, amount);
             self.accounts.insert(&self.owner_id, &lostfound.into());
         } else {
-            env::panic(ERR30_NON_WHITELIST_TOKEN.as_bytes());
+            log!("Deposit {} {} failed due to non global whitelisted token", amount, token_id);
         }
         
     }
