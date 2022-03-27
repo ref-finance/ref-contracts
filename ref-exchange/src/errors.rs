@@ -24,7 +24,6 @@ pub const ERR27_DEPOSIT_NEEDED: &str =
     "E27: attach 1yN to swap tokens not in whitelist";
 pub const ERR28_WRONG_MSG_FORMAT: &str = "E28: Illegal msg in ft_transfer_call";
 pub const ERR29_ILLEGAL_WITHDRAW_AMOUNT: &str = "E29: Illegal withdraw amount";
-pub const ERR30_NON_WHITELIST_TOKEN: &str = "E30: non-whitelisted token can NOT deposit into lost-found.";
 
 // Liquidity operations.
 
