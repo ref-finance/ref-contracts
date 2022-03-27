@@ -146,33 +146,33 @@ impl Contract {
 
     /// Returns information about specified pool.
     pub fn get_pool(&self, pool_id: u64) -> PoolInfo {
-        self.pools.get(pool_id).expect("ERR_NO_POOL").into()
+        self.pools.get(pool_id).expect(ERR85_NO_POOL).into()
     }
 
     /// Returns stable pool information about specified pool.
     pub fn get_stable_pool(&self, pool_id: u64) -> StablePoolInfo {
-        self.pools.get(pool_id).expect("ERR_NO_POOL").into()
+        self.pools.get(pool_id).expect(ERR85_NO_POOL).into()
     }
 
     /// Return total fee of the given pool.
     pub fn get_pool_fee(&self, pool_id: u64) -> u32 {
-        self.pools.get(pool_id).expect("ERR_NO_POOL").get_fee()
+        self.pools.get(pool_id).expect(ERR85_NO_POOL).get_fee()
     }
 
     /// Return volumes of the given pool.
     pub fn get_pool_volumes(&self, pool_id: u64) -> Vec<SwapVolume> {
-        self.pools.get(pool_id).expect("ERR_NO_POOL").get_volumes()
+        self.pools.get(pool_id).expect(ERR85_NO_POOL).get_volumes()
     }
 
     pub fn get_pool_share_price(&self, pool_id: u64) -> U128 {
-        self.pools.get(pool_id).expect("ERR_NO_POOL").get_share_price().into()
+        self.pools.get(pool_id).expect(ERR85_NO_POOL).get_share_price().into()
     }
 
     /// Returns number of shares given account has in given pool.
     pub fn get_pool_shares(&self, pool_id: u64, account_id: ValidAccountId) -> U128 {
         self.pools
             .get(pool_id)
-            .expect("ERR_NO_POOL")
+            .expect(ERR85_NO_POOL)
             .share_balances(account_id.as_ref())
             .into()
     }
@@ -181,7 +181,7 @@ impl Contract {
     pub fn get_pool_total_shares(&self, pool_id: u64) -> U128 {
         self.pools
             .get(pool_id)
-            .expect("ERR_NO_POOL")
+            .expect(ERR85_NO_POOL)
             .share_total_balance()
             .into()
     }
@@ -214,7 +214,7 @@ impl Contract {
         amount_in: U128,
         token_out: ValidAccountId,
     ) -> U128 {
-        let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         pool.get_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &AdminFees::new(self.exchange_fee))
             .into()
     }
@@ -251,7 +251,7 @@ impl Contract {
         pool_id: u64,
         amounts: &Vec<U128>,
     ) -> U128 {
-        let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         pool.predict_add_stable_liquidity(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
             .into()
     }
@@ -261,7 +261,7 @@ impl Contract {
         pool_id: u64,
         shares: U128,
     ) -> Vec<U128> {
-        let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         pool.predict_remove_liquidity(shares.into()).into_iter().map(|x| U128(x)).collect()
     }
 
@@ -270,7 +270,7 @@ impl Contract {
         pool_id: u64,
         amounts: &Vec<U128>,
     ) -> U128 {
-        let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         pool.predict_remove_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
             .into()
     }

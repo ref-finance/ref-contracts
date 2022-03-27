@@ -7,9 +7,7 @@ use near_sdk::{env, AccountId, Balance};
 use crate::StorageKey;
 use crate::admin_fee::AdminFees;
 
-use crate::errors::{
-    ERR13_LP_NOT_REGISTERED, ERR14_LP_ALREADY_REGISTERED, ERR31_ZERO_AMOUNT, ERR32_ZERO_SHARES,
-};
+use crate::errors::*;
 use crate::utils::{
     add_to_collection, integer_sqrt, SwapVolume, FEE_DIVISOR, INIT_SHARES_SUPPLY, U256,
 };
@@ -49,14 +47,14 @@ impl SimplePool {
     ) -> Self {
         assert!(
             total_fee < FEE_DIVISOR,
-            "ERR_FEE_TOO_LARGE"
+            "{}", ERR90_FEE_TOO_LARGE
         );
         // [AUDIT_10]
-        assert_eq!(token_account_ids.len(), NUM_TOKENS, "ERR_SHOULD_HAVE_2_TOKENS");
+        assert_eq!(token_account_ids.len(), NUM_TOKENS, "{}", ERR89_WRONG_TOKEN_COUNT);
         Self {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
-            amounts: vec![0u128; token_account_ids.len()],
-            volumes: vec![SwapVolume::default(); token_account_ids.len()],
+            amounts: vec![0u128; NUM_TOKENS],
+            volumes: vec![SwapVolume::default(); NUM_TOKENS],
             total_fee,
             exchange_fee,
             referral_fee,
@@ -79,11 +77,11 @@ impl SimplePool {
 
     /// Transfers shares from predecessor to receiver.
     pub fn share_transfer(&mut self, sender_id: &AccountId, receiver_id: &AccountId, amount: u128) {
-        let balance = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
+        let balance = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
         if let Some(new_balance) = balance.checked_sub(amount) {
             self.shares.insert(&sender_id, &new_balance);
         } else {
-            env::panic(b"ERR_NOT_ENOUGH_SHARES");
+            env::panic(ERR91_NOT_ENOUGH_SHARES.as_bytes());
         }
         let balance_out = self
             .shares
@@ -112,8 +110,8 @@ impl SimplePool {
     pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>) -> Balance {
         assert_eq!(
             amounts.len(),
-            self.token_account_ids.len(),
-            "ERR_WRONG_TOKEN_COUNT"
+            NUM_TOKENS,
+            "{}", ERR89_WRONG_AMOUNT_COUNT
         );
         let shares = if self.shares_total_supply > 0 {
             let mut fair_supply = U256::max_value();
@@ -174,17 +172,17 @@ impl SimplePool {
     ) -> Vec<Balance> {
         assert_eq!(
             min_amounts.len(),
-            self.token_account_ids.len(),
-            "ERR_WRONG_TOKEN_COUNT"
+            NUM_TOKENS,
+            "{}", ERR89_WRONG_AMOUNT_COUNT
         );
-        let prev_shares_amount = self.shares.get(&sender_id).expect("ERR_NO_SHARES");
-        assert!(prev_shares_amount >= shares, "ERR_NOT_ENOUGH_SHARES");
+        let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
+        assert!(prev_shares_amount >= shares, "{}", ERR91_NOT_ENOUGH_SHARES);
         let mut result = vec![];
         for i in 0..self.token_account_ids.len() {
             let amount = (U256::from(self.amounts[i]) * U256::from(shares)
                 / U256::from(self.shares_total_supply))
             .as_u128();
-            assert!(amount >= min_amounts[i], "ERR_MIN_AMOUNT");
+            assert!(amount >= min_amounts[i], "{}", ERR68_SLIPPAGE);
             self.amounts[i] -= amount;
             result.push(amount);
         }
@@ -216,7 +214,7 @@ impl SimplePool {
         self.token_account_ids
             .iter()
             .position(|id| id == token_id)
-            .expect("ERR_MISSING_TOKEN")
+            .expect(ERR102_INVALID_TOKEN_ID)
     }
 
     /// Returns number of tokens in outcome, given amount.
@@ -234,7 +232,7 @@ impl SimplePool {
                 && out_balance > U256::zero()
                 && token_in != token_out
                 && amount_in > 0,
-            "ERR_INVALID"
+            "{}", ERR76_INVALID_PARAMS
         );
         let amount_with_fee = U256::from(amount_in) * U256::from(FEE_DIVISOR - self.total_fee);
         (amount_with_fee * out_balance / (U256::from(FEE_DIVISOR) * in_balance + amount_with_fee))
@@ -275,11 +273,11 @@ impl SimplePool {
         min_amount_out: Balance,
         admin_fee: &AdminFees,
     ) -> Balance {
-        assert_ne!(token_in, token_out, "ERR_SAME_TOKEN_SWAP");
+        assert_ne!(token_in, token_out, "{}", ERR73_SAME_TOKEN);
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
         let amount_out = self.internal_get_return(in_idx, amount_in, out_idx);
-        assert!(amount_out >= min_amount_out, "ERR_MIN_AMOUNT");
+        assert!(amount_out >= min_amount_out, "{}", ERR68_SLIPPAGE);
         env::log(
             format!(
                 "Swapped {} {} for {} {}",
@@ -299,7 +297,7 @@ impl SimplePool {
             integer_sqrt(U256::from(self.amounts[in_idx]) * U256::from(self.amounts[out_idx]));
 
         // Invariant can not reduce (otherwise loosing balance of the pool and something it broken).
-        assert!(new_invariant >= prev_invariant, "ERR_INVARIANT");
+        assert!(new_invariant >= prev_invariant, "{}", ERR75_INVARIANT_REDUCE);
         let numerator = (new_invariant - prev_invariant) * U256::from(self.shares_total_supply);
 
         // Allocate exchange fee as fraction of total fee by issuing LP shares proportionally.

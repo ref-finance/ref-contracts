@@ -1,5 +1,5 @@
 use near_sdk::json_types::{U128};
-use near_sdk_sim::{call, view, to_yocto};
+use near_sdk_sim::{call, to_yocto};
 
 use ref_exchange::{RunningState, SwapAction};
 use crate::common::utils::*;
@@ -15,17 +15,19 @@ fn guardians_scenario_01() {
     println!("Guardians Case 0101: only owner can add guardians");
     let out_come = call!(
         root,
-        pool.extend_guardians(vec![guard1.valid_account_id(), guard2.valid_account_id()])
+        pool.extend_guardians(vec![guard1.valid_account_id(), guard2.valid_account_id()]),
+        deposit=1
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
     let metadata = get_metadata(&pool);
     assert_eq!(metadata.guardians.len(), 0);
 
     let out_come = call!(
         owner,
-        pool.extend_guardians(vec![guard1.valid_account_id(), guard2.valid_account_id()])
+        pool.extend_guardians(vec![guard1.valid_account_id(), guard2.valid_account_id()]),
+        deposit=1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
@@ -37,11 +39,12 @@ fn guardians_scenario_01() {
     println!("Guardians Case 0102: only owner and guardians can manage global whitelists");
     let out_come = call!(
         root,
-        pool.remove_whitelisted_tokens(vec![to_va(eth()), to_va(dai())])
+        pool.remove_whitelisted_tokens(vec![to_va(eth()), to_va(dai())]),
+        deposit=1
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
     let wl = get_whitelist(&pool);
     assert_eq!(wl.len(), 3);
     assert_eq!(wl.get(0).unwrap().clone(), dai());
@@ -50,7 +53,8 @@ fn guardians_scenario_01() {
 
     let out_come = call!(
         owner,
-        pool.remove_whitelisted_tokens(vec![to_va(usdt()), to_va(eth()), to_va(dai())])
+        pool.remove_whitelisted_tokens(vec![to_va(usdt()), to_va(eth()), to_va(dai())]),
+        deposit=1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
@@ -59,7 +63,8 @@ fn guardians_scenario_01() {
 
     let out_come = call!(
         owner,
-        pool.extend_whitelisted_tokens(vec![to_va(dai())])
+        pool.extend_whitelisted_tokens(vec![to_va(dai())]),
+        deposit=1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
@@ -69,7 +74,8 @@ fn guardians_scenario_01() {
 
     let out_come = call!(
         guard1,
-        pool.extend_whitelisted_tokens(vec![to_va(eth())])
+        pool.extend_whitelisted_tokens(vec![to_va(eth())]),
+        deposit=1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
@@ -80,7 +86,8 @@ fn guardians_scenario_01() {
 
     let out_come = call!(
         guard2,
-        pool.extend_whitelisted_tokens(vec![to_va(usdt())])
+        pool.extend_whitelisted_tokens(vec![to_va(usdt())]),
+        deposit=1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
@@ -98,7 +105,7 @@ fn guardians_scenario_01() {
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
     let metadata = get_metadata(&pool);
     assert_eq!(metadata.state, RunningState::Running);
 
@@ -209,7 +216,7 @@ fn guardians_scenario_01() {
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
     let metadata = get_metadata(&pool);
     assert_eq!(metadata.state, RunningState::Paused);
 
@@ -220,7 +227,7 @@ fn guardians_scenario_01() {
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
     let metadata = get_metadata(&pool);
     assert_eq!(metadata.state, RunningState::Paused);
 
@@ -250,15 +257,18 @@ fn guardians_scenario_02() {
     let owner = root.create_user("owner2".to_string(), to_yocto("100"));
     call!(
         old_owner,
-        pool.set_owner(owner.valid_account_id())
+        pool.set_owner(owner.valid_account_id()),
+        deposit=1
     ).assert_success();
     call!(
         owner,
-        pool.extend_guardians(vec![guard1.valid_account_id()])
+        pool.extend_guardians(vec![guard1.valid_account_id()]),
+        deposit=1
     ).assert_success();
     call!(
         owner,
-        pool.modify_admin_fee(1600, 400)
+        pool.modify_admin_fee(1600, 400),
+        deposit=1
     ).assert_success();
     call!(
         root,

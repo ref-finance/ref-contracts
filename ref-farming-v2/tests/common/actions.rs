@@ -23,7 +23,7 @@ pub(crate) fn prepair_pool_and_liquidity(
     let pool = deploy_pool(&root, swap(), owner.account_id());
     let token1 = deploy_token(&root, dai(), vec![swap()]);
     let token2 = deploy_token(&root, eth(), vec![swap()]);
-    call!(owner, pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth())]))
+    call!(owner, pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth())]), deposit=1)
     .assert_success();
     call!(root,
         pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 25),
@@ -47,7 +47,8 @@ pub(crate) fn prepair_pool(
     let token2 = deploy_token(&root, eth(), vec![swap()]);
     call!(
         owner,
-        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth())])
+        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth())]),
+        deposit=1
     );
     call!(
         root,

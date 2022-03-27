@@ -41,10 +41,10 @@ fn try_identify_pool_id(token_id: &String) -> Result<u64, &'static str> {
         if let Ok(pool_id) = str::parse::<u64>(&token_id[1..token_id.len()]) {
             Ok(pool_id)
         } else {
-            Err("Illegal pool id")
+            Err(ERR87_ILLEGAL_POOL_ID)
         }
     } else {
-        Err("Illegal pool id")
+        Err(ERR87_ILLEGAL_POOL_ID)
     }
 }
 
@@ -70,7 +70,7 @@ impl Contract {
         assert_ne!(sender_id, receiver_id, "{}", ERR33_TRANSFER_TO_SELF);
         match parse_token_id(token_id) {
             TokenOrPool::Pool(pool_id) => {
-                let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+                let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
                 pool.share_transfer(sender_id, receiver_id, amount);
                 self.pools.replace(pool_id, &pool);
                 log!(
@@ -106,7 +106,7 @@ impl Contract {
     fn internal_mft_balance(&self, token_id: String, account_id: &AccountId) -> Balance {
         match parse_token_id(token_id) {
             TokenOrPool::Pool(pool_id) => {
-                let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+                let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
                 pool.share_balances(account_id)
             }
             TokenOrPool::Token(token_id) => self.internal_get_deposit(account_id, &token_id),
@@ -124,7 +124,7 @@ impl Contract {
     pub fn mft_total_supply(&self, token_id: String) -> U128 {
         match parse_token_id(token_id) {
             TokenOrPool::Pool(pool_id) => {
-                let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+                let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
                 U128(pool.share_total_balance())
             }
             TokenOrPool::Token(_token_id) => unimplemented!(),
@@ -138,9 +138,9 @@ impl Contract {
         self.assert_contract_running();
         let prev_storage = env::storage_usage();
         match parse_token_id(token_id) {
-            TokenOrPool::Token(_) => env::panic(b"ERR_INVALID_REGISTER"),
+            TokenOrPool::Token(_) => env::panic(ERR110_INVALID_REGISTER.as_bytes()),
             TokenOrPool::Pool(pool_id) => {
-                let mut pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+                let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
                 pool.share_register(account_id.as_ref());
                 self.pools.replace(pool_id, &pool);
                 self.internal_check_storage(prev_storage);
@@ -252,7 +252,7 @@ impl Contract {
     pub fn mft_metadata(&self, token_id: String) -> FungibleTokenMetadata {
         match parse_token_id(token_id) {
             TokenOrPool::Pool(pool_id) => {
-                let pool = self.pools.get(pool_id).expect("ERR_NO_POOL");
+                let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
                 let decimals = pool.get_share_decimal();
                 FungibleTokenMetadata {
                     // [AUDIT_08]
