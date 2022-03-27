@@ -271,7 +271,8 @@ pub fn init_pool_env() -> (
 
     call!(
         owner,
-        pool.extend_whitelisted_tokens(TOKENS.map(|v| to_va(v.to_string())).to_vec())
+        pool.extend_whitelisted_tokens(TOKENS.map(|v| to_va(v.to_string())).to_vec()),
+        deposit=1
     );
     (root, owner, pool, users)
 }
@@ -363,7 +364,8 @@ pub fn setup_stable_pool_with_liquidity_and_operators(
         owner,
         pool.extend_whitelisted_tokens(
             (&token_contracts).into_iter().map(|x| x.valid_account_id()).collect()
-        )
+        ),
+        deposit=1
     );
     call!(
         owner,

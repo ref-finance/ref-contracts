@@ -592,7 +592,8 @@ fn sim_stable_e82 () {
 
     let outcome = call!(
         owner,
-        ex.stable_swap_ramp_amp(0, 0, U64(0))
+        ex.stable_swap_ramp_amp(0, 0, U64(0)),
+        deposit=1
     );
     assert_failure(outcome, "E82: insufficient ramp time");
 }
@@ -624,13 +625,15 @@ fn sim_stable_e83 () {
 
     let outcome = call!(
         owner,
-        ex.stable_swap_ramp_amp(0, 0, U64(3 * 86400 * 1_000_000_000))
+        ex.stable_swap_ramp_amp(0, 0, U64(3 * 86400 * 1_000_000_000)),
+        deposit=1
     );
     assert_failure(outcome, "E83: invalid amp factor");
 
     let outcome = call!(
         owner,
-        ex.stable_swap_ramp_amp(0, 1_000_001, U64(3 * 86400 * 1_000_000_000))
+        ex.stable_swap_ramp_amp(0, 1_000_001, U64(3 * 86400 * 1_000_000_000)),
+        deposit=1
     );
     assert_failure(outcome, "E83: invalid amp factor");
 }
@@ -659,7 +662,8 @@ fn sim_stable_e84 () {
 
     let outcome = call!(
         owner,
-        ex.stable_swap_ramp_amp(0, 1, U64(3 * 86400 * 1_000_000_000))
+        ex.stable_swap_ramp_amp(0, 1, U64(3 * 86400 * 1_000_000_000)),
+        deposit=1
     );
     assert_failure(outcome, "E84: amp factor change is too large");
 }

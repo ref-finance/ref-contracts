@@ -111,7 +111,8 @@ fn setup_pool_with_liquidity() -> (
     let token2 = test_token(&root, eth(), vec![swap()]);
     call!(
         owner,
-        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth())])
+        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth())]),
+        deposit=1
     );
     call!(
         root,
@@ -249,7 +250,8 @@ fn test_withdraw_failure() {
     // Add DAI and ETH to token whitelist
     call!(
         owner,
-        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth())])
+        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth())]),
+        deposit=1
     );
     call!(
         root,
