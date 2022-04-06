@@ -1,4 +1,3 @@
-use near_sdk::json_types::{U128};
 use near_sdk_sim::{call, to_yocto};
 
 use crate::common::utils::*;
@@ -7,7 +6,6 @@ pub mod common;
 #[test]
 fn owner_scenario_01() {
     let (root, owner, pool, token1, _, _) = setup_pool_with_liquidity();
-    let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
 
     assert_eq!(balance_of(&token1, &pool.account_id()), to_yocto("105"));
 
@@ -28,7 +26,7 @@ fn owner_scenario_01() {
     );
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("ERR_NOT_ALLOWED"));
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
     // println!("{}", get_error_status(&out_come));
 
     println!("Owner Case 0102: owner retrieve unmanaged token but unregstered");

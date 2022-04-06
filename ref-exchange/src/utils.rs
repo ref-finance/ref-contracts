@@ -6,6 +6,7 @@ use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{ext_contract, AccountId, Balance, Gas};
 use uint::construct_uint;
+use crate::errors::*;
 
 /// Attach no deposit.
 pub const NO_DEPOSIT: u128 = 0;
@@ -68,7 +69,7 @@ pub fn add_to_collection(c: &mut LookupMap<AccountId, Balance>, key: &String, va
 /// Checks if there are any duplicates in the given list of tokens.
 pub fn check_token_duplicates(tokens: &[ValidAccountId]) {
     let token_set: HashSet<_> = tokens.iter().map(|a| a.as_ref()).collect();
-    assert_eq!(token_set.len(), tokens.len(), "ERR_TOKEN_DUPLICATES");
+    assert_eq!(token_set.len(), tokens.len(), "{}", ERR92_TOKEN_DUPLICATES);
 }
 
 /// Newton's method of integer square root.

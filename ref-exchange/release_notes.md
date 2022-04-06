@@ -1,5 +1,12 @@
 # Release Notes
 
+### Version 1.4.4
+1. Return minted shares for `add_liquidity`;
+2. Return received tokens amount for `remove_liquidity`;
+3. Request one yocto deposit in all owner and guardians interfaces;
+4. Unify error msg;
+5. Other modification according to audition recommendation;
+
 ### Version 1.4.3
 1. Let both guardians and owner can remove exchange liquidity to owner inner account by remove_exchange_fee_liquidity;
 2. Let both guardians and owner can withdraw owner token to owner wallet by withdraw_owner_token;
