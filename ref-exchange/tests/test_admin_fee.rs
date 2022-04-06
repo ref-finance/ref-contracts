@@ -87,7 +87,8 @@ fn modify_admin_fee() {
     // and 1 bps (referal fee) in total.
     let out_come = call!(
         owner,
-        pool.modify_admin_fee(1600, 400)
+        pool.modify_admin_fee(1600, 400),
+        deposit = 1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
