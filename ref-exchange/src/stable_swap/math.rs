@@ -176,8 +176,8 @@ impl StableSwap {
         }
     }
 
-    /// * Compute stable swap invariant (D) for unrated balances
-    pub fn compute_d_unrated(&self, c_amounts: &Vec<Balance>) -> Option<U256> {
+    /// * Compute stable swap invariant (D) with rates applied to input balances
+    pub fn compute_d_with_rates(&self, c_amounts: &Vec<Balance>) -> Option<U256> {
         self.compute_d(&self.rate_balances(c_amounts))
     }
 
@@ -240,14 +240,14 @@ impl StableSwap {
         let n_coins = old_c_amounts.len();
         
         // Initial invariant
-        let d_0 = self.compute_d_unrated(old_c_amounts)?;
+        let d_0 = self.compute_d_with_rates(old_c_amounts)?;
 
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in deposit_c_amounts.iter().enumerate() {
             new_balances[index] = old_c_amounts[index].checked_add(*value)?;
         }
         // Invariant after change
-        let d_1 = self.compute_d_unrated(&new_balances)?;
+        let d_1 = self.compute_d_with_rates(&new_balances)?;
         if d_1 <= d_0 {
             None
         } else {
@@ -266,7 +266,7 @@ impl StableSwap {
                 new_balances[i] = new_balances[i].checked_sub(fee)?;
             }
 
-            let d_2 = self.compute_d_unrated(&new_balances)?;
+            let d_2 = self.compute_d_with_rates(&new_balances)?;
 
             // d1 > d2 > d0, 
             // (d2-d0) => mint_shares (charged fee),
@@ -350,7 +350,7 @@ impl StableSwap {
     ) -> Option<(Balance, Balance)> {
         let n_coins = old_c_amounts.len();
         // Initial invariant, D0
-        let d_0 = self.compute_d_unrated(old_c_amounts)?;
+        let d_0 = self.compute_d_with_rates(old_c_amounts)?;
 
         // real invariant after withdraw, D1
         let mut new_balances = vec![0_u128; n_coins];
@@ -358,7 +358,7 @@ impl StableSwap {
             new_balances[index] = old_c_amounts[index].checked_sub(*value)?;
         }
 
-        let d_1 = self.compute_d_unrated(&new_balances)?;
+        let d_1 = self.compute_d_with_rates(&new_balances)?;
 
         // compare ideal token portions from D1 with withdraws, to calculate diff fee.
         if d_1 >= d_0 {
@@ -380,7 +380,7 @@ impl StableSwap {
                 new_balances[i] = new_balances[i].checked_sub(fee)?;
             }
 
-            let d_2 = self.compute_d_unrated(&new_balances)?;
+            let d_2 = self.compute_d_with_rates(&new_balances)?;
 
             // d0 > d1 > d2, 
             // (d0-d2) => burn_shares (plus fee),

@@ -200,7 +200,7 @@ impl StableSwapPool {
             }
             (
                 invariant
-                    .compute_d_unrated(&c_amounts)
+                    .compute_d_with_rates(&c_amounts)
                     .expect(ERR66_INVARIANT_CALC_ERR)
                     .as_u128(),
                 0,
