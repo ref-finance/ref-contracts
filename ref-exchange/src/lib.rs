@@ -1230,7 +1230,7 @@ mod tests {
         assert_eq!(0, contract.get_user_whitelisted_tokens(accounts(3)).len());
         testing_env!(context
             .predecessor_account_id(accounts(0))
-            .attached_deposit(env::storage_byte_cost() * 334)
+            .attached_deposit(env::storage_byte_cost() * 378) // * was 334
             .build());
         let pool_id = contract.add_stable_swap_pool(tokens, vec![18, 18], 25, 240);
         println!("{:?}", contract.version());
