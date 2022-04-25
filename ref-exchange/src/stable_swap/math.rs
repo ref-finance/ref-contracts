@@ -425,7 +425,7 @@ impl StableSwap {
             token_out_idx,
         )?.as_u128();
 
-        let dy = current_c_amounts_rated[token_out_idx].checked_sub(y + 1)?; // * ? curve sub -1 just in case there were some rounding errors
+        let dy = current_c_amounts_rated[token_out_idx].checked_sub(y)?; // * ? curve sub -1 just in case there were some rounding errors
         let trade_fee = fees.trade_fee(dy);
         let admin_fee = fees.admin_trade_fee(trade_fee);
         let amount_swapped = dy.checked_sub(trade_fee)?;
