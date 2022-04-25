@@ -12,6 +12,7 @@ use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR, U256};
 use crate::StorageKey;
 
 mod math;
+mod stnear;
 
 pub const MIN_DECIMAL: u8 = 1;
 pub const MAX_DECIMAL: u8 = 18;
@@ -27,10 +28,6 @@ pub struct StableSwapPool {
     pub token_decimals: Vec<u8>,
     /// token amounts in comparable decimal.
     pub c_amounts: Vec<Balance>,
-    /// *
-    pub stored_rates: Vec<Balance>,
-    /// *
-    pub rates_updated_at: u64,
     /// Volumes accumulated by this pool.
     pub volumes: Vec<SwapVolume>,
     /// Fee charged for swap (gets divided by FEE_DIVISOR).
@@ -47,6 +44,10 @@ pub struct StableSwapPool {
     pub init_amp_time: Timestamp,
     /// Stop ramp up amplification time.
     pub stop_amp_time: Timestamp,
+    /// *
+    pub stored_rates: Vec<Balance>,
+    /// *
+    pub rates_updated_at: u64,
 }
 
 impl StableSwapPool {
@@ -82,6 +83,10 @@ impl StableSwapPool {
             init_amp_time: 0,
             stop_amp_time: 0,
         }
+    }
+
+    pub fn assert_rates_acquired(&self) {
+        assert!(self.rates_updated_at > 0, "No rates acquired");
     }
 
     pub fn get_amounts(&self) ->Vec<u128> {
