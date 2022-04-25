@@ -67,12 +67,11 @@ impl StableSwapPool {
             ERR61_AMP_ILLEGAL
         );
         assert!(total_fee < FEE_DIVISOR, "{}", ERR62_FEE_ILLEGAL);
-        let mut stored_rates = vec![10u128.pow(TARGET_DECIMAL as u32); token_account_ids.len()];
         Self {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
             token_decimals,
             c_amounts: vec![0u128; token_account_ids.len()],
-            stored_rates,
+            stored_rates: vec![10u128.pow(TARGET_DECIMAL as u32); token_account_ids.len()],
             rates_updated_at: 0,
             volumes: vec![SwapVolume::default(); token_account_ids.len()],
             total_fee,
