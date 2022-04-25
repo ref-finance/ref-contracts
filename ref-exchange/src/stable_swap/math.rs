@@ -415,26 +415,26 @@ impl StableSwap {
         let rate_in = self.rates[token_in_idx];
 
         // * rate input
-        let token_in_amount = self.mul_rate(token_in_amount, rate_in);
-        let current_c_amounts = self.rate_balances(current_c_amounts);
+        let token_in_amount_rated = self.mul_rate(token_in_amount, rate_in);
+        let current_c_amounts_rated = self.rate_balances(current_c_amounts);
 
         let y = self.compute_y(
-            token_in_amount + current_c_amounts[token_in_idx], 
-            &current_c_amounts,
+            token_in_amount_rated + current_c_amounts_rated[token_in_idx], 
+            &current_c_amounts_rated,
             token_in_idx,
             token_out_idx,
         )?.as_u128();
 
-        let dy = current_c_amounts[token_out_idx].checked_sub(y + 1)?; // * -1 just in case there were some rounding errors
+        let dy = current_c_amounts_rated[token_out_idx].checked_sub(y + 1)?; // * -1 just in case there were some rounding errors
         let trade_fee = fees.trade_fee(dy);
         let admin_fee = fees.admin_trade_fee(trade_fee);
         let amount_swapped = dy.checked_sub(trade_fee)?;
 
-        let new_destination_amount = current_c_amounts[token_out_idx]
+        let new_destination_amount = current_c_amounts_rated[token_out_idx]
             .checked_sub(amount_swapped)?
             .checked_sub(admin_fee)?;
-        let new_source_amount = current_c_amounts[token_in_idx]
-            .checked_add(token_in_amount)?;
+        let new_source_amount = current_c_amounts_rated[token_in_idx]
+            .checked_add(token_in_amount_rated)?;
 
         // * rate back result
         Some(SwapResult::new(
