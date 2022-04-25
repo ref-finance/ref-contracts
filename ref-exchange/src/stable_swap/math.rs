@@ -425,7 +425,7 @@ impl StableSwap {
             token_out_idx,
         )?.as_u128();
 
-        let dy = current_c_amounts_rated[token_out_idx].checked_sub(y + 1)?; // * -1 just in case there were some rounding errors
+        let dy = current_c_amounts_rated[token_out_idx].checked_sub(y + 1)?; // * ? curve sub -1 just in case there were some rounding errors
         let trade_fee = fees.trade_fee(dy);
         let admin_fee = fees.admin_trade_fee(trade_fee);
         let amount_swapped = dy.checked_sub(trade_fee)?;
@@ -438,8 +438,8 @@ impl StableSwap {
 
         // * rate back result
         Some(SwapResult::new(
-            self.div_rate(new_destination_amount, rate_out),
             self.div_rate(new_source_amount, rate_in),
+            self.div_rate(new_destination_amount, rate_out),
             self.div_rate(amount_swapped, rate_out),
             self.div_rate(admin_fee, rate_out),
             self.div_rate(trade_fee, rate_out),
