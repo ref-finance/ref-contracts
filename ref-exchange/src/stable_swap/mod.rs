@@ -16,7 +16,8 @@ mod math;
 pub const MIN_DECIMAL: u8 = 1;
 pub const MAX_DECIMAL: u8 = 18;
 pub const TARGET_DECIMAL: u8 = 18;
-pub const MIN_RESERVE: u128 = 1_000_000_000_000_000_000;
+pub const PRECISION: u128 = 10u128.pow(TARGET_DECIMAL as u32); 
+pub const MIN_RESERVE: u128 = 1 * PRECISION;
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct StableSwapPool {
@@ -26,6 +27,10 @@ pub struct StableSwapPool {
     pub token_decimals: Vec<u8>,
     /// token amounts in comparable decimal.
     pub c_amounts: Vec<Balance>,
+    /// *
+    pub stored_rates: Vec<Balance>,
+    /// *
+    pub rates_updated_at: u64,
     /// Volumes accumulated by this pool.
     pub volumes: Vec<SwapVolume>,
     /// Fee charged for swap (gets divided by FEE_DIVISOR).
@@ -62,10 +67,13 @@ impl StableSwapPool {
             ERR61_AMP_ILLEGAL
         );
         assert!(total_fee < FEE_DIVISOR, "{}", ERR62_FEE_ILLEGAL);
+        let mut stored_rates = vec![10u128.pow(TARGET_DECIMAL as u32); token_account_ids.len()];
         Self {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
             token_decimals,
             c_amounts: vec![0u128; token_account_ids.len()],
+            stored_rates,
+            rates_updated_at: 0,
             volumes: vec![SwapVolume::default(); token_account_ids.len()],
             total_fee,
             shares: LookupMap::new(StorageKey::Shares { pool_id: id }),
@@ -138,6 +146,7 @@ impl StableSwapPool {
             env::block_timestamp(),
             self.init_amp_time,
             self.stop_amp_time,
+            self.stored_rates.clone(),
         )
     }
 
@@ -192,7 +201,7 @@ impl StableSwapPool {
             }
             (
                 invariant
-                    .compute_d(&c_amounts)
+                    .compute_d_unrated(&c_amounts)
                     .expect(ERR66_INVARIANT_CALC_ERR)
                     .as_u128(),
                 0,
@@ -669,14 +678,7 @@ impl StableSwapPool {
             "{}",
             ERR82_INSUFFICIENT_RAMP_TIME
         );
-        let invariant = StableSwap::new(
-            self.init_amp_factor,
-            self.target_amp_factor,
-            current_time,
-            self.init_amp_time,
-            self.stop_amp_time,
-        );
-        let amp_factor = invariant
+        let amp_factor = self.get_invariant()
             .compute_amp_factor()
             .expect(ERR66_INVARIANT_CALC_ERR);
         assert!(
@@ -700,14 +702,7 @@ impl StableSwapPool {
     /// [Admin function] Stop increase of amplification factor.
     pub fn stop_ramp_amplification(&mut self) {
         let current_time = env::block_timestamp();
-        let invariant = StableSwap::new(
-            self.init_amp_factor,
-            self.target_amp_factor,
-            current_time,
-            self.init_amp_time,
-            self.stop_amp_time,
-        );
-        let amp_factor = invariant
+        let amp_factor = self.get_invariant()
             .compute_amp_factor()
             .expect(ERR65_INIT_TOKEN_BALANCE);
         self.init_amp_factor = amp_factor;

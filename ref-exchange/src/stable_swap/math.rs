@@ -5,6 +5,8 @@ use near_sdk::{Balance, Timestamp};
 use crate::admin_fee::AdminFees;
 use crate::utils::{FEE_DIVISOR, U256};
 
+use super::PRECISION;
+
 /// Minimum ramp duration, in nano sec.
 pub const MIN_RAMP_DURATION: Timestamp = 86400 * 1_000_000_000;
 /// Min amplification coefficient.
@@ -66,6 +68,24 @@ pub struct SwapResult {
     pub fee: Balance,
 }
 
+impl SwapResult {
+    pub fn new(
+        new_source_amount: Balance,
+        new_destination_amount: Balance,
+        amount_swapped: Balance,
+        admin_fee: Balance,
+        fee: Balance,
+    ) -> Self {
+        Self {
+            new_source_amount,
+            new_destination_amount,
+            amount_swapped,
+            admin_fee,
+            fee,
+        }
+    }
+}
+
 /// The StableSwap invariant calculator.
 pub struct StableSwap {
     /// Initial amplification coefficient (A)
@@ -78,6 +98,8 @@ pub struct StableSwap {
     start_ramp_ts: Timestamp,
     /// Ramp A stop timestamp
     stop_ramp_ts: Timestamp,
+    /// *
+    rates: Vec<Balance>,
 }
 
 impl StableSwap {
@@ -87,6 +109,7 @@ impl StableSwap {
         current_ts: Timestamp,
         start_ramp_ts: Timestamp,
         stop_ramp_ts: Timestamp,
+        rates: Vec<Balance>,
     ) -> Self {
         Self {
             initial_amp_factor,
@@ -94,7 +117,27 @@ impl StableSwap {
             current_ts,
             start_ramp_ts,
             stop_ramp_ts,
+            rates,
         }
+    }
+
+    /// *
+    fn mul_rate(&self, amount: Balance, rate: Balance) -> Balance {
+        (U256::from(amount) * U256::from(rate) / U256::from(PRECISION))
+            .as_u128()
+    }
+
+    /// *
+    fn div_rate(&self, amount: Balance, rate: Balance) -> Balance {
+        (U256::from(amount) * U256::from(PRECISION) / U256::from(rate))
+            .as_u128()
+    }
+
+    /// *
+    fn rate_balances(&self, amounts: &Vec<Balance>) -> Vec<Balance> {
+        amounts.iter().zip(self.rates.iter()).map(|(&amount, &rate)| {
+            self.mul_rate(amount, rate)
+        }).collect()
     }
 
     /// Compute the amplification coefficient (A)
@@ -131,6 +174,11 @@ impl StableSwap {
             // when stop_ramp_ts == 0 or current_ts >= stop_ramp_ts
             Some(self.target_amp_factor as u128)
         }
+    }
+
+    /// * Compute stable swap invariant (D) for unrated balances
+    pub fn compute_d_unrated(&self, c_amounts: &Vec<Balance>) -> Option<U256> {
+        self.compute_d(&self.rate_balances(c_amounts))
     }
 
     /// Compute stable swap invariant (D)
@@ -192,14 +240,14 @@ impl StableSwap {
         let n_coins = old_c_amounts.len();
         
         // Initial invariant
-        let d_0 = self.compute_d(old_c_amounts)?;
+        let d_0 = self.compute_d_unrated(old_c_amounts)?;
 
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in deposit_c_amounts.iter().enumerate() {
             new_balances[index] = old_c_amounts[index].checked_add(*value)?;
         }
         // Invariant after change
-        let d_1 = self.compute_d(&new_balances)?;
+        let d_1 = self.compute_d_unrated(&new_balances)?;
         if d_1 <= d_0 {
             None
         } else {
@@ -218,7 +266,7 @@ impl StableSwap {
                 new_balances[i] = new_balances[i].checked_sub(fee)?;
             }
 
-            let d_2 = self.compute_d(&new_balances)?;
+            let d_2 = self.compute_d_unrated(&new_balances)?;
 
             // d1 > d2 > d0, 
             // (d2-d0) => mint_shares (charged fee),
@@ -302,7 +350,7 @@ impl StableSwap {
     ) -> Option<(Balance, Balance)> {
         let n_coins = old_c_amounts.len();
         // Initial invariant, D0
-        let d_0 = self.compute_d(old_c_amounts)?;
+        let d_0 = self.compute_d_unrated(old_c_amounts)?;
 
         // real invariant after withdraw, D1
         let mut new_balances = vec![0_u128; n_coins];
@@ -310,7 +358,7 @@ impl StableSwap {
             new_balances[index] = old_c_amounts[index].checked_sub(*value)?;
         }
 
-        let d_1 = self.compute_d(&new_balances)?;
+        let d_1 = self.compute_d_unrated(&new_balances)?;
 
         // compare ideal token portions from D1 with withdraws, to calculate diff fee.
         if d_1 >= d_0 {
@@ -332,7 +380,7 @@ impl StableSwap {
                 new_balances[i] = new_balances[i].checked_sub(fee)?;
             }
 
-            let d_2 = self.compute_d(&new_balances)?;
+            let d_2 = self.compute_d_unrated(&new_balances)?;
 
             // d0 > d1 > d2, 
             // (d0-d2) => burn_shares (plus fee),
@@ -363,14 +411,21 @@ impl StableSwap {
         current_c_amounts: &Vec<Balance>, // in-pool tokens comparable amounts vector, 
         fees: &Fees,
     ) -> Option<SwapResult> {
+        let rate_out = self.rates[token_out_idx];
+        let rate_in = self.rates[token_in_idx];
+
+        // * rate input
+        let token_in_amount = self.mul_rate(token_in_amount, rate_in);
+        let current_c_amounts = self.rate_balances(current_c_amounts);
+
         let y = self.compute_y(
             token_in_amount + current_c_amounts[token_in_idx], 
-            current_c_amounts,
+            &current_c_amounts,
             token_in_idx,
             token_out_idx,
         )?.as_u128();
 
-        let dy = current_c_amounts[token_out_idx].checked_sub(y)?;
+        let dy = current_c_amounts[token_out_idx].checked_sub(y + 1)?; // * -1 just in case there were some rounding errors
         let trade_fee = fees.trade_fee(dy);
         let admin_fee = fees.admin_trade_fee(trade_fee);
         let amount_swapped = dy.checked_sub(trade_fee)?;
@@ -381,12 +436,13 @@ impl StableSwap {
         let new_source_amount = current_c_amounts[token_in_idx]
             .checked_add(token_in_amount)?;
 
-        Some(SwapResult {
-            new_source_amount,
-            new_destination_amount,
-            amount_swapped,
-            admin_fee,
-            fee: trade_fee,
-        })
+        // * rate back result
+        Some(SwapResult::new(
+            self.div_rate(new_destination_amount, rate_out),
+            self.div_rate(new_source_amount, rate_in),
+            self.div_rate(amount_swapped, rate_out),
+            self.div_rate(admin_fee, rate_out),
+            self.div_rate(trade_fee, rate_out),
+        ))
     }
 }
