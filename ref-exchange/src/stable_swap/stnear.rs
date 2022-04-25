@@ -5,6 +5,7 @@ use crate::*;
 use super::PRECISION;
 
 pub const METAPOOL_ADDRESS: &str = "metapool.near";
+const NO_DEPOSIT: Balance = 0;
 
 pub mod gas {
     use near_sdk::Gas;
@@ -32,8 +33,7 @@ pub trait SelfCallbacks {
 
 #[near_bindgen]
 impl Contract {
-
-    /// 
+    ///
     #[payable]
     pub fn update_pool_rates(&mut self, pool_id: u64) -> PromiseOrValue<U128> {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
@@ -46,17 +46,21 @@ impl Contract {
             }
         }
 
-        ext_metapool::get_st_near_price(&AccountId::from(METAPOOL_ADDRESS), 0, gas::GET_PRICE)
-            .then(ext_self::st_near_price_callback(
-                pool_id,
-                &env::current_account_id(),
-                0,
-                gas::CALLBACK,
-            ))
-            .into()
+        ext_metapool::get_st_near_price(
+            &AccountId::from(METAPOOL_ADDRESS),
+            NO_DEPOSIT,
+            gas::GET_PRICE,
+        )
+        .then(ext_self::st_near_price_callback(
+            pool_id,
+            &env::current_account_id(),
+            NO_DEPOSIT,
+            gas::CALLBACK,
+        ))
+        .into()
     }
 
-    /// 
+    ///
     #[private]
     fn st_near_price_callback(&mut self, pool_id: u64, #[callback] price: U128) -> U128 {
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
