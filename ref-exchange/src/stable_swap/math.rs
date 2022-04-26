@@ -3,7 +3,7 @@
 use near_sdk::{Balance, Timestamp};
 
 use crate::admin_fee::AdminFees;
-use crate::utils::{FEE_DIVISOR, U256};
+use crate::utils::{FEE_DIVISOR, U384};
 
 use super::PRECISION;
 
@@ -123,13 +123,13 @@ impl StableSwap {
 
     /// *
     fn mul_rate(&self, amount: Balance, rate: Balance) -> Balance {
-        (U256::from(amount) * U256::from(rate) / U256::from(PRECISION))
+        (U384::from(amount) * U384::from(rate) / U384::from(PRECISION))
             .as_u128()
     }
 
     /// *
     fn div_rate(&self, amount: Balance, rate: Balance) -> Balance {
-        (U256::from(amount) * U256::from(PRECISION) / U256::from(rate))
+        (U384::from(amount) * U384::from(PRECISION) / U384::from(rate))
             .as_u128()
     }
 
@@ -177,22 +177,22 @@ impl StableSwap {
     }
 
     /// * Compute stable swap invariant (D) with rates applied to input balances
-    pub fn compute_d_with_rates(&self, c_amounts: &Vec<Balance>) -> Option<U256> {
+    pub fn compute_d_with_rates(&self, c_amounts: &Vec<Balance>) -> Option<U384> {
         self.compute_d(&self.rate_balances(c_amounts))
     }
 
     /// Compute stable swap invariant (D)
     /// Equation:
     /// A * sum(x_i) * n**n + D = A * D * n**n + D**(n+1) / (n**n * prod(x_i))
-    pub fn compute_d(&self, c_amounts: &Vec<Balance>) -> Option<U256> {
+    pub fn compute_d(&self, c_amounts: &Vec<Balance>) -> Option<U384> {
         let n_coins = c_amounts.len() as u128;
         let sum_x = c_amounts.iter().fold(0, |sum, i| sum + i);
         if sum_x == 0 {
             Some(0.into())
         } else {
             let amp_factor = self.compute_amp_factor()?;
-            let mut d_prev: U256;
-            let mut d: U256 = sum_x.into();
+            let mut d_prev: U384;
+            let mut d: U384 = sum_x.into();
             for _ in 0..256 {
                 // $ D_{k,prod} = \frac{D_k^{n+1}}{n^n \prod x_{i}} = \frac{D^3}{4xy} $
                 let mut d_prod = d;
@@ -203,7 +203,7 @@ impl StableSwap {
                 d_prev = d;
 
                 let ann = amp_factor.checked_mul(n_coins.checked_pow(n_coins as u32)?.into())?;
-                let leverage = (U256::from(sum_x)).checked_mul(ann.into())?;
+                let leverage = (U384::from(sum_x)).checked_mul(ann.into())?;
                 // d = (ann * sum_x + d_prod * n_coins) * d_prev / ((ann - 1) * d_prev + (n_coins + 1) * d_prod)
                 let numerator = d_prev.checked_mul(
                     d_prod
@@ -274,12 +274,12 @@ impl StableSwap {
             // (d1-d2) => fee part,
             // diff_shares = mint_shares + fee part
 
-            let mint_shares = U256::from(pool_token_supply)
+            let mint_shares = U384::from(pool_token_supply)
                 .checked_mul(d_2.checked_sub(d_0)?)?
                 .checked_div(d_0)?
                 .as_u128();
             
-            let diff_shares = U256::from(pool_token_supply)
+            let diff_shares = U384::from(pool_token_supply)
                 .checked_mul(d_1.checked_sub(d_0)?)?
                 .checked_div(d_0)?
                 .as_u128();
@@ -296,7 +296,7 @@ impl StableSwap {
         current_c_amounts: &Vec<Balance>,  // in-pool tokens amount in comparable precision,
         index_x: usize, // x token's index
         index_y: usize, // y token's index
-    ) -> Option<U256> {
+    ) -> Option<U384> {
         let n_coins = current_c_amounts.len() as u128;
         let amp_factor = self.compute_amp_factor()?;
         let ann = amp_factor.checked_mul(n_coins.checked_pow(n_coins as u32)?.into())?;
@@ -318,7 +318,7 @@ impl StableSwap {
         let b = d.checked_div(ann.into())?.checked_add(s_.into())?; // d will be subtracted later
 
         // Solve for y by approximating: y**2 + b*y = c
-        let mut y_prev: U256;
+        let mut y_prev: U384;
         let mut y = d;
         for _ in 0..256 {
             y_prev = y;
@@ -387,11 +387,11 @@ impl StableSwap {
             // (d0-d1) => diff_shares (without fee),
             // (d1-d2) => fee part,
             // burn_shares = diff_shares + fee part
-            let burn_shares = U256::from(pool_token_supply)
+            let burn_shares = U384::from(pool_token_supply)
                 .checked_mul(d_0.checked_sub(d_2)?)?
                 .checked_div(d_0)?
                 .as_u128();
-            let diff_shares = U256::from(pool_token_supply)
+            let diff_shares = U384::from(pool_token_supply)
                 .checked_mul(d_0.checked_sub(d_1)?)?
                 .checked_div(d_0)?
                 .as_u128();
@@ -411,12 +411,15 @@ impl StableSwap {
         current_c_amounts: &Vec<Balance>, // in-pool tokens comparable amounts vector, 
         fees: &Fees,
     ) -> Option<SwapResult> {
-        let rate_out = self.rates[token_out_idx];
         let rate_in = self.rates[token_in_idx];
+        let rate_out = self.rates[token_out_idx];
+        println!("************************ rates {} / {}", &rate_in, &rate_out);
 
         // * rate input
         let token_in_amount_rated = self.mul_rate(token_in_amount, rate_in);
         let current_c_amounts_rated = self.rate_balances(current_c_amounts);
+        println!("************************ in {:?}", &token_in_amount_rated);
+        println!("************************ am {:?}", &current_c_amounts_rated);
 
         let y = self.compute_y(
             token_in_amount_rated + current_c_amounts_rated[token_in_idx], 
@@ -424,8 +427,11 @@ impl StableSwap {
             token_in_idx,
             token_out_idx,
         )?.as_u128();
+        println!("************************ y {:?}", &y);
 
-        let dy = current_c_amounts_rated[token_out_idx].checked_sub(y)?; // * ? curve sub -1 just in case there were some rounding errors
+        let dy = current_c_amounts_rated[token_out_idx].checked_sub(y)?.saturating_sub(1); // * ? curve sub -1 just in case there were some rounding errors
+
+        println!("************************ dy {:?}", &dy);
         let trade_fee = fees.trade_fee(dy);
         let admin_fee = fees.admin_trade_fee(trade_fee);
         let amount_swapped = dy.checked_sub(trade_fee)?;

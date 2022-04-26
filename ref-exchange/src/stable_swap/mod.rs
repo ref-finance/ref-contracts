@@ -14,9 +14,9 @@ use crate::StorageKey;
 mod math;
 mod stnear;
 
+pub const TARGET_DECIMAL: u8 = 24;
 pub const MIN_DECIMAL: u8 = 1;
-pub const MAX_DECIMAL: u8 = 18;
-pub const TARGET_DECIMAL: u8 = 18;
+pub const MAX_DECIMAL: u8 = TARGET_DECIMAL;
 pub const PRECISION: u128 = 10u128.pow(TARGET_DECIMAL as u32); 
 pub const MIN_RESERVE: u128 = 1 * PRECISION;
 
@@ -133,6 +133,7 @@ impl StableSwapPool {
 
     /// *
     fn assert_actual_rates(&self) {
+        // new pool has rates_updated_at equal 0, same as default epoch_height in unit tests
         assert!(
             self.rates_updated_at == env::epoch_height(),
             "{}",
@@ -519,16 +520,22 @@ impl StableSwapPool {
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
         let result = self.internal_get_return(in_idx, amount_in, out_idx, &fees);
+        let amount_swapped = self.c_amount_to_amount(result.amount_swapped, out_idx);
         assert!(
-            self.c_amount_to_amount(result.amount_swapped, out_idx) >= min_amount_out,
+            amount_swapped >= min_amount_out,
             "{}",
             ERR68_SLIPPAGE
+        );
+        assert!(
+            amount_swapped > 0,
+            "{}",
+            ERR112_SWAPPED_AMOUNT_EQUALS_0
         );
         env::log(
             format!(
                 "Swapped {} {} for {} {}, total fee {}, admin fee {}",
                 amount_in, token_in, 
-                self.c_amount_to_amount(result.amount_swapped, out_idx), 
+                amount_swapped, 
                 token_out, 
                 self.c_amount_to_amount(result.fee, out_idx), 
                 self.c_amount_to_amount(result.admin_fee, out_idx)
@@ -542,7 +549,7 @@ impl StableSwapPool {
 
         // Keeping track of volume per each input traded separately.
         self.volumes[in_idx].input.0 += amount_in;
-        self.volumes[out_idx].output.0 += self.c_amount_to_amount(result.amount_swapped, out_idx);
+        self.volumes[out_idx].output.0 += amount_swapped;
 
         // handle admin / referral fee.
         if fees.referral_fee + fees.exchange_fee > 0 {
@@ -586,7 +593,7 @@ impl StableSwapPool {
             }
         }
 
-        self.c_amount_to_amount(result.amount_swapped, out_idx)
+        amount_swapped
     }
 
     /// convert admin_fee into shares without any fee.
@@ -766,10 +773,11 @@ mod tests {
 
         let out = swap(&mut pool, 1, 10000000000, 2);
         assert_eq!(out, 9999495232);
-        assert_eq!(pool.c_amounts, vec![110000000000000000000000, 90000504767247802010004]);
+        assert_eq!(pool.c_amounts, vec![110000000000000000000000000000, 90000504767247802010004771578]);
     }
 
     #[test]
+    #[should_panic(expected = "E112: Swapped amount equals 0")]
     fn test_stable_julia_02() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
@@ -783,12 +791,11 @@ mod tests {
         let mut amounts = vec![100000000000, 100000000000];
         let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
 
-        let out = swap(&mut pool, 1, 0, 2);
-        assert_eq!(out, 0);
-        assert_eq!(pool.c_amounts, vec![100000000000000000000000, 100000000000000000000000]);
+        swap(&mut pool, 1, 0, 2);
     }
 
     #[test]
+    #[should_panic(expected = "E112: Swapped amount equals 0")]
     fn test_stable_julia_03() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
@@ -802,9 +809,7 @@ mod tests {
         let mut amounts = vec![100000000000, 100000000000];
         let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
 
-        let out = swap(&mut pool, 1, 1, 2);
-        assert_eq!(out, 1);
-        assert_eq!(pool.c_amounts, vec![100000000001000000000000, 99999999999000000000000]);
+        swap(&mut pool, 1, 1, 2);
     }
 
     #[test]
@@ -823,7 +828,7 @@ mod tests {
 
         let out = swap(&mut pool, 1, 100000000000, 2);
         assert_eq!(out, 98443663539);
-        assert_eq!(pool.c_amounts, vec![200000000000000000000000, 1556336460086846919343]);
+        assert_eq!(pool.c_amounts, vec![200000000000000000000000000000, 1556336460086846919343293209]);
     }
 
     #[test]
@@ -842,7 +847,7 @@ mod tests {
 
         let out = swap(&mut pool, 1, 99999000000, 2);
         assert_eq!(out, 98443167413);
-        assert_eq!(pool.c_amounts, vec![199999000000000000000000, 1556832586795864493703]);
+        assert_eq!(pool.c_amounts, vec![199999000000000000000000000000, 1556832586795864493703718004]);
     }
 
     #[test]
@@ -904,7 +909,7 @@ mod tests {
             100000000000_000000,
         ];
         let share = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-        assert_eq!(share, 900000000000_000000000000000000);
+        assert_eq!(share, 900000000000_000000000000000000000000);
         let out = pool.swap(
             &String::from("aone.near"),
             99999000000,
@@ -931,10 +936,10 @@ mod tests {
 
         let out = swap(&mut pool, 1, 1000000, 2);
         assert_eq!(out, 1000031);
-        assert_eq!(pool.c_amounts, vec![6000000000000000000, 8999968751649207660]);
+        assert_eq!(pool.c_amounts, vec![6000000000000000000000000, 8999968751649207660820809]);
         let out2 = swap(&mut pool, 2, out, 1);
         assert_eq!(out2, 999999); // due to precision difference.
-        assert_eq!(pool.c_amounts, vec![5000000248340316022, 9999999751649207660]);
+        assert_eq!(pool.c_amounts, vec![5000000248340316023057348, 9999999751649207660820809]);
 
         // Add only one side of the capital.
         let mut amounts2 = vec![5000000, 0];

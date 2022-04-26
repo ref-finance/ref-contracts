@@ -87,3 +87,4 @@ pub const ERR110_INVALID_REGISTER: &str = "E110: Invalid register";
 
 // rated pool
 pub const ERR111_RATES_EXPIRED: &str = "E111: Rates expired";
+pub const ERR112_SWAPPED_AMOUNT_EQUALS_0: &str = "E112: Swapped amount equals 0";
