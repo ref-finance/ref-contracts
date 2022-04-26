@@ -85,10 +85,6 @@ impl StableSwapPool {
         }
     }
 
-    pub fn assert_rates_acquired(&self) {
-        assert!(self.rates_updated_at > 0, "No rates acquired");
-    }
-
     pub fn get_amounts(&self) ->Vec<u128> {
         let mut amounts = self.c_amounts.clone();
         for (index, value) in self.token_decimals.iter().enumerate() {
@@ -132,6 +128,15 @@ impl StableSwapPool {
             balance >= MIN_RESERVE,
             "{}",
             ERR69_MIN_RESERVE
+        );
+    }
+
+    /// *
+    fn assert_actual_rates(&self) {
+        assert!(
+            self.rates_updated_at == env::epoch_height(),
+            "{}",
+            ERR111_RATES_EXPIRED
         );
     }
 
@@ -247,6 +252,8 @@ impl StableSwapPool {
         min_shares: Balance,
         fees: &AdminFees,
     ) -> Balance {
+        self.assert_actual_rates();
+
         let n_coins = self.token_account_ids.len();
         assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
 
@@ -386,6 +393,8 @@ impl StableSwapPool {
         max_burn_shares: Balance,
         fees: &AdminFees,
     ) -> Balance {
+        self.assert_actual_rates();
+
         let n_coins = self.token_account_ids.len();
         assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
         let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
@@ -504,6 +513,8 @@ impl StableSwapPool {
         min_amount_out: Balance,
         fees: &AdminFees,
     ) -> Balance {
+        self.assert_actual_rates();
+
         assert_ne!(token_in, token_out, "{}", ERR71_SWAP_DUP_TOKENS);
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);

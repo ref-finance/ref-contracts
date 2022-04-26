@@ -84,3 +84,6 @@ pub const ERR103_NOT_INITIALIZED: &str = "E103: contract is not initialized";
 
 //mft
 pub const ERR110_INVALID_REGISTER: &str = "E110: Invalid register";
+
+// rated pool
+pub const ERR111_RATES_EXPIRED: &str = "E111: Rates expired";
