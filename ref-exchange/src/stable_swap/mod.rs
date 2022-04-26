@@ -777,7 +777,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "E112: Swapped amount equals 0")]
+    #[should_panic(expected = "E121: Swapped amount equals 0")]
     fn test_stable_julia_02() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
@@ -795,7 +795,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "E112: Swapped amount equals 0")]
+    #[should_panic(expected = "E121: Swapped amount equals 0")]
     fn test_stable_julia_03() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
