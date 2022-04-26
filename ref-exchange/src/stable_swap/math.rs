@@ -413,13 +413,10 @@ impl StableSwap {
     ) -> Option<SwapResult> {
         let rate_in = self.rates[token_in_idx];
         let rate_out = self.rates[token_out_idx];
-        println!("************************ rates {} / {}", &rate_in, &rate_out);
 
         // * rate input
         let token_in_amount_rated = self.mul_rate(token_in_amount, rate_in);
         let current_c_amounts_rated = self.rate_balances(current_c_amounts);
-        println!("************************ in {:?}", &token_in_amount_rated);
-        println!("************************ am {:?}", &current_c_amounts_rated);
 
         let y = self.compute_y(
             token_in_amount_rated + current_c_amounts_rated[token_in_idx], 
@@ -427,11 +424,9 @@ impl StableSwap {
             token_in_idx,
             token_out_idx,
         )?.as_u128();
-        println!("************************ y {:?}", &y);
 
         let dy = current_c_amounts_rated[token_out_idx].checked_sub(y)?.saturating_sub(1); // * ? curve sub -1 just in case there were some rounding errors
 
-        println!("************************ dy {:?}", &dy);
         let trade_fee = fees.trade_fee(dy);
         let admin_fee = fees.admin_trade_fee(trade_fee);
         let amount_swapped = dy.checked_sub(trade_fee)?;
