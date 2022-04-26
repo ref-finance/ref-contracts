@@ -4,14 +4,14 @@ use crate::*;
 
 use super::PRECISION;
 
-pub const METAPOOL_ADDRESS: &str = "metapool.near";
+pub const METAPOOL_ADDRESS: &str = "meta-v2.pool.testnet"; //"metapool.near";
 const NO_DEPOSIT: Balance = 0;
 
 pub mod gas {
     use near_sdk::Gas;
 
     /// The base amount of gas for a regular execution.
-    const BASE: Gas = 10_000_000_000_000;
+    const BASE: Gas = 5_000_000_000_000;
 
     /// The amount of gas for cross-contract call
     pub const GET_PRICE: Gas = BASE;
@@ -62,14 +62,12 @@ impl Contract {
 
     ///
     #[private]
-    fn st_near_price_callback(&mut self, pool_id: u64, #[callback] price: U128) -> U128 {
+    pub fn st_near_price_callback(&mut self, pool_id: u64, #[callback] price: U128) -> U128 {
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         match &mut pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => {
-                let mut rates = vec![1 * PRECISION; pool.tokens().len()];
-                rates[0] = price.0;
-                pool.stored_rates = rates;
+                pool.stored_rates = vec![price.0, 1 * PRECISION];
                 pool.rates_updated_at = env::epoch_height();
             }
         }
