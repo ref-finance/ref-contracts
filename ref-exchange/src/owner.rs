@@ -186,6 +186,9 @@ impl Contract {
             Pool::StableSwapPool(pool) => {
                 pool.ramp_amplification(future_amp_factor as u128, future_amp_time.0)
             }
+            Pool::RatedSwapPool(pool) => {
+                pool.ramp_amplification(future_amp_factor as u128, future_amp_time.0)
+            }
             _ => env::panic(ERR88_NOT_STABLE_POOL.as_bytes()),
         }
         self.pools.replace(pool_id, &pool);
@@ -198,9 +201,27 @@ impl Contract {
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         match &mut pool {
             Pool::StableSwapPool(pool) => pool.stop_ramp_amplification(),
+            Pool::RatedSwapPool(pool) => pool.stop_ramp_amplification(),
             _ => env::panic(ERR88_NOT_STABLE_POOL.as_bytes()),
         }
         self.pools.replace(pool_id, &pool);
+    }
+
+    ///
+    #[payable]
+    pub fn rated_swap_ramp_amp(
+        &mut self,
+        pool_id: u64,
+        future_amp_factor: u64,
+        future_amp_time: WrappedTimestamp,
+    ) {
+        self.stable_swap_ramp_amp(pool_id, future_amp_factor, future_amp_time)
+    }
+
+    ///
+    #[payable]
+    pub fn rated_swap_stop_ramp_amp(&mut self, pool_id: u64) {
+        self.stable_swap_stop_ramp_amp(pool_id)
     }
 
     pub(crate) fn assert_owner(&self) {

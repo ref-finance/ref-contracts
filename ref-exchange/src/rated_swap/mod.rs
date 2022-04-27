@@ -5,7 +5,7 @@ use near_sdk::{env, AccountId, Balance, Timestamp};
 
 use crate::admin_fee::AdminFees;
 use crate::errors::*;
-use crate::stable_swap::math::{
+use crate::rated_swap::math::{
     Fees, RatedSwap, SwapResult, MAX_AMP, MAX_AMP_CHANGE, MIN_AMP, MIN_RAMP_DURATION,
 };
 use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR, U256};
@@ -758,7 +758,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stable_julia_01() {
+    fn test_rated_julia_01() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
@@ -778,7 +778,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "E121: Swapped amount equals 0")]
-    fn test_stable_julia_02() {
+    fn test_rated_julia_02() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
@@ -796,7 +796,7 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "E121: Swapped amount equals 0")]
-    fn test_stable_julia_03() {
+    fn test_rated_julia_03() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
@@ -813,7 +813,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stable_julia_04() {
+    fn test_rated_julia_04() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
@@ -832,7 +832,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stable_julia_05() {
+    fn test_rated_julia_05() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
@@ -851,7 +851,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stable_max() {
+    fn test_rated_max() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
@@ -921,7 +921,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stable_basics() {
+    fn test_rated_basics() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
@@ -977,7 +977,7 @@ mod tests {
 
     /// Test everything with fees.
     #[test]
-    fn test_stable_with_fees() {
+    fn test_rated_with_fees() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let mut pool =
@@ -1003,7 +1003,7 @@ mod tests {
     /// Test that adding and then removing all of the liquidity leaves the pool empty and with no shares.
     #[test]
     #[should_panic(expected = "E69: pool reserved token balance less than MIN_RESERVE")]
-    fn test_stable_add_transfer_remove_liquidity() {
+    fn test_rated_add_transfer_remove_liquidity() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0);
@@ -1029,7 +1029,7 @@ mod tests {
 
     /// Test ramping up amplification factor, ramping it even more and then stopping.
     #[test]
-    fn test_stable_ramp_amp() {
+    fn test_rated_ramp_amp() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0);
@@ -1046,4 +1046,8 @@ mod tests {
             .build());
         pool.stop_ramp_amplification();
     }
+
+    // TODO: test assert_actual_rates
+    // TODO: test swap with rate
+
 }

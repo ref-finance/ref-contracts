@@ -67,6 +67,14 @@ impl From<Pool> for PoolInfo {
                 total_fee: pool.total_fee,
                 shares_total_supply: U128(pool.shares_total_supply),
             },
+            Pool::RatedSwapPool(pool) => Self {
+                pool_kind,
+                amp: pool.get_amp(),
+                amounts: pool.get_amounts().into_iter().map(|a| U128(a)).collect(),
+                token_account_ids: pool.token_account_ids,
+                total_fee: pool.total_fee,
+                shares_total_supply: U128(pool.shares_total_supply),
+            },
         }
     }
 }
@@ -101,6 +109,47 @@ impl From<Pool> for StablePoolInfo {
                 token_account_ids: pool.token_account_ids,
                 total_fee: pool.total_fee,
                 shares_total_supply: U128(pool.shares_total_supply),
+            },
+            Pool::RatedSwapPool(_) => unimplemented!(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
+pub struct RatedPoolInfo {
+    /// List of tokens in the pool.
+    pub token_account_ids: Vec<AccountId>,
+    pub decimals: Vec<u8>,
+    /// backend tokens.
+    pub amounts: Vec<U128>,
+    /// backend tokens in comparable precision
+    pub c_amounts: Vec<U128>,
+    /// Fee charged for swap.
+    pub total_fee: u32,
+    /// Total number of shares.
+    pub shares_total_supply: U128,
+    pub amp: u64,
+    pub rates: Vec<U128>,
+    pub rates_updated_at: u64,
+}
+
+impl From<Pool> for RatedPoolInfo {
+    fn from(pool: Pool) -> Self {
+        match pool {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => Self {
+                amp: pool.get_amp(),
+                amounts: pool.get_amounts().into_iter().map(|a| U128(a)).collect(),
+                decimals: pool.token_decimals,
+                c_amounts: pool.c_amounts.into_iter().map(|a| U128(a)).collect(),
+                token_account_ids: pool.token_account_ids,
+                total_fee: pool.total_fee,
+                shares_total_supply: U128(pool.shares_total_supply),
+                rates: pool.stored_rates.into_iter().map(|a| U128(a)).collect(),
+                rates_updated_at: pool.rates_updated_at,
             },
         }
     }
@@ -151,6 +200,11 @@ impl Contract {
 
     /// Returns stable pool information about specified pool.
     pub fn get_stable_pool(&self, pool_id: u64) -> StablePoolInfo {
+        self.pools.get(pool_id).expect(ERR85_NO_POOL).into()
+    }
+
+    /// Returns rated pool information about specified pool.
+    pub fn get_rated_pool(&self, pool_id: u64) -> RatedPoolInfo {
         self.pools.get(pool_id).expect(ERR85_NO_POOL).into()
     }
 
