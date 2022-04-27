@@ -1351,7 +1351,7 @@ mod tests {
     #[test]
     fn test_rated() {
         let (mut context, mut contract) = setup_contract();
-        let token_amounts = vec![(accounts(1), to_yocto("5")), (accounts(2), to_yocto("5"))];
+        let token_amounts = vec![(accounts(1), to_yocto("3")), (accounts(2), to_yocto("5"))];
         let tokens = token_amounts
             .iter()
             .map(|(x, _)| x.clone())
@@ -1380,14 +1380,16 @@ mod tests {
         deposit_tokens(&mut context, &mut contract, accounts(3), token_amounts.clone());
         deposit_tokens(&mut context, &mut contract, accounts(0), vec![]);
 
-        let predict = contract.predict_add_rated_liquidity(pool_id, &vec![to_yocto("4").into(), to_yocto("4").into()], &None);
+        contract.internal_update_pool_rates(pool_id, 2_000000000000000000000000); // set token1/token2 rate = 2.0
+
+        let predict = contract.predict_add_rated_liquidity(pool_id, &vec![to_yocto("2").into(), to_yocto("4").into()], &None);
         testing_env!(context
             .predecessor_account_id(accounts(3))
             .attached_deposit(to_yocto("0.0007"))
             .build());
         let add_liq = contract.add_rated_liquidity(
             pool_id,
-            vec![to_yocto("4").into(), to_yocto("4").into()],
+            vec![to_yocto("2").into(), to_yocto("4").into()],
             U128(1),
         );
         assert_eq!(predict.0, add_liq.0);
@@ -1396,7 +1398,7 @@ mod tests {
         assert_eq!(8000000000000000000000000000000, contract.get_pool_total_shares(pool_id).0);
         
         let expected_out = contract.get_return(0, accounts(1), to_yocto("1").into(), accounts(2));
-        assert_eq!(expected_out.0, 996947470156575219215718);
+        assert_eq!(expected_out.0, 1992244454139326876254354);
 
         testing_env!(context
             .predecessor_account_id(accounts(3))
@@ -1409,7 +1411,7 @@ mod tests {
             0
         );
         assert_eq!(0, contract.get_deposits(accounts(3)).get(&accounts(1).to_string()).unwrap().0);
-        assert_eq!(to_yocto("1") + 996947470156575219215718, contract.get_deposits(accounts(3)).get(&accounts(2).to_string()).unwrap().0);
+        assert_eq!(to_yocto("1") + 1992244454139326876254354, contract.get_deposits(accounts(3)).get(&accounts(2).to_string()).unwrap().0);
 
         let predict = contract.predict_remove_liquidity(pool_id, to_yocto("0.1").into());
         testing_env!(context

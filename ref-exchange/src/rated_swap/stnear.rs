@@ -62,17 +62,23 @@ impl Contract {
     ///
     #[private]
     pub fn st_near_price_callback(&mut self, pool_id: u64, #[callback] price: U128) -> U128 {
+        self.internal_update_pool_rates(pool_id, price.0);
+        price
+    }
+}
+
+impl Contract {
+    pub fn internal_update_pool_rates(&mut self, pool_id: u64, price: Balance) {
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         match &mut pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(pool) => {
-                pool.stored_rates = vec![price.0, 1 * PRECISION];
+                pool.stored_rates = vec![price, 1 * PRECISION];
                 pool.rates_updated_at = env::epoch_height();
             }
         }
         self.pools.replace(pool_id, &pool);
-        price
     }
 }
 

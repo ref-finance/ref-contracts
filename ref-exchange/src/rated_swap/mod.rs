@@ -184,10 +184,9 @@ impl RatedSwapPool {
 
     /// Get per lp token price, with 1e8 precision
     pub fn get_share_price(&self) -> u128 {
-
-        let sum_token = self.c_amounts.iter().sum::<u128>();
-
-        U256::from(sum_token)
+        self.get_invariant_with_rates(&self.stored_rates)
+            .compute_d_with_rates(&self.c_amounts)
+            .expect(ERR66_INVARIANT_CALC_ERR)
             .checked_mul(100000000.into())
             .unwrap()
             .checked_div(self.shares_total_supply.into())
