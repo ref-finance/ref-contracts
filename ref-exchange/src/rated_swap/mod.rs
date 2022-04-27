@@ -861,6 +861,46 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected = "E120: Rates expired")]
+    fn test_rated_julia_06() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let fees = AdminFees::zero();
+        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1000, 0, AccountId::from("remote"));
+        assert_eq!(
+            pool.tokens(),
+            vec![accounts(1).to_string(), accounts(2).to_string()]
+        );
+
+        let mut amounts = vec![100000000000, 100000000000];
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+
+        testing_env!(context.predecessor_account_id(accounts(0)).epoch_height(123).build());
+        swap(&mut pool, 1, 1_000000, 2);
+    }
+
+    #[test]
+    fn test_rated_julia_07() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let fees = AdminFees::zero();
+        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![TARGET_DECIMAL, TARGET_DECIMAL], 1000, 0, AccountId::from("remote"));
+        assert_eq!(
+            pool.tokens(),
+            vec![accounts(1).to_string(), accounts(2).to_string()]
+        );
+
+        pool.stored_rates = vec![2 * PRECISION, 1 * PRECISION];
+
+        let mut amounts = vec![100000 * PRECISION, 200000 * PRECISION];
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+
+        let out = swap(&mut pool, 1, 1 * PRECISION, 2);
+        assert_eq!(out, 1_999999990004997550200911);
+        assert_eq!(pool.c_amounts, vec![100001 * PRECISION, 199998_000000009995002449799089]);
+    }
+
+    #[test]
     fn test_rated_max() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
@@ -1057,8 +1097,4 @@ mod tests {
             .build());
         pool.stop_ramp_amplification();
     }
-
-    // TODO: test assert_actual_rates
-    // TODO: test swap with rate
-
 }
