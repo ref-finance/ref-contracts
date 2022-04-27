@@ -1230,6 +1230,104 @@ mod tests {
         assert_eq!(0, contract.get_user_whitelisted_tokens(accounts(3)).len());
         testing_env!(context
             .predecessor_account_id(accounts(0))
+            .attached_deposit(env::storage_byte_cost() * 334)
+            .build());
+        let pool_id = contract.add_stable_swap_pool(tokens, vec![18, 18], 25, 240);
+        println!("{:?}", contract.version());
+        println!("{:?}", contract.get_stable_pool(pool_id));
+        println!("{:?}", contract.get_pools(0, 100));
+        println!("{:?}", contract.get_pool(0));
+        assert_eq!(1, contract.get_number_of_pools());
+        assert_eq!(25, contract.get_pool_fee(pool_id));
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(to_yocto("0.03"))
+            .build());
+        contract.storage_deposit(None, None);
+        assert_eq!(to_yocto("0.03"), contract.get_user_storage_state(accounts(3)).unwrap().deposit.0);
+        deposit_tokens(&mut context, &mut contract, accounts(3), token_amounts.clone());
+        deposit_tokens(&mut context, &mut contract, accounts(0), vec![]);
+
+        let predict = contract.predict_add_stable_liquidity(pool_id, &vec![to_yocto("4").into(), to_yocto("4").into()]);
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(to_yocto("0.0007"))
+            .build());
+        let add_liq = contract.add_stable_liquidity(
+            pool_id,
+            vec![to_yocto("4").into(), to_yocto("4").into()],
+            U128(1),
+        );
+        assert_eq!(predict.0, add_liq.0);
+        assert_eq!(100000000, contract.get_pool_share_price(pool_id).0);
+        assert_eq!(8000000000000000000000000, contract.get_pool_shares(pool_id, accounts(3)).0);
+        assert_eq!(8000000000000000000000000, contract.get_pool_total_shares(pool_id).0);
+        
+        let expected_out = contract.get_return(0, accounts(1), to_yocto("1").into(), accounts(2));
+        assert_eq!(expected_out.0, 996947470156575219215720);
+
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(1)
+            .build());
+        let amount_out = swap(&mut contract, 0, accounts(1), to_yocto("1").into(), accounts(2));
+        assert_eq!(amount_out, expected_out.0);
+        assert_eq!(
+            contract.get_deposit(accounts(3), accounts(1)).0,
+            0
+        );
+        assert_eq!(0, contract.get_deposits(accounts(3)).get(&accounts(1).to_string()).unwrap().0);
+        assert_eq!(to_yocto("1") + 996947470156575219215720, contract.get_deposits(accounts(3)).get(&accounts(2).to_string()).unwrap().0);
+
+        let predict = contract.predict_remove_liquidity(pool_id, to_yocto("0.1").into());
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(1)
+            .build());
+        let remove_liq = contract.remove_liquidity(
+            pool_id,
+            to_yocto("0.1").into(),
+            vec![1.into(), 1.into()],
+        );
+        assert_eq!(predict, remove_liq);
+
+        let predict = contract.predict_remove_liquidity_by_tokens(pool_id, &vec![to_yocto("0.1").into(), to_yocto("0.1").into()]);
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(1)
+            .build());
+        let remove_liq_by_token = contract.remove_liquidity_by_tokens(
+            pool_id,
+            vec![to_yocto("0.1").into(), to_yocto("0.1").into()],
+            to_yocto("1").into(),
+        );
+        assert_eq!(predict.0, remove_liq_by_token.0);
+
+        testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
+        contract.remove_exchange_fee_liquidity(0, to_yocto("0.0001").into(), vec![1.into(), 1.into()]);
+        testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
+        contract.withdraw_owner_token(accounts(1), to_yocto("0.00001").into());
+        testing_env!(context.predecessor_account_id(accounts(0)).block_timestamp(2*86400 * 1_000_000_000).attached_deposit(1).build());
+        contract.stable_swap_ramp_amp(0,250, (3*86400 * 1_000_000_000).into());
+        testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
+        contract.stable_swap_stop_ramp_amp(0);
+    }
+
+
+    #[test]
+    fn test_rated() {
+        let (mut context, mut contract) = setup_contract();
+        let token_amounts = vec![(accounts(1), to_yocto("5")), (accounts(2), to_yocto("5"))];
+        let tokens = token_amounts
+            .iter()
+            .map(|(x, _)| x.clone())
+            .collect::<Vec<_>>();
+        testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
+        contract.extend_whitelisted_tokens(tokens.clone());
+        assert_eq!(contract.get_whitelisted_tokens(), vec![accounts(1).to_string(), accounts(2).to_string()]);
+        assert_eq!(0, contract.get_user_whitelisted_tokens(accounts(3)).len());
+        testing_env!(context
+            .predecessor_account_id(accounts(0))
             .attached_deposit(env::storage_byte_cost() * 378) // * was 334
             .build());
         let pool_id = contract.add_stable_swap_pool(tokens, vec![18, 18], 25, 240);
