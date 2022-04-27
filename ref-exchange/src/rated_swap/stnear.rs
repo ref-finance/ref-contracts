@@ -39,7 +39,8 @@ impl Contract {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         match pool {
             Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(pool) => {
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => {
                 if pool.rates_updated_at == env::epoch_height() {
                     return PromiseOrValue::Value(pool.stored_rates[0].into());
                 }
@@ -66,7 +67,8 @@ impl Contract {
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         match &mut pool {
             Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(pool) => {
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => {
                 pool.stored_rates = vec![price.0, 1 * PRECISION];
                 pool.rates_updated_at = env::epoch_height();
             }
@@ -75,3 +77,5 @@ impl Contract {
         price
     }
 }
+
+// TODO: tests

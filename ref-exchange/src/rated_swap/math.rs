@@ -3,7 +3,9 @@
 use near_sdk::{Balance, Timestamp};
 
 use crate::admin_fee::AdminFees;
-use crate::utils::{FEE_DIVISOR, U256};
+use crate::utils::{FEE_DIVISOR, U384};
+
+use super::PRECISION;
 
 /// Minimum ramp duration, in nano sec.
 pub const MIN_RAMP_DURATION: Timestamp = 86400 * 1_000_000_000;
@@ -66,8 +68,26 @@ pub struct SwapResult {
     pub fee: Balance,
 }
 
-/// The StableSwap invariant calculator.
-pub struct StableSwap {
+impl SwapResult {
+    pub fn new(
+        new_source_amount: Balance,
+        new_destination_amount: Balance,
+        amount_swapped: Balance,
+        admin_fee: Balance,
+        fee: Balance,
+    ) -> Self {
+        Self {
+            new_source_amount,
+            new_destination_amount,
+            amount_swapped,
+            admin_fee,
+            fee,
+        }
+    }
+}
+
+/// The RatedSwap invariant calculator.
+pub struct RatedSwap {
     /// Initial amplification coefficient (A)
     initial_amp_factor: u128,
     /// Target amplification coefficient (A)
@@ -78,15 +98,18 @@ pub struct StableSwap {
     start_ramp_ts: Timestamp,
     /// Ramp A stop timestamp
     stop_ramp_ts: Timestamp,
+    /// *
+    rates: Vec<Balance>,
 }
 
-impl StableSwap {
+impl RatedSwap {
     pub fn new(
         initial_amp_factor: u128,
         target_amp_factor: u128,
         current_ts: Timestamp,
         start_ramp_ts: Timestamp,
         stop_ramp_ts: Timestamp,
+        rates: &Vec<Balance>,
     ) -> Self {
         Self {
             initial_amp_factor,
@@ -94,7 +117,27 @@ impl StableSwap {
             current_ts,
             start_ramp_ts,
             stop_ramp_ts,
+            rates: rates.clone(),
         }
+    }
+
+    /// *
+    fn mul_rate(&self, amount: Balance, rate: Balance) -> Balance {
+        (U384::from(amount) * U384::from(rate) / U384::from(PRECISION))
+            .as_u128()
+    }
+
+    /// *
+    fn div_rate(&self, amount: Balance, rate: Balance) -> Balance {
+        (U384::from(amount) * U384::from(PRECISION) / U384::from(rate))
+            .as_u128()
+    }
+
+    /// *
+    fn rate_balances(&self, amounts: &Vec<Balance>) -> Vec<Balance> {
+        amounts.iter().zip(self.rates.iter()).map(|(&amount, &rate)| {
+            self.mul_rate(amount, rate)
+        }).collect()
     }
 
     /// Compute the amplification coefficient (A)
@@ -133,18 +176,23 @@ impl StableSwap {
         }
     }
 
+    /// * Compute stable swap invariant (D) with rates applied to input balances
+    pub fn compute_d_with_rates(&self, c_amounts: &Vec<Balance>) -> Option<U384> {
+        self.compute_d(&self.rate_balances(c_amounts))
+    }
+
     /// Compute stable swap invariant (D)
     /// Equation:
     /// A * sum(x_i) * n**n + D = A * D * n**n + D**(n+1) / (n**n * prod(x_i))
-    pub fn compute_d(&self, c_amounts: &Vec<Balance>) -> Option<U256> {
+    pub fn compute_d(&self, c_amounts: &Vec<Balance>) -> Option<U384> {
         let n_coins = c_amounts.len() as u128;
         let sum_x = c_amounts.iter().fold(0, |sum, i| sum + i);
         if sum_x == 0 {
             Some(0.into())
         } else {
             let amp_factor = self.compute_amp_factor()?;
-            let mut d_prev: U256;
-            let mut d: U256 = sum_x.into();
+            let mut d_prev: U384;
+            let mut d: U384 = sum_x.into();
             for _ in 0..256 {
                 // $ D_{k,prod} = \frac{D_k^{n+1}}{n^n \prod x_{i}} = \frac{D^3}{4xy} $
                 let mut d_prod = d;
@@ -155,7 +203,7 @@ impl StableSwap {
                 d_prev = d;
 
                 let ann = amp_factor.checked_mul(n_coins.checked_pow(n_coins as u32)?.into())?;
-                let leverage = (U256::from(sum_x)).checked_mul(ann.into())?;
+                let leverage = (U384::from(sum_x)).checked_mul(ann.into())?;
                 // d = (ann * sum_x + d_prod * n_coins) * d_prev / ((ann - 1) * d_prev + (n_coins + 1) * d_prod)
                 let numerator = d_prev.checked_mul(
                     d_prod
@@ -192,14 +240,14 @@ impl StableSwap {
         let n_coins = old_c_amounts.len();
         
         // Initial invariant
-        let d_0 = self.compute_d(old_c_amounts)?;
+        let d_0 = self.compute_d_with_rates(old_c_amounts)?;
 
         let mut new_balances = vec![0_u128; n_coins];
         for (index, value) in deposit_c_amounts.iter().enumerate() {
             new_balances[index] = old_c_amounts[index].checked_add(*value)?;
         }
         // Invariant after change
-        let d_1 = self.compute_d(&new_balances)?;
+        let d_1 = self.compute_d_with_rates(&new_balances)?;
         if d_1 <= d_0 {
             None
         } else {
@@ -218,7 +266,7 @@ impl StableSwap {
                 new_balances[i] = new_balances[i].checked_sub(fee)?;
             }
 
-            let d_2 = self.compute_d(&new_balances)?;
+            let d_2 = self.compute_d_with_rates(&new_balances)?;
 
             // d1 > d2 > d0, 
             // (d2-d0) => mint_shares (charged fee),
@@ -226,12 +274,12 @@ impl StableSwap {
             // (d1-d2) => fee part,
             // diff_shares = mint_shares + fee part
 
-            let mint_shares = U256::from(pool_token_supply)
+            let mint_shares = U384::from(pool_token_supply)
                 .checked_mul(d_2.checked_sub(d_0)?)?
                 .checked_div(d_0)?
                 .as_u128();
             
-            let diff_shares = U256::from(pool_token_supply)
+            let diff_shares = U384::from(pool_token_supply)
                 .checked_mul(d_1.checked_sub(d_0)?)?
                 .checked_div(d_0)?
                 .as_u128();
@@ -248,7 +296,7 @@ impl StableSwap {
         current_c_amounts: &Vec<Balance>,  // in-pool tokens amount in comparable precision,
         index_x: usize, // x token's index
         index_y: usize, // y token's index
-    ) -> Option<U256> {
+    ) -> Option<U384> {
         let n_coins = current_c_amounts.len() as u128;
         let amp_factor = self.compute_amp_factor()?;
         let ann = amp_factor.checked_mul(n_coins.checked_pow(n_coins as u32)?.into())?;
@@ -270,7 +318,7 @@ impl StableSwap {
         let b = d.checked_div(ann.into())?.checked_add(s_.into())?; // d will be subtracted later
 
         // Solve for y by approximating: y**2 + b*y = c
-        let mut y_prev: U256;
+        let mut y_prev: U384;
         let mut y = d;
         for _ in 0..256 {
             y_prev = y;
@@ -302,7 +350,7 @@ impl StableSwap {
     ) -> Option<(Balance, Balance)> {
         let n_coins = old_c_amounts.len();
         // Initial invariant, D0
-        let d_0 = self.compute_d(old_c_amounts)?;
+        let d_0 = self.compute_d_with_rates(old_c_amounts)?;
 
         // real invariant after withdraw, D1
         let mut new_balances = vec![0_u128; n_coins];
@@ -310,7 +358,7 @@ impl StableSwap {
             new_balances[index] = old_c_amounts[index].checked_sub(*value)?;
         }
 
-        let d_1 = self.compute_d(&new_balances)?;
+        let d_1 = self.compute_d_with_rates(&new_balances)?;
 
         // compare ideal token portions from D1 with withdraws, to calculate diff fee.
         if d_1 >= d_0 {
@@ -332,18 +380,18 @@ impl StableSwap {
                 new_balances[i] = new_balances[i].checked_sub(fee)?;
             }
 
-            let d_2 = self.compute_d(&new_balances)?;
+            let d_2 = self.compute_d_with_rates(&new_balances)?;
 
             // d0 > d1 > d2, 
             // (d0-d2) => burn_shares (plus fee),
             // (d0-d1) => diff_shares (without fee),
             // (d1-d2) => fee part,
             // burn_shares = diff_shares + fee part
-            let burn_shares = U256::from(pool_token_supply)
+            let burn_shares = U384::from(pool_token_supply)
                 .checked_mul(d_0.checked_sub(d_2)?)?
                 .checked_div(d_0)?
                 .as_u128();
-            let diff_shares = U256::from(pool_token_supply)
+            let diff_shares = U384::from(pool_token_supply)
                 .checked_mul(d_0.checked_sub(d_1)?)?
                 .checked_div(d_0)?
                 .as_u128();
@@ -363,30 +411,39 @@ impl StableSwap {
         current_c_amounts: &Vec<Balance>, // in-pool tokens comparable amounts vector, 
         fees: &Fees,
     ) -> Option<SwapResult> {
+        let rate_in = self.rates[token_in_idx];
+        let rate_out = self.rates[token_out_idx];
+
+        // * rate input
+        let token_in_amount_rated = self.mul_rate(token_in_amount, rate_in);
+        let current_c_amounts_rated = self.rate_balances(current_c_amounts);
+
         let y = self.compute_y(
-            token_in_amount + current_c_amounts[token_in_idx], 
-            current_c_amounts,
+            token_in_amount_rated + current_c_amounts_rated[token_in_idx], 
+            &current_c_amounts_rated,
             token_in_idx,
             token_out_idx,
         )?.as_u128();
 
-        let dy = current_c_amounts[token_out_idx].checked_sub(y)?;
+        let dy = current_c_amounts_rated[token_out_idx].checked_sub(y)?.saturating_sub(1); // * ? curve sub -1 just in case there were some rounding errors
+
         let trade_fee = fees.trade_fee(dy);
         let admin_fee = fees.admin_trade_fee(trade_fee);
         let amount_swapped = dy.checked_sub(trade_fee)?;
 
-        let new_destination_amount = current_c_amounts[token_out_idx]
+        let new_destination_amount = current_c_amounts_rated[token_out_idx]
             .checked_sub(amount_swapped)?
             .checked_sub(admin_fee)?;
-        let new_source_amount = current_c_amounts[token_in_idx]
-            .checked_add(token_in_amount)?;
+        let new_source_amount = current_c_amounts_rated[token_in_idx]
+            .checked_add(token_in_amount_rated)?;
 
-        Some(SwapResult {
-            new_source_amount,
-            new_destination_amount,
-            amount_swapped,
-            admin_fee,
-            fee: trade_fee,
-        })
+        // * rate back result
+        Some(SwapResult::new(
+            self.div_rate(new_source_amount, rate_in),
+            self.div_rate(new_destination_amount, rate_out),
+            self.div_rate(amount_swapped, rate_out),
+            self.div_rate(admin_fee, rate_out),
+            self.div_rate(trade_fee, rate_out),
+        ))
     }
 }
