@@ -220,7 +220,7 @@ impl Pool {
     pub fn predict_add_rated_liquidity(
         &self,
         amounts: &Vec<Balance>,
-        rates: &Vec<Balance>,
+        rates: &Option<Vec<Balance>>,
         fees: &AdminFees,
     ) -> Balance {
         match self {

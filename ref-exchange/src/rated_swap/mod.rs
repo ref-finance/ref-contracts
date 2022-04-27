@@ -233,14 +233,18 @@ impl RatedSwapPool {
     pub fn predict_add_rated_liquidity(
         &self,
         amounts: &Vec<Balance>,
-        rates: &Vec<Balance>,
+        rates: &Option<Vec<Balance>>,
         fees: &AdminFees,
     ) -> Balance {
 
         let n_coins = self.token_account_ids.len();
         assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
 
-        let (new_shares, _) = self.calc_add_liquidity_with_rates(amounts, rates, fees);
+        let (new_shares, _) = self.calc_add_liquidity_with_rates(
+            amounts,
+            rates.as_ref().unwrap_or(&self.stored_rates),
+            fees
+        );
 
         new_shares
     }
