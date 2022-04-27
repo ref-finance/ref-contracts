@@ -220,12 +220,13 @@ impl Pool {
     pub fn predict_add_rated_liquidity(
         &self,
         amounts: &Vec<Balance>,
+        rates: &Vec<Balance>,
         fees: &AdminFees,
     ) -> Balance {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
-            Pool::RatedSwapPool(pool) => pool.predict_add_rated_liquidity(amounts, fees),
+            Pool::RatedSwapPool(pool) => pool.predict_add_rated_liquidity(amounts, rates, fees),
         }
     }
 

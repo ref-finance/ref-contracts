@@ -142,21 +142,21 @@ impl RatedSwapPool {
     }
 
     pub fn get_amp(&self) -> u64 {
-        if let Some(amp) = self.get_invariant().compute_amp_factor() {
+        if let Some(amp) = self.get_invariant_with_rates(&self.stored_rates).compute_amp_factor() {
             amp as u64
         } else {
             0
         }
     }
 
-    fn get_invariant(&self) -> RatedSwap {
+    fn get_invariant_with_rates(&self, rates: &Vec<Balance>) -> RatedSwap {
         RatedSwap::new(
             self.init_amp_factor,
             self.target_amp_factor,
             env::block_timestamp(),
             self.init_amp_time,
             self.stop_amp_time,
-            self.stored_rates.clone(),
+            rates,
         )
     }
 
@@ -193,12 +193,13 @@ impl RatedSwapPool {
 
     /// caculate mint share and related fee for adding liquidity
     /// return (share, fee_part)
-    fn calc_add_liquidity(
+    fn calc_add_liquidity_with_rates(
         &self, 
-        amounts: &Vec<Balance>, 
+        amounts: &Vec<Balance>,
+        rates: &Vec<Balance>,
         fees: &AdminFees,
     ) -> (Balance, Balance) {
-        let invariant = self.get_invariant();
+        let invariant = self.get_invariant_with_rates(rates);
 
         // make amounts into comparable-amounts
         let c_amounts = self.amounts_to_c_amounts(amounts);
@@ -232,13 +233,14 @@ impl RatedSwapPool {
     pub fn predict_add_rated_liquidity(
         &self,
         amounts: &Vec<Balance>,
+        rates: &Vec<Balance>,
         fees: &AdminFees,
     ) -> Balance {
 
         let n_coins = self.token_account_ids.len();
         assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
 
-        let (new_shares, _) = self.calc_add_liquidity(amounts, fees);
+        let (new_shares, _) = self.calc_add_liquidity_with_rates(amounts, rates, fees);
 
         new_shares
     }
@@ -258,7 +260,7 @@ impl RatedSwapPool {
         let n_coins = self.token_account_ids.len();
         assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
 
-        let (new_shares, fee_part) = self.calc_add_liquidity(amounts, fees);
+        let (new_shares, fee_part) = self.calc_add_liquidity_with_rates(amounts, &self.stored_rates, fees);
 
         //slippage check on the LP tokens.
         assert!(new_shares >= min_shares, "{}", ERR68_SLIPPAGE);
@@ -369,7 +371,7 @@ impl RatedSwapPool {
             self.assert_min_reserve(self.c_amounts[i].checked_sub(c_amounts[i]).unwrap_or(0));
         }
 
-        let invariant = self.get_invariant();
+        let invariant = self.get_invariant_with_rates(&self.stored_rates);
         let trade_fee = Fees::new(self.total_fee, &fees);
 
         let (burn_shares, _) = invariant
@@ -406,7 +408,7 @@ impl RatedSwapPool {
             self.assert_min_reserve(self.c_amounts[i].checked_sub(c_amounts[i]).unwrap_or(0));
         }
 
-        let invariant = self.get_invariant();
+        let invariant = self.get_invariant_with_rates(&self.stored_rates);
         let trade_fee = Fees::new(self.total_fee, &fees);
 
         let (burn_shares, fee_part) = invariant
@@ -473,7 +475,7 @@ impl RatedSwapPool {
         // make amounts into comparable-amounts
         let c_amount_in = self.amount_to_c_amount(amount_in, token_in);
 
-        self.get_invariant()
+        self.get_invariant_with_rates(&self.stored_rates)
             .swap_to(
                 token_in,
                 c_amount_in,
@@ -604,7 +606,7 @@ impl RatedSwapPool {
         token_id: usize,
         c_amount: Balance,
     ) -> Balance {
-        let invariant = self.get_invariant();
+        let invariant = self.get_invariant_with_rates(&self.stored_rates);
 
         let mut c_amounts = vec![0_u128; self.c_amounts.len()];
         c_amounts[token_id] = c_amount;
@@ -700,7 +702,7 @@ impl RatedSwapPool {
             "{}",
             ERR82_INSUFFICIENT_RAMP_TIME
         );
-        let amp_factor = self.get_invariant()
+        let amp_factor = self.get_invariant_with_rates(&self.stored_rates)
             .compute_amp_factor()
             .expect(ERR66_INVARIANT_CALC_ERR);
         assert!(
@@ -724,7 +726,7 @@ impl RatedSwapPool {
     /// [Admin function] Stop increase of amplification factor.
     pub fn stop_ramp_amplification(&mut self) {
         let current_time = env::block_timestamp();
-        let amp_factor = self.get_invariant()
+        let amp_factor = self.get_invariant_with_rates(&self.stored_rates)
             .compute_amp_factor()
             .expect(ERR65_INIT_TOKEN_BALANCE);
         self.init_amp_factor = amp_factor;

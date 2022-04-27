@@ -109,7 +109,7 @@ impl RatedSwap {
         current_ts: Timestamp,
         start_ramp_ts: Timestamp,
         stop_ramp_ts: Timestamp,
-        rates: Vec<Balance>,
+        rates: &Vec<Balance>,
     ) -> Self {
         Self {
             initial_amp_factor,
@@ -117,7 +117,7 @@ impl RatedSwap {
             current_ts,
             start_ramp_ts,
             stop_ramp_ts,
-            rates,
+            rates: rates.clone(),
         }
     }
 

@@ -1378,7 +1378,7 @@ mod tests {
         deposit_tokens(&mut context, &mut contract, accounts(3), token_amounts.clone());
         deposit_tokens(&mut context, &mut contract, accounts(0), vec![]);
 
-        let predict = contract.predict_add_rated_liquidity(pool_id, &vec![to_yocto("4").into(), to_yocto("4").into()]);
+        let predict = contract.predict_add_rated_liquidity(pool_id, &vec![to_yocto("4").into(), to_yocto("4").into()], &vec![U128(to_yocto("1")); 2]);
         testing_env!(context
             .predecessor_account_id(accounts(3))
             .attached_deposit(to_yocto("0.0007"))
