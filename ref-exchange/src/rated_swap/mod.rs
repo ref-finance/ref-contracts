@@ -48,6 +48,8 @@ pub struct RatedSwapPool {
     pub stored_rates: Vec<Balance>,
     /// *
     pub rates_updated_at: u64,
+    /// *
+    pub contract_id: AccountId,
 }
 
 impl RatedSwapPool {
@@ -57,6 +59,7 @@ impl RatedSwapPool {
         token_decimals: Vec<u8>,
         amp_factor: u128,
         total_fee: u32,
+        contract_id: AccountId,
     ) -> Self {
         for decimal in token_decimals.clone().into_iter() {
             assert!(decimal <= MAX_DECIMAL, "{}", ERR60_DECIMAL_ILLEGAL);
@@ -72,8 +75,6 @@ impl RatedSwapPool {
             token_account_ids: token_account_ids.iter().map(|a| a.clone().into()).collect(),
             token_decimals,
             c_amounts: vec![0u128; token_account_ids.len()],
-            stored_rates: vec![1 * PRECISION; token_account_ids.len()], // all rates equals 1.0
-            rates_updated_at: 0,
             volumes: vec![SwapVolume::default(); token_account_ids.len()],
             total_fee,
             shares: LookupMap::new(StorageKey::Shares { pool_id: id }),
@@ -82,6 +83,9 @@ impl RatedSwapPool {
             target_amp_factor: amp_factor,
             init_amp_time: 0,
             stop_amp_time: 0,
+            stored_rates: vec![1 * PRECISION; token_account_ids.len()], // all rates equals 1.0
+            rates_updated_at: 0,
+            contract_id,
         }
     }
 
@@ -768,7 +772,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
-        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1000, 0);
+        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1000, 0, AccountId::from("remote"));
         assert_eq!(
             pool.tokens(),
             vec![accounts(1).to_string(), accounts(2).to_string()]
@@ -788,7 +792,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
-        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1000, 0);
+        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1000, 0, AccountId::from("remote"));
         assert_eq!(
             pool.tokens(),
             vec![accounts(1).to_string(), accounts(2).to_string()]
@@ -806,7 +810,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
-        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1000, 0);
+        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1000, 0, AccountId::from("remote"));
         assert_eq!(
             pool.tokens(),
             vec![accounts(1).to_string(), accounts(2).to_string()]
@@ -823,7 +827,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
-        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1000, 0);
+        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1000, 0, AccountId::from("remote"));
         assert_eq!(
             pool.tokens(),
             vec![accounts(1).to_string(), accounts(2).to_string()]
@@ -842,7 +846,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
-        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1000, 0);
+        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 1000, 0, AccountId::from("remote"));
         assert_eq!(
             pool.tokens(),
             vec![accounts(1).to_string(), accounts(2).to_string()]
@@ -886,7 +890,8 @@ mod tests {
                 6,
             ], 
             1000, 
-            0
+            0,
+            AccountId::from("remote")
         );
         assert_eq!(
             pool.tokens(),
@@ -931,7 +936,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let fees = AdminFees::zero();
-        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0);
+        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0, AccountId::from("remote"));
         assert_eq!(
             pool.tokens(),
             vec![accounts(1).to_string(), accounts(2).to_string()]
@@ -987,7 +992,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
         let mut pool =
-            RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 2000);
+            RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 2000, AccountId::from("remote"));
         let mut amounts = vec![5000000, 10000000];
         let fees = AdminFees::new(1000); // 10% exchange fee
 
@@ -1012,7 +1017,7 @@ mod tests {
     fn test_rated_add_transfer_remove_liquidity() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0);
+        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0, AccountId::from("remote"));
         let mut amounts = vec![5000000, 10000000];
         let fees = AdminFees::zero();
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
@@ -1038,7 +1043,7 @@ mod tests {
     fn test_rated_ramp_amp() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0);
+        let mut pool = RatedSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0, AccountId::from("remote"));
 
         let start_ts = MIN_RAMP_DURATION + 1_000_000_000;
         testing_env!(context.block_timestamp(start_ts).build());
