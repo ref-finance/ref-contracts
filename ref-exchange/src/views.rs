@@ -310,6 +310,16 @@ impl Contract {
             .into()
     }
 
+    pub fn predict_add_rated_liquidity(
+        &self,
+        pool_id: u64,
+        amounts: &Vec<U128>,
+    ) -> U128 {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        pool.predict_add_rated_liquidity(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
+            .into()
+    }
+
     pub fn predict_remove_liquidity(
         &self,
         pool_id: u64,

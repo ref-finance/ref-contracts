@@ -213,7 +213,19 @@ impl Pool {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => pool.predict_add_stable_liquidity(amounts, fees),
-            Pool::RatedSwapPool(pool) => pool.predict_add_stable_liquidity(amounts, fees),
+            Pool::RatedSwapPool(_) => unimplemented!(),
+        }
+    }
+
+    pub fn predict_add_rated_liquidity(
+        &self,
+        amounts: &Vec<Balance>,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.predict_add_rated_liquidity(amounts, fees),
         }
     }
 

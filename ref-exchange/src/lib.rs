@@ -302,6 +302,16 @@ impl Contract {
         mint_shares.into()
     }
 
+    #[payable]
+    pub fn add_rated_liquidity(
+        &mut self,
+        pool_id: u64,
+        amounts: Vec<U128>,
+        min_shares: U128,
+    ) -> U128 {
+        self.add_stable_liquidity(pool_id, amounts, min_shares)
+    }
+
     /// Remove liquidity from the pool into general pool of liquidity.
     #[payable]
     pub fn remove_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) -> Vec<U128> {
@@ -1368,12 +1378,12 @@ mod tests {
         deposit_tokens(&mut context, &mut contract, accounts(3), token_amounts.clone());
         deposit_tokens(&mut context, &mut contract, accounts(0), vec![]);
 
-        let predict = contract.predict_add_stable_liquidity(pool_id, &vec![to_yocto("4").into(), to_yocto("4").into()]);
+        let predict = contract.predict_add_rated_liquidity(pool_id, &vec![to_yocto("4").into(), to_yocto("4").into()]);
         testing_env!(context
             .predecessor_account_id(accounts(3))
             .attached_deposit(to_yocto("0.0007"))
             .build());
-        let add_liq = contract.add_stable_liquidity(
+        let add_liq = contract.add_rated_liquidity(
             pool_id,
             vec![to_yocto("4").into(), to_yocto("4").into()],
             U128(1),

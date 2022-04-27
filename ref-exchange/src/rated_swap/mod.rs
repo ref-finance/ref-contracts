@@ -229,7 +229,7 @@ impl RatedSwapPool {
         }
     }
 
-    pub fn predict_add_stable_liquidity(
+    pub fn predict_add_rated_liquidity(
         &self,
         amounts: &Vec<Balance>,
         fees: &AdminFees,
