@@ -1,10 +1,9 @@
-use near_sdk::{ext_contract, json_types::U128, near_bindgen, AccountId, PromiseOrValue};
+use near_sdk::{ext_contract, json_types::U128, near_bindgen, PromiseOrValue};
 
 use crate::*;
 
 use super::PRECISION;
 
-pub const METAPOOL_ADDRESS: &str = "meta-v2.pool.testnet"; //"metapool.near";
 const NO_DEPOSIT: Balance = 0;
 
 pub mod gas {
@@ -36,19 +35,18 @@ impl Contract {
     ///
     #[payable]
     pub fn update_pool_rates(&mut self, pool_id: u64) -> PromiseOrValue<U128> {
-        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        match pool {
+        let pool = match self.pools.get(pool_id).expect(ERR85_NO_POOL) {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
-            Pool::RatedSwapPool(pool) => {
-                if pool.rates_updated_at == env::epoch_height() {
-                    return PromiseOrValue::Value(pool.stored_rates[0].into());
-                }
-            }
+            Pool::RatedSwapPool(pool) => pool,
+        };
+
+        if pool.rates_updated_at == env::epoch_height() {
+            return PromiseOrValue::Value(pool.stored_rates[0].into());
         }
 
         ext_metapool::get_st_near_price(
-            &AccountId::from(METAPOOL_ADDRESS),
+            &pool.contract_id,
             NO_DEPOSIT,
             gas::GET_PRICE,
         )
@@ -64,17 +62,23 @@ impl Contract {
     ///
     #[private]
     pub fn st_near_price_callback(&mut self, pool_id: u64, #[callback] price: U128) -> U128 {
+        self.internal_update_pool_rates(pool_id, price.0);
+        price
+    }
+}
+
+impl Contract {
+    pub fn internal_update_pool_rates(&mut self, pool_id: u64, price: Balance) {
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         match &mut pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(pool) => {
-                pool.stored_rates = vec![price.0, 1 * PRECISION];
+                pool.stored_rates = vec![price, 1 * PRECISION];
                 pool.rates_updated_at = env::epoch_height();
             }
         }
         self.pools.replace(pool_id, &pool);
-        price
     }
 }
 
