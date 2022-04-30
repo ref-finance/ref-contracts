@@ -1,5 +1,8 @@
 # Release Notes
 
+### Version 1.4.5
+1. fix off-by-one issue in stable-swap;
+
 ### Version 1.4.4
 1. Return minted shares for `add_liquidity`;
 2. Return received tokens amount for `remove_liquidity`;
