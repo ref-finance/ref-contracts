@@ -1,68 +1,38 @@
-NEAR_CONTRACT_BUILDER_IMAGE=nearprotocol/contract-builder
-
-FARMING_DIR=ref-farming-v2
-FARMING_BUILDER_NAME=build_v2_ref_farming
-FARMING_RELEASE=ref_farming_v2
-
 EXCHANGE_DIR=ref-exchange
-EXCHANGE_BUILDER_NAME=build_ref_exchange
-EXCHANGE_RELEASE=ref_exchange
 
-test-all: test-exchange test-farming
+RFLAGS="-C link-arg=-s"
 
-build-farming:
-	$(call create_builder,${FARMING_BUILDER_NAME},${FARMING_DIR})
-	$(call start_builder,${FARMING_BUILDER_NAME})
-	$(call setup_builder,${FARMING_BUILDER_NAME})
-	
-test-farming: build-farming
-	cd ${FARMING_DIR} && RUSTFLAGS='-C link-arg=-s' cargo test
-
-build-exchange:
-	$(call create_builder,${EXCHANGE_BUILDER_NAME},${EXCHANGE_DIR})
-	$(call start_builder,${EXCHANGE_BUILDER_NAME})
-	$(call setup_builder,${EXCHANGE_BUILDER_NAME})
-	
-test-exchange: build-exchange
-	cd ${EXCHANGE_DIR} && RUSTFLAGS='-C link-arg=-s' cargo test
-
-res:
+build: ref-exchange
+	rustup target add wasm32-unknown-unknown
+	RUSTFLAGS=$(RFLAGS) cargo build -p ref-exchange --target wasm32-unknown-unknown --release
 	mkdir -p res
+	cp target/wasm32-unknown-unknown/release/ref_exchange.wasm ./res/ref_exchange.wasm
 
-release-farming: res
-	$(call release_wasm,${FARMING_RELEASE})
+test: build mock-ft
+	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange
 
-release-exchange: res
-	$(call release_wasm,${EXCHANGE_RELEASE})
+mock-ft: test-token
+	rustup target add wasm32-unknown-unknown
+	RUSTFLAGS=$(RFLAGS) cargo build -p test-token --target wasm32-unknown-unknown --release
+	mkdir -p res
+	cp target/wasm32-unknown-unknown/release/test_token.wasm ./res/test_token.wasm
 
-remove-builders:
-	$(call remove_builder,${FARMING_BUILDER_NAME}) || \
-	$(call remove_builder,${EXCHANGE_BUILDER_NAME})
+release:
+	$(call docker_build,_rust_setup.sh)
+	mkdir -p res
+	cp target/wasm32-unknown-unknown/release/ref_exchange.wasm res/ref_exchange_release.wasm
 
-define create_builder 
-	docker ps -a | grep $(1) || docker create \
+clean:
+	cargo clean
+	rm -rf res/
+
+define docker_build
+	docker build -t my-contract-builder .
+	docker run \
 		--mount type=bind,source=${PWD},target=/host \
 		--cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
-		--name=$(1) \
-		-w /host/$(2) \
-		-e RUSTFLAGS='-C link-arg=-s' \
-		-it \
-		${NEAR_CONTRACT_BUILDER_IMAGE} \
-		/bin/bash
-endef
-
-define start_builder
-	docker ps | grep $(1) || docker start $(1) 
-endef
-
-define setup_builder
-	docker exec $(1) /bin/bash _rust_setup.sh 
-endef
-
-define remove_builder
-	docker stop $(1) && sleep 3 && docker rm $(1) 
-endef
-
-define release_wasm
-	cp ${PWD}/target/wasm32-unknown-unknown/release/$(1).wasm ${PWD}/res/$(1)_release.wasm
+		-w /host \
+		-e RUSTFLAGS=$(RFLAGS) \
+		-i -t my-contract-builder \
+		/bin/bash $(1)
 endef

@@ -756,7 +756,7 @@ mod tests {
 
         let out = swap(&mut pool, 1, 10000000000, 2);
         assert_eq!(out, 9999495232);
-        assert_eq!(pool.c_amounts, vec![110000000000000000000000, 90000504767247802010004]);
+        assert_eq!(pool.c_amounts, vec![110000000000000000000000, 90000504767247802010005]);
     }
 
     #[test]
@@ -793,8 +793,8 @@ mod tests {
         let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
 
         let out = swap(&mut pool, 1, 1, 2);
-        assert_eq!(out, 1);
-        assert_eq!(pool.c_amounts, vec![100000000001000000000000, 99999999999000000000000]);
+        assert_eq!(out, 0);
+        assert_eq!(pool.c_amounts, vec![100000000001000000000000, 99999999999000000000001]);
     }
 
     #[test]
@@ -813,7 +813,7 @@ mod tests {
 
         let out = swap(&mut pool, 1, 100000000000, 2);
         assert_eq!(out, 98443663539);
-        assert_eq!(pool.c_amounts, vec![200000000000000000000000, 1556336460086846919343]);
+        assert_eq!(pool.c_amounts, vec![200000000000000000000000, 1556336460086846919344]);
     }
 
     #[test]
@@ -832,7 +832,7 @@ mod tests {
 
         let out = swap(&mut pool, 1, 99999000000, 2);
         assert_eq!(out, 98443167413);
-        assert_eq!(pool.c_amounts, vec![199999000000000000000000, 1556832586795864493703]);
+        assert_eq!(pool.c_amounts, vec![199999000000000000000000, 1556832586795864493704]);
     }
 
     #[test]
@@ -921,10 +921,10 @@ mod tests {
 
         let out = swap(&mut pool, 1, 1000000, 2);
         assert_eq!(out, 1000031);
-        assert_eq!(pool.c_amounts, vec![6000000000000000000, 8999968751649207660]);
+        assert_eq!(pool.c_amounts, vec![6000000000000000000, 8999968751649207661]);
         let out2 = swap(&mut pool, 2, out, 1);
         assert_eq!(out2, 999999); // due to precision difference.
-        assert_eq!(pool.c_amounts, vec![5000000248340316022, 9999999751649207660]);
+        assert_eq!(pool.c_amounts, vec![5000000248340316023, 9999999751649207661]);
 
         // Add only one side of the capital.
         let mut amounts2 = vec![5000000, 0];
