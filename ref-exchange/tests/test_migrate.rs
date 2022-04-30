@@ -10,7 +10,7 @@ pub mod common;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_141.wasm",
-    EXCHANGE_WASM_BYTES => "../res/ref_exchange_release.wasm",
+    EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
 }
 
 #[test]

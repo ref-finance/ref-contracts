@@ -18,6 +18,9 @@ sandbox-tests/compiled-contracts/*.wasm
 
 neardev
 
+res/
+!res/ref_exchange_141.wasm
+
 # res/ref_farming.wasm
 # res/ref_exchange.wasm
 # res/ref_exchange_release.wasm

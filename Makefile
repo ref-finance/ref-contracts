@@ -9,7 +9,12 @@ build: ref-exchange
 	cp target/wasm32-unknown-unknown/release/ref_exchange.wasm ./res/ref_exchange.wasm
 
 test: build mock-ft
-	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange
+	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange 
+
+test-release: mock-ft
+	mkdir -p res
+	cp ./releases/ref_exchange_release.wasm ./res/ref_exchange.wasm
+	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange 
 
 mock-ft: test-token
 	rustup target add wasm32-unknown-unknown
