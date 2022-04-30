@@ -14,7 +14,7 @@ use crate::StorageKey;
 mod math;
 
 pub const MIN_DECIMAL: u8 = 1;
-pub const MAX_DECIMAL: u8 = 18;
+pub const MAX_DECIMAL: u8 = 24;
 pub const TARGET_DECIMAL: u8 = 18;
 pub const MIN_RESERVE: u128 = 1_000_000_000_000_000_000;
 
@@ -80,10 +80,17 @@ impl StableSwapPool {
     pub fn get_amounts(&self) ->Vec<u128> {
         let mut amounts = self.c_amounts.clone();
         for (index, value) in self.token_decimals.iter().enumerate() {
-            let factor = 10_u128
-                .checked_pow((TARGET_DECIMAL - value) as u32)
-                .unwrap();
-            amounts[index] = amounts[index].checked_div(factor).unwrap();
+            if *value <= TARGET_DECIMAL {
+                let factor = 10_u128
+                    .checked_pow((TARGET_DECIMAL - value) as u32)
+                    .unwrap();
+                amounts[index] = amounts[index].checked_div(factor).unwrap();
+            } else {
+                let factor = 10_u128
+                    .checked_pow((value - TARGET_DECIMAL) as u32)
+                    .unwrap();
+                amounts[index] = amounts[index].checked_mul(factor).unwrap();
+            }
         }
         amounts
     }
@@ -91,28 +98,49 @@ impl StableSwapPool {
     fn amounts_to_c_amounts(&self, amounts: &Vec<u128>) ->Vec<u128> {
         let mut c_amounts = amounts.clone();
         for (index, value) in self.token_decimals.iter().enumerate() {
-            let factor = 10_u128
-                .checked_pow((TARGET_DECIMAL - value) as u32)
-                .unwrap();
-            c_amounts[index] = c_amounts[index].checked_mul(factor).unwrap();
+            if *value <= TARGET_DECIMAL {
+                let factor = 10_u128
+                    .checked_pow((TARGET_DECIMAL - value) as u32)
+                    .unwrap();
+                c_amounts[index] = c_amounts[index].checked_mul(factor).unwrap();
+            } else {
+                let factor = 10_u128
+                    .checked_pow((value - TARGET_DECIMAL) as u32)
+                    .unwrap();
+                c_amounts[index] = c_amounts[index].checked_div(factor).unwrap();
+            }
         }
         c_amounts
     }
 
     fn amount_to_c_amount(&self, amount: u128, index: usize) -> u128 {
         let value = self.token_decimals.get(index).unwrap();
-        let factor = 10_u128
+        if *value <= TARGET_DECIMAL {
+            let factor = 10_u128
                 .checked_pow((TARGET_DECIMAL - value) as u32)
                 .unwrap();
-        amount.checked_mul(factor).unwrap()
+            amount.checked_mul(factor).unwrap()
+        } else {
+            let factor = 10_u128
+                .checked_pow((value - TARGET_DECIMAL) as u32)
+                .unwrap();
+            amount.checked_div(factor).unwrap()
+        }
     }
 
     fn c_amount_to_amount(&self, c_amount: u128, index: usize) -> u128 {
         let value = self.token_decimals.get(index).unwrap();
-        let factor = 10_u128
+        if *value <= TARGET_DECIMAL {
+            let factor = 10_u128
                 .checked_pow((TARGET_DECIMAL - value) as u32)
                 .unwrap();
-        c_amount.checked_div(factor).unwrap()
+            c_amount.checked_div(factor).unwrap()
+        } else {
+            let factor = 10_u128
+                .checked_pow((value - TARGET_DECIMAL) as u32)
+                .unwrap();
+            c_amount.checked_mul(factor).unwrap()
+        }
     }
 
     fn assert_min_reserve(&self, balance: u128) {
@@ -238,14 +266,12 @@ impl StableSwapPool {
         assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
 
         let (new_shares, fee_part) = self.calc_add_liquidity(amounts, fees);
-
         //slippage check on the LP tokens.
         assert!(new_shares >= min_shares, "{}", ERR68_SLIPPAGE);
 
         for i in 0..n_coins {
             self.c_amounts[i] = self.c_amounts[i].checked_add(self.amount_to_c_amount(amounts[i], i)).unwrap();
         }
-
         self.mint_shares(sender_id, new_shares);
         env::log(
             format!(
@@ -760,6 +786,25 @@ mod tests {
     }
 
     #[test]
+    fn test_stable_romeo_01() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let fees = AdminFees::zero();
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![18, 24], 1000, 0);
+        assert_eq!(
+            pool.tokens(),
+            vec![accounts(1).to_string(), accounts(2).to_string()]
+        );
+
+        let mut amounts = vec![100000000000000000000000, 100000000000000000000000000000];
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+
+        let out = swap(&mut pool, 1, 10000000000000000000000, 2);
+        assert_eq!(out, 9999495232752197989995000000);
+        assert_eq!(pool.c_amounts, vec![110000000000000000000000, 90000504767247802010005]);
+    }
+
+    #[test]
     fn test_stable_julia_02() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
@@ -771,6 +816,25 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000, 100000000000];
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+
+        let out = swap(&mut pool, 1, 0, 2);
+        assert_eq!(out, 0);
+        assert_eq!(pool.c_amounts, vec![100000000000000000000000, 100000000000000000000000]);
+    }
+
+    #[test]
+    fn test_stable_romeo_02() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let fees = AdminFees::zero();
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![18, 24], 1000, 0);
+        assert_eq!(
+            pool.tokens(),
+            vec![accounts(1).to_string(), accounts(2).to_string()]
+        );
+
+        let mut amounts = vec![100000000000000000000000, 100000000000000000000000000000];
         let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
 
         let out = swap(&mut pool, 1, 0, 2);
@@ -798,6 +862,25 @@ mod tests {
     }
 
     #[test]
+    fn test_stable_romeo_03() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let fees = AdminFees::zero();
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![18, 24], 1000, 0);
+        assert_eq!(
+            pool.tokens(),
+            vec![accounts(1).to_string(), accounts(2).to_string()]
+        );
+
+        let mut amounts = vec![100000000000000000000000, 100000000000000000000000000000];
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+
+        let out = swap(&mut pool, 1, 1, 2);
+        assert_eq!(out, 0);
+        assert_eq!(pool.c_amounts, vec![100000000000000000000001, 100000000000000000000000]);
+    }
+
+    #[test]
     fn test_stable_julia_04() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
@@ -817,6 +900,25 @@ mod tests {
     }
 
     #[test]
+    fn test_stable_romeo_04() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let fees = AdminFees::zero();
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![18, 24], 1000, 0);
+        assert_eq!(
+            pool.tokens(),
+            vec![accounts(1).to_string(), accounts(2).to_string()]
+        );
+
+        let mut amounts = vec![100000000000000000000000, 100000000000000000000000000000];
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+
+        let out = swap(&mut pool, 1, 100000000000000000000000, 2);
+        assert_eq!(out, 98443663539913153080656000000);
+        assert_eq!(pool.c_amounts, vec![200000000000000000000000, 1556336460086846919344]);
+    }
+
+    #[test]
     fn test_stable_julia_05() {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
@@ -832,6 +934,25 @@ mod tests {
 
         let out = swap(&mut pool, 1, 99999000000, 2);
         assert_eq!(out, 98443167413);
+        assert_eq!(pool.c_amounts, vec![199999000000000000000000, 1556832586795864493704]);
+    }
+
+    #[test]
+    fn test_stable_romeo_05() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let fees = AdminFees::zero();
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![18, 24], 1000, 0);
+        assert_eq!(
+            pool.tokens(),
+            vec![accounts(1).to_string(), accounts(2).to_string()]
+        );
+
+        let mut amounts = vec![100000000000000000000000, 100000000000000000000000000000];
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+
+        let out = swap(&mut pool, 1, 99999000000000000000000, 2);
+        assert_eq!(out, 98443167413204135506296000000);
         assert_eq!(pool.c_amounts, vec![199999000000000000000000, 1556832586795864493704]);
     }
 

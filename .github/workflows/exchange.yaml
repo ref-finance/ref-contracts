@@ -16,9 +16,4 @@ jobs:
       - run: |
           rustup toolchain install stable-2021-11-01 && \
           rustup default stable-2021-11-01 && \
-          rustup target add wasm32-unknown-unknown && \
-          cd ref-exchange && \
-          cargo build --target wasm32-unknown-unknown --release
-      - run: |
-          cd ref-exchange && \
-          cargo test -- --skip fuzzy
+          make test
