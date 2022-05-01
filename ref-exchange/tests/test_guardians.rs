@@ -1,5 +1,5 @@
 use near_sdk::json_types::{U128};
-use near_sdk_sim::{call, view, to_yocto};
+use near_sdk_sim::{call, to_yocto};
 
 use ref_exchange::{RunningState, SwapAction};
 use crate::common::utils::*;
