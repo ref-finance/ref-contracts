@@ -369,8 +369,9 @@ impl StableSwap {
             token_in_idx,
             token_out_idx,
         )?.as_u128();
+        // https://github.com/curvefi/curve-contract/blob/b0bbf77f8f93c9c5f4e415bce9cd71f0cdee960e/contracts/pool-templates/base/SwapTemplateBase.vy#L466
+        let dy = current_c_amounts[token_out_idx].checked_sub(y)?.checked_sub(1).unwrap_or(0_u128);
 
-        let dy = current_c_amounts[token_out_idx].checked_sub(y)?;
         let trade_fee = fees.trade_fee(dy);
         let admin_fee = fees.admin_trade_fee(trade_fee);
         let amount_swapped = dy.checked_sub(trade_fee)?;

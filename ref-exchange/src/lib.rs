@@ -1264,7 +1264,7 @@ mod tests {
         assert_eq!(8000000000000000000000000, contract.get_pool_total_shares(pool_id).0);
         
         let expected_out = contract.get_return(0, accounts(1), to_yocto("1").into(), accounts(2));
-        assert_eq!(expected_out.0, 996947470156575219215720);
+        assert_eq!(expected_out.0, 996947470156575219215719);
 
         testing_env!(context
             .predecessor_account_id(accounts(3))
@@ -1277,7 +1277,7 @@ mod tests {
             0
         );
         assert_eq!(0, contract.get_deposits(accounts(3)).get(&accounts(1).to_string()).unwrap().0);
-        assert_eq!(to_yocto("1") + 996947470156575219215720, contract.get_deposits(accounts(3)).get(&accounts(2).to_string()).unwrap().0);
+        assert_eq!(to_yocto("1") + 996947470156575219215719, contract.get_deposits(accounts(3)).get(&accounts(2).to_string()).unwrap().0);
 
         let predict = contract.predict_remove_liquidity(pool_id, to_yocto("0.1").into());
         testing_env!(context
