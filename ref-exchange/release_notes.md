@@ -3,6 +3,7 @@
 ### Version 1.4.5
 1. Fix off-by-one issue in stable-swap;
 2. Support up to 24 decimal tokens in stable-swap;
+3. Avoid mandatory all token register when add stable liquidity with subset of tokens;
 
 ### Version 1.4.4
 1. Return minted shares for `add_liquidity`;
