@@ -8,12 +8,14 @@ jobs:
   test_ref_exchange:
     runs-on: ubuntu-latest 
     container:
-      image: nearprotocol/contract-builder:latest
+      image: rust:1.56.1
       env:
         RUSTFLAGS: -C link-arg=-s
     steps:
       - uses: actions/checkout@v2
       - run: |
+          apt-get update && apt-get install -y git less vim && \
           rustup toolchain install stable-2021-11-01 && \
           rustup default stable-2021-11-01 && \
+          rustup target add wasm32-unknown-unknown && \
           make test
