@@ -1,5 +1,3 @@
-EXCHANGE_DIR=ref-exchange
-
 RFLAGS="-C link-arg=-s"
 
 build: ref-exchange
