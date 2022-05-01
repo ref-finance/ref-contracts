@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: |
-          apt-get update && apt-get install -y git less vim && \
+          apt-get update && apt-get install -y git less vim clang && \
           rustup toolchain install stable-2021-11-01 && \
           rustup default stable-2021-11-01 && \
           rustup target add wasm32-unknown-unknown && \
