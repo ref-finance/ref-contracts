@@ -311,6 +311,25 @@ impl Contract {
             .into()
     }
 
+    pub fn predict_remove_liquidity(
+        &self,
+        pool_id: u64,
+        shares: U128,
+    ) -> Vec<U128> {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        pool.predict_remove_liquidity(shares.into()).into_iter().map(|x| U128(x)).collect()
+    }
+
+    pub fn predict_remove_liquidity_by_tokens(
+        &self,
+        pool_id: u64,
+        amounts: &Vec<U128>,
+    ) -> U128 {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        pool.predict_remove_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
+            .into()
+    }
+
     ///
     pub fn predict_add_rated_liquidity(
         &self,
@@ -330,22 +349,37 @@ impl Contract {
         ).into()
     }
 
-    pub fn predict_remove_liquidity(
-        &self,
-        pool_id: u64,
-        shares: U128,
-    ) -> Vec<U128> {
-        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.predict_remove_liquidity(shares.into()).into_iter().map(|x| U128(x)).collect()
-    }
-
-    pub fn predict_remove_liquidity_by_tokens(
+    ///
+    pub fn predict_remove_rated_liquidity_by_tokens(
         &self,
         pool_id: u64,
         amounts: &Vec<U128>,
+        rates: &Option<Vec<U128>>,
     ) -> U128 {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.predict_remove_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
+        let rates = match rates {
+            Some(rates) => Some(rates.into_iter().map(|x| x.0).collect()),
+            _ => None
+        };
+        pool.predict_remove_rated_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &rates, &AdminFees::new(self.exchange_fee))
+            .into()
+    }
+
+    ///
+    pub fn get_rated_return(
+        &self,
+        pool_id: u64,
+        token_in: ValidAccountId,
+        amount_in: U128,
+        token_out: ValidAccountId,
+        rates: &Option<Vec<U128>>,
+    ) -> U128 {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let rates = match rates {
+            Some(rates) => Some(rates.into_iter().map(|x| x.0).collect()),
+            _ => None
+        };
+        pool.get_rated_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &rates, &AdminFees::new(self.exchange_fee))
             .into()
     }
 }

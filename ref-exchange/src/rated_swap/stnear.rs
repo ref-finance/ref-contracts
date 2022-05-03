@@ -45,18 +45,14 @@ impl Contract {
             return PromiseOrValue::Value(pool.stored_rates[0].into());
         }
 
-        ext_metapool::get_st_near_price(
-            &pool.contract_id,
-            NO_DEPOSIT,
-            gas::GET_PRICE,
-        )
-        .then(ext_self::st_near_price_callback(
-            pool_id,
-            &env::current_account_id(),
-            NO_DEPOSIT,
-            gas::CALLBACK,
-        ))
-        .into()
+        ext_metapool::get_st_near_price(&pool.contract_id, NO_DEPOSIT, gas::GET_PRICE)
+            .then(ext_self::st_near_price_callback(
+                pool_id,
+                &env::current_account_id(),
+                NO_DEPOSIT,
+                gas::CALLBACK,
+            ))
+            .into()
     }
 
     ///

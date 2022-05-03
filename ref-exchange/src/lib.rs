@@ -1382,7 +1382,10 @@ mod tests {
 
         contract.internal_update_pool_rates(pool_id, 2_000000000000000000000000); // set token1/token2 rate = 2.0
 
-        let predict = contract.predict_add_rated_liquidity(pool_id, &vec![to_yocto("2").into(), to_yocto("4").into()], &None);
+        let pool_info = contract.get_rated_pool(pool_id);
+        assert_eq!(pool_info.rates, vec![U128(2_000000000000000000000000), U128(1_000000000000000000000000)]);
+
+        let predict = contract.predict_add_rated_liquidity(pool_id, &vec![to_yocto("2").into(), to_yocto("4").into()], &Some(pool_info.rates.clone()));
         testing_env!(context
             .predecessor_account_id(accounts(3))
             .attached_deposit(to_yocto("0.0007"))
@@ -1397,7 +1400,7 @@ mod tests {
         assert_eq!(8000000000000000000000000000000, contract.get_pool_shares(pool_id, accounts(3)).0);
         assert_eq!(8000000000000000000000000000000, contract.get_pool_total_shares(pool_id).0);
         
-        let expected_out = contract.get_return(0, accounts(1), to_yocto("1").into(), accounts(2));
+        let expected_out = contract.get_rated_return(0, accounts(1), to_yocto("1").into(), accounts(2), &Some(pool_info.rates.clone()));
         assert_eq!(expected_out.0, 1992244454139326876254354);
 
         testing_env!(context
@@ -1425,7 +1428,7 @@ mod tests {
         );
         assert_eq!(predict, remove_liq);
 
-        let predict = contract.predict_remove_liquidity_by_tokens(pool_id, &vec![to_yocto("0.1").into(), to_yocto("0.1").into()]);
+        let predict = contract.predict_remove_rated_liquidity_by_tokens(pool_id, &vec![to_yocto("0.1").into(), to_yocto("0.1").into()], &Some(pool_info.rates));
         testing_env!(context
             .predecessor_account_id(accounts(3))
             .attached_deposit(1)

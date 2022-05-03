@@ -393,6 +393,33 @@ impl RatedSwapPool {
         burn_shares
     }
 
+    pub fn predict_remove_rated_liquidity_by_tokens(
+        &self,
+        amounts: &Vec<Balance>,
+        rates: &Option<Vec<Balance>>,
+        fees: &AdminFees,
+    ) -> Balance {
+        let n_coins = self.token_account_ids.len();
+        let c_amounts = self.amounts_to_c_amounts(amounts);
+        for i in 0..n_coins {
+            self.assert_min_reserve(self.c_amounts[i].checked_sub(c_amounts[i]).unwrap_or(0));
+        }
+
+        let invariant = self.get_invariant_with_rates(rates.as_ref().unwrap_or(&self.stored_rates));
+        let trade_fee = Fees::new(self.total_fee, &fees);
+
+        let (burn_shares, _) = invariant
+            .compute_lp_amount_for_withdraw(
+                &c_amounts,
+                &self.c_amounts,
+                self.shares_total_supply,
+                &trade_fee,
+            )
+            .expect(ERR67_LPSHARE_CALC_ERR);
+
+        burn_shares
+    }
+
     /// Remove liquidity from the pool by fixed tokens-out,
     /// allows to remove liquidity of a subset of tokens, by providing 0 in `amounts`.
     /// Fee will be charged according to diff between ideal token portions.
@@ -479,10 +506,21 @@ impl RatedSwapPool {
         token_out: usize,
         fees: &AdminFees,
     ) -> SwapResult {
+        self.internal_get_return_with_rates(token_in, amount_in, token_out, &self.stored_rates, fees)
+    }
+
+    fn internal_get_return_with_rates(
+        &self,
+        token_in: usize,
+        amount_in: Balance,
+        token_out: usize,
+        rates: &Vec<Balance>,
+        fees: &AdminFees,
+    ) -> SwapResult {
         // make amounts into comparable-amounts
         let c_amount_in = self.amount_to_c_amount(amount_in, token_in);
 
-        self.get_invariant_with_rates(&self.stored_rates)
+        self.get_invariant_with_rates(rates)
             .swap_to(
                 token_in,
                 c_amount_in,
@@ -502,11 +540,24 @@ impl RatedSwapPool {
         token_out: &AccountId,
         fees: &AdminFees,
     ) -> Balance {
+        self.get_rated_return(token_in, amount_in, token_out, &None, fees)
+    }
+
+    ///
+    pub fn get_rated_return(
+        &self,
+        token_in: &AccountId,
+        amount_in: Balance,
+        token_out: &AccountId,
+        rates: &Option<Vec<Balance>>,
+        fees: &AdminFees,
+    ) -> Balance {
         assert_ne!(token_in, token_out, "{}", ERR71_SWAP_DUP_TOKENS);
-        let c_amount_out = self.internal_get_return(
+        let c_amount_out = self.internal_get_return_with_rates(
             self.token_index(token_in),
             amount_in,
             self.token_index(token_out),
+            rates.as_ref().unwrap_or(&self.stored_rates),
             &fees,
         )
         .amount_swapped;
