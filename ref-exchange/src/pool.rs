@@ -217,19 +217,6 @@ impl Pool {
         }
     }
 
-    pub fn predict_add_rated_liquidity(
-        &self,
-        amounts: &Vec<Balance>,
-        rates: &Option<Vec<Balance>>,
-        fees: &AdminFees,
-    ) -> Balance {
-        match self {
-            Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(_) => unimplemented!(),
-            Pool::RatedSwapPool(pool) => pool.predict_add_rated_liquidity(amounts, rates, fees),
-        }
-    }
-
     pub fn predict_remove_liquidity(
         &self,
         shares: Balance,
@@ -250,6 +237,47 @@ impl Pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => pool.predict_remove_liquidity_by_tokens(amounts, fees),
             Pool::RatedSwapPool(pool) => pool.predict_remove_liquidity_by_tokens(amounts, fees),
+        }
+    }
+
+    pub fn predict_add_rated_liquidity(
+        &self,
+        amounts: &Vec<Balance>,
+        rates: &Option<Vec<Balance>>,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.predict_add_rated_liquidity(amounts, rates, fees),
+        }
+    }
+
+    pub fn predict_remove_rated_liquidity_by_tokens(
+        &self,
+        amounts: &Vec<Balance>,
+        rates: &Option<Vec<Balance>>,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.predict_remove_rated_liquidity_by_tokens(amounts, rates, fees),
+        }
+    }
+
+    pub fn get_rated_return(
+        &self,
+        token_in: &AccountId,
+        amount_in: Balance,
+        token_out: &AccountId,
+        rates: &Option<Vec<Balance>>,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.get_rated_return(token_in, amount_in, token_out, rates, fees),
         }
     }
 }
