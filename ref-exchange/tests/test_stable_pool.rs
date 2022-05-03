@@ -13,6 +13,7 @@ pub mod common;
 
 
 const ONE_LPT: u128 = 1000000000000000000;
+const ONE_CUSD: u128 = 1000000000000000000000000;
 const ONE_DAI: u128 = 1000000000000000000;
 const ONE_USDT: u128 = 1000000;
 const ONE_USDC: u128 = 1000000;
@@ -366,4 +367,96 @@ fn sim_stable_max_liquidity() {
     assert_eq!(mft_total_supply(&pool, ":0"), 900000900000000000000000000000);
     let last_share_price = pool_share_price(&pool, 0);
     println!("share_price: {}", last_share_price);
+}
+
+#[test]
+fn sim_stable_lp_storage() {
+    let (root, _owner, pool, tokens) = 
+        setup_stable_pool_with_liquidity(
+            vec![
+                "dai1234567890123456789012345678901234567890123456789012345678901".to_string(), 
+                usdt(), 
+                "cusd123456789012345678901234567890123456789012345678901234567890".to_string()
+                ],
+            vec![100000*ONE_DAI, 100000*ONE_USDT, 100000*ONE_CUSD],
+            vec![18, 6, 24],
+            5,
+            240,
+        );
+    let tokens = &tokens;
+
+    // user add liquidity with mono token
+    let usdt_token = &tokens[1];
+    let user = root.create_user("user".to_string(), to_yocto("100"));
+    call!(
+        user,
+        usdt_token.mint(user.valid_account_id(), U128(500*ONE_USDT))
+    )
+    .assert_success();
+
+    call!(
+        user,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("0.0025")
+    )
+    .assert_success();
+
+    let sb = get_storage_balance(&pool, user.valid_account_id()).unwrap();
+    assert_eq!(sb.total.0, to_yocto("0.0025"));
+    assert_eq!(sb.total.0 - sb.available.0, to_yocto("0.00102"));
+
+    call!(
+        user,
+        usdt_token.ft_transfer_call(
+            pool.valid_account_id(), 
+            U128(500*ONE_USDT), 
+            None, 
+            "".to_string()
+        ),
+        deposit = 1
+    )
+    .assert_success();
+
+    let sb = get_storage_balance(&pool, user.valid_account_id()).unwrap();
+    assert_eq!(sb.total.0, to_yocto("0.0025"));
+    assert_eq!(sb.available.0, 0);
+
+    let out_come = call!(
+        user,
+        pool.add_stable_liquidity(0, vec![U128(0), U128(500*ONE_USDT), U128(0)], U128(1)),
+        deposit = to_yocto("0.0007")
+    );
+    out_come.assert_success();
+    let sb = get_storage_balance(&pool, user.valid_account_id()).unwrap();
+    assert_eq!(sb.total.0, to_yocto("0.0025"));
+    assert_eq!(sb.available.0, 0);
+
+    // remove by shares
+    let out_come = call!(
+        user,
+        pool.remove_liquidity(0, U128(300*ONE_LPT), vec![U128(1*ONE_DAI), U128(1*ONE_USDT), U128(1*ONE_CUSD)]),
+        deposit = 1 
+    );
+    assert!(!out_come.is_ok());
+
+    call!(
+        user,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("0.00296")
+    )
+    .assert_success();
+    let sb = get_storage_balance(&pool, user.valid_account_id()).unwrap();
+    assert_eq!(sb.total.0, to_yocto("0.00546"));
+    assert_eq!(sb.available.0, to_yocto("0.00296"));
+
+    // remove by shares
+    let out_come = call!(
+        user,
+        pool.remove_liquidity(0, U128(300*ONE_LPT), vec![U128(1*ONE_DAI), U128(1*ONE_USDT), U128(1*ONE_CUSD)]),
+        deposit = 1 
+    );
+    out_come.assert_success();
+    let sb = get_storage_balance(&pool, user.valid_account_id()).unwrap();
+    assert_eq!(sb.total.0, to_yocto("0.00546"));
+    assert_eq!(sb.available.0, 0);
 }
