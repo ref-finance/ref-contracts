@@ -37,7 +37,7 @@ fi
 PYTHON_IMAGE=python
 CONTAINER=python_base
 
-echo 'Using docker to comparing boost_farming_release.wasm in releases folder with the one (if exist) in res folder ...'
+echo 'Using docker to comparing ref_exchange_release.wasm in releases folder with the one (if exist) in res folder ...'
 
 docker ps -a | grep ${CONTAINER} > /dev/null || docker create \
     --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
@@ -54,8 +54,8 @@ docker exec ${CONTAINER} ls -l | grep release.wasm && docker exec ${CONTAINER} r
 docker exec ${CONTAINER} ls -l | grep build.wasm && docker exec ${CONTAINER} rm build.wasm
 
 docker cp scripts/codehash.py ${CONTAINER}:/host/codehash.py
-docker cp releases/boost_farming_release.wasm ${CONTAINER}:/host/release.wasm
-ls -l res | grep boost_farming_release.wasm > /dev/null && docker cp res/boost_farming_release.wasm ${CONTAINER}:/host/build.wasm
+docker cp releases/ref_exchange_release.wasm ${CONTAINER}:/host/release.wasm
+ls -l res | grep ref_exchange_release.wasm > /dev/null && docker cp res/ref_exchange_release.wasm ${CONTAINER}:/host/build.wasm
 
 docker exec ${CONTAINER} pip3 install base58 > /dev/null 2>&1
 docker exec ${CONTAINER} python3 codehash.py release.wasm build.wasm
