@@ -57,6 +57,7 @@ docker cp scripts/codehash.py ${CONTAINER}:/host/codehash.py
 docker cp releases/ref_exchange_release.wasm ${CONTAINER}:/host/release.wasm
 ls -l res | grep ref_exchange_release.wasm > /dev/null && docker cp res/ref_exchange_release.wasm ${CONTAINER}:/host/build.wasm
 
+
 docker exec ${CONTAINER} pip3 install base58 > /dev/null 2>&1
 docker exec ${CONTAINER} python3 codehash.py release.wasm build.wasm
 
