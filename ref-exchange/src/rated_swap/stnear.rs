@@ -1,23 +1,8 @@
-use near_sdk::{ext_contract, json_types::U128, near_bindgen, PromiseOrValue};
+use near_sdk::{ext_contract, PromiseOrValue};
 
 use crate::*;
 
-use super::PRECISION;
-
-const NO_DEPOSIT: Balance = 0;
-
-pub mod gas {
-    use near_sdk::Gas;
-
-    /// The base amount of gas for a regular execution.
-    const BASE: Gas = 5_000_000_000_000;
-
-    /// The amount of gas for cross-contract call
-    pub const GET_PRICE: Gas = BASE;
-
-    /// The amount of gas for callback
-    pub const CALLBACK: Gas = BASE;
-}
+use super::{RatesTrait, PRECISION};
 
 #[ext_contract(ext_metapool)]
 pub trait ExtMetapool {
@@ -25,56 +10,33 @@ pub trait ExtMetapool {
     fn get_st_near_price(&self) -> U128;
 }
 
-#[ext_contract(ext_self)]
-pub trait SelfCallbacks {
-    fn st_near_price_callback(&mut self, pool_id: u64, #[callback] price: U128) -> U128;
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct StnearRates {
+    /// *
+    pub stored_rates: Vec<Balance>,
+    /// *
+    pub rates_updated_at: u64,
+    /// *
+    pub contract_id: AccountId,
 }
 
-#[near_bindgen]
-impl Contract {
-    ///
-    #[payable]
-    pub fn update_pool_rates(&mut self, pool_id: u64) -> PromiseOrValue<U128> {
-        let pool = match self.pools.get(pool_id).expect(ERR85_NO_POOL) {
-            Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(_) => unimplemented!(),
-            Pool::RatedSwapPool(pool) => pool,
-        };
-
-        if pool.rates_updated_at == env::epoch_height() {
-            return PromiseOrValue::Value(pool.stored_rates[0].into());
+impl RatesTrait for StnearRates {
+    fn update_pool_rates(&self) -> PromiseOrValue<bool> {
+        if self.rates_updated_at == env::epoch_height() {
+            return PromiseOrValue::Value(true);
         }
 
-        ext_metapool::get_st_near_price(&pool.contract_id, NO_DEPOSIT, gas::GET_PRICE)
-            .then(ext_self::st_near_price_callback(
-                pool_id,
-                &env::current_account_id(),
-                NO_DEPOSIT,
-                gas::CALLBACK,
-            ))
-            .into()
+        ext_metapool::get_st_near_price(&self.contract_id, NO_DEPOSIT, gas::BASE).into()
     }
 
-    ///
-    #[private]
-    pub fn st_near_price_callback(&mut self, pool_id: u64, #[callback] price: U128) -> U128 {
-        self.internal_update_pool_rates(pool_id, price.0);
-        price
-    }
-}
-
-impl Contract {
-    pub fn internal_update_pool_rates(&mut self, pool_id: u64, price: Balance) {
-        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        match &mut pool {
-            Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(_) => unimplemented!(),
-            Pool::RatedSwapPool(pool) => {
-                pool.stored_rates = vec![price, 1 * PRECISION];
-                pool.rates_updated_at = env::epoch_height();
-            }
+    fn rates_callback(&mut self, cross_call_result: &Vec<u8>) -> bool {
+        if let Ok(U128(price)) = near_sdk::serde_json::from_slice::<U128>(cross_call_result) {
+            self.stored_rates = vec![price, 1 * PRECISION];
+            self.rates_updated_at = env::epoch_height();
+        } else {
+            panic!("Parse failed");
         }
-        self.pools.replace(pool_id, &pool);
+        true
     }
 }
 

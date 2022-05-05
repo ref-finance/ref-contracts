@@ -1,7 +1,7 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::ValidAccountId;
-use near_sdk::{env, AccountId, Balance, Timestamp};
+use near_sdk::{env, AccountId, Balance, Timestamp, PromiseOrValue};
 
 use crate::admin_fee::AdminFees;
 use crate::errors::*;
@@ -11,6 +11,8 @@ use crate::rated_swap::math::{
 use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR, U256};
 use crate::StorageKey;
 
+use self::stnear::StnearRates;
+
 mod math;
 mod stnear;
 
@@ -19,6 +21,16 @@ pub const MIN_DECIMAL: u8 = 1;
 pub const MAX_DECIMAL: u8 = TARGET_DECIMAL;
 pub const PRECISION: u128 = 10u128.pow(TARGET_DECIMAL as u32); 
 pub const MIN_RESERVE: u128 = 1 * PRECISION;
+
+#[derive(BorshSerialize, BorshDeserialize)]
+pub enum Rates {
+    Stnear(StnearRates)
+}
+
+pub trait RatesTrait {
+    fn update_pool_rates(&self) -> PromiseOrValue<bool>;
+    fn rates_callback(&mut self, cross_call_result: &Vec<u8>) -> bool;
+}
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct RatedSwapPool {
@@ -50,6 +62,7 @@ pub struct RatedSwapPool {
     pub rates_updated_at: u64,
     /// *
     pub contract_id: AccountId,
+    pub rates: Rates,
 }
 
 impl RatedSwapPool {
@@ -85,7 +98,12 @@ impl RatedSwapPool {
             stop_amp_time: 0,
             stored_rates: vec![1 * PRECISION; token_account_ids.len()], // all rates equals 1.0
             rates_updated_at: 0,
-            contract_id,
+            contract_id: contract_id.clone(),
+            rates: Rates::Stnear(StnearRates {
+                stored_rates: vec![1 * PRECISION; token_account_ids.len()], // all rates equals 1.0
+                rates_updated_at: 0,
+                contract_id,
+            })
         }
     }
 
@@ -143,6 +161,19 @@ impl RatedSwapPool {
             "{}",
             ERR111_RATES_EXPIRED
         );
+    }
+
+    /// *
+    pub fn update_pool_rates(&self) -> PromiseOrValue<bool> {
+        match &self.rates {
+            Rates::Stnear(rates) => rates.update_pool_rates(),
+        }
+    }
+
+    pub fn rates_callback(&mut self, cross_call_result: &Vec<u8>) -> bool {
+        match &mut self.rates {
+            Rates::Stnear(rates) => rates.rates_callback(cross_call_result),
+        }
     }
 
     pub fn get_amp(&self) -> u64 {

@@ -1,5 +1,5 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{AccountId, Balance};
+use near_sdk::{AccountId, Balance, PromiseOrValue};
 
 use crate::admin_fee::AdminFees;
 use crate::simple_pool::SimplePool;
@@ -278,6 +278,22 @@ impl Pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(pool) => pool.get_rated_return(token_in, amount_in, token_out, rates, fees),
+        }
+    }
+
+    pub fn update_pool_rates(&self) -> PromiseOrValue<bool> {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.update_pool_rates(),
+        }
+    }
+
+    pub fn rates_callback(&mut self, cross_call_result: &Vec<u8>) -> bool {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.rates_callback(cross_call_result),
         }
     }
 }

@@ -10,7 +10,7 @@ use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
-    PromiseResult, StorageUsage, BorshStorageKey
+    PromiseResult, StorageUsage, BorshStorageKey, PromiseOrValue, ext_contract
 };
 
 use crate::account_deposit::{VAccount, Account};
@@ -67,6 +67,21 @@ impl fmt::Display for RunningState {
             RunningState::Paused => write!(f, "Paused"),
         }
     }
+}
+
+#[ext_contract(ext_self)]
+pub trait SelfCallbacks {
+    fn rates_callback(&mut self, pool_id: u64) -> bool;
+}
+
+
+const NO_DEPOSIT: Balance = 0;
+
+pub mod gas {
+    use near_sdk::Gas;
+
+    /// The base amount of gas for a regular execution.
+    pub const BASE: Gas = 10_000_000_000_000;
 }
 
 #[near_bindgen]
@@ -388,6 +403,45 @@ impl Contract {
         self.internal_save_account(&sender_id, deposits);
 
         burn_shares.into()
+    }
+
+    ///
+    #[payable]
+    pub fn update_pool_rates(&mut self, pool_id: u64) -> PromiseOrValue<bool> {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        match pool.update_pool_rates() {
+            PromiseOrValue::Promise(promise) => {
+                promise.then(ext_self::rates_callback(
+                    pool_id,
+                    &env::current_account_id(),
+                    NO_DEPOSIT,
+                    gas::BASE,
+                ))
+                .into()
+            },
+            PromiseOrValue::Value(true) => PromiseOrValue::Value(true),
+            PromiseOrValue::Value(false) => panic!("fail"),
+        }
+
+    }
+
+    ///
+    #[private]
+    pub fn rates_callback(&mut self, pool_id: u64) -> bool {
+        assert_eq!(env::promise_results_count(), 1, "Too many results");
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let result = match env::promise_result(0) {
+            // Current version of protocol never return `NotReady`
+            // https://docs.rs/near-sdk/3.1.0/near_sdk/enum.PromiseResult.html#variant.NotReady
+            PromiseResult::NotReady => panic!("NotReady"),
+            PromiseResult::Failed => panic!("Cross-contract call failed"),
+            PromiseResult::Successful(cross_call_result) => pool.rates_callback(&cross_call_result)
+        };
+
+        if result {
+            self.pools.replace(pool_id, &pool);
+        }
+        result
     }
 }
 
@@ -1380,7 +1434,8 @@ mod tests {
         deposit_tokens(&mut context, &mut contract, accounts(3), token_amounts.clone());
         deposit_tokens(&mut context, &mut contract, accounts(0), vec![]);
 
-        contract.internal_update_pool_rates(pool_id, 2_000000000000000000000000); // set token1/token2 rate = 2.0
+        let FIXME = 0;
+        //contract.internal_update_pool_rates(pool_id, 2_000000000000000000000000); // set token1/token2 rate = 2.0
 
         let pool_info = contract.get_rated_pool(pool_id);
         assert_eq!(pool_info.rates, vec![U128(2_000000000000000000000000), U128(1_000000000000000000000000)]);
