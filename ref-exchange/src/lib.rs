@@ -10,8 +10,9 @@ use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
-    PromiseResult, StorageUsage, BorshStorageKey, PromiseOrValue, ext_contract, Gas
+    PromiseResult, StorageUsage, BorshStorageKey, PromiseOrValue, ext_contract
 };
+use utils::{NO_DEPOSIT, GAS_FOR_BASIC_OP};
 
 use crate::account_deposit::{VAccount, Account};
 pub use crate::action::SwapAction;
@@ -42,10 +43,6 @@ mod utils;
 mod views;
 
 near_sdk::setup_alloc!();
-
-const NO_DEPOSIT: Balance = 0;
-/// The base amount of gas for a regular execution.
-const BASE_GAS: Gas = 10_000_000_000_000;
 
 #[derive(BorshStorageKey, BorshSerialize)]
 pub(crate) enum StorageKey {
@@ -411,14 +408,13 @@ impl Contract {
                     pool_id,
                     &env::current_account_id(),
                     NO_DEPOSIT,
-                    BASE_GAS,
+                    GAS_FOR_BASIC_OP,
                 ))
                 .into()
             },
-            PromiseOrValue::Value(true) => PromiseOrValue::Value(true),
-            PromiseOrValue::Value(false) => panic!("fail"),
+            PromiseOrValue::Value(false) => panic!("Failed to update rates"),
+            _ => PromiseOrValue::Value(true),
         }
-
     }
 
     ///
@@ -431,7 +427,7 @@ impl Contract {
         };
 
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        assert!(pool.updates_callback(&cross_call_result), "Failed to apply new rates");
+        assert!(pool.update_callback(&cross_call_result), "Failed to apply new rates");
         self.pools.replace(pool_id, &pool);
         true
     }
@@ -1408,7 +1404,7 @@ mod tests {
         assert_eq!(0, contract.get_user_whitelisted_tokens(accounts(3)).len());
         testing_env!(context
             .predecessor_account_id(accounts(0))
-            .attached_deposit(env::storage_byte_cost() * 388) // required storage depends on contract_id length
+            .attached_deposit(env::storage_byte_cost() * 389) // required storage depends on contract_id length
             .build());
         let pool_id = contract.add_rated_swap_pool(tokens, vec![18, 18], 25, 240, "STNEAR".to_owned(), ValidAccountId::try_from("remote").unwrap());
         println!("{:?}", contract.version());
@@ -1426,8 +1422,11 @@ mod tests {
         deposit_tokens(&mut context, &mut contract, accounts(3), token_amounts.clone());
         deposit_tokens(&mut context, &mut contract, accounts(0), vec![]);
 
-        let FIXME = 0;
-        //contract.internal_update_pool_rates(pool_id, 2_000000000000000000000000); // set token1/token2 rate = 2.0
+        // set token1/token2 rate = 2.0
+        let mut pool = contract.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let cross_call_result = near_sdk::serde_json::to_vec(&U128(2_000000000000000000000000)).unwrap();
+        pool.update_callback(&cross_call_result);
+        contract.pools.replace(pool_id, &pool);
 
         let pool_info = contract.get_rated_pool(pool_id);
         assert_eq!(pool_info.rates, vec![U128(2_000000000000000000000000), U128(1_000000000000000000000000)]);
