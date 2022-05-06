@@ -32,7 +32,7 @@ impl RatesTrait for StnearRates {
             return PromiseOrValue::Value(true);
         }
 
-        ext_metapool::get_st_near_price(&self.contract_id, NO_DEPOSIT, gas::BASE).into()
+        ext_metapool::get_st_near_price(&self.contract_id, NO_DEPOSIT, BASE_GAS).into()
     }
     fn update_callback(&mut self, cross_call_result: &Vec<u8>) -> bool {
         if let Ok(U128(price)) = near_sdk::serde_json::from_slice::<U128>(cross_call_result) {

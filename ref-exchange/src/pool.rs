@@ -290,7 +290,7 @@ impl Pool {
         }
     }
 
-    pub fn rates_callback(&mut self, cross_call_result: &Vec<u8>) -> bool {
+    pub fn updates_callback(&mut self, cross_call_result: &Vec<u8>) -> bool {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),

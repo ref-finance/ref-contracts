@@ -10,7 +10,7 @@ use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
-    PromiseResult, StorageUsage, BorshStorageKey, PromiseOrValue, ext_contract
+    PromiseResult, StorageUsage, BorshStorageKey, PromiseOrValue, ext_contract, Gas
 };
 
 use crate::account_deposit::{VAccount, Account};
@@ -43,6 +43,10 @@ mod views;
 
 near_sdk::setup_alloc!();
 
+const NO_DEPOSIT: Balance = 0;
+/// The base amount of gas for a regular execution.
+const BASE_GAS: Gas = 10_000_000_000_000;
+
 #[derive(BorshStorageKey, BorshSerialize)]
 pub(crate) enum StorageKey {
     Pools,
@@ -71,17 +75,7 @@ impl fmt::Display for RunningState {
 
 #[ext_contract(ext_self)]
 pub trait SelfCallbacks {
-    fn rates_callback(&mut self, pool_id: u64) -> bool;
-}
-
-
-const NO_DEPOSIT: Balance = 0;
-
-pub mod gas {
-    use near_sdk::Gas;
-
-    /// The base amount of gas for a regular execution.
-    pub const BASE: Gas = 10_000_000_000_000;
+    fn update_pool_rates_callback(&mut self, pool_id: u64) -> bool;
 }
 
 #[near_bindgen]
@@ -413,11 +407,11 @@ impl Contract {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         match pool.update_rates() {
             PromiseOrValue::Promise(promise) => {
-                promise.then(ext_self::rates_callback(
+                promise.then(ext_self::update_pool_rates_callback(
                     pool_id,
                     &env::current_account_id(),
                     NO_DEPOSIT,
-                    gas::BASE,
+                    BASE_GAS,
                 ))
                 .into()
             },
@@ -429,7 +423,7 @@ impl Contract {
 
     ///
     #[private]
-    pub fn rates_callback(&mut self, pool_id: u64) -> bool {
+    pub fn update_pool_rates_callback(&mut self, pool_id: u64) -> bool {
         assert_eq!(env::promise_results_count(), 1, "Too many results");
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         let result = match env::promise_result(0) {
@@ -437,7 +431,7 @@ impl Contract {
             // https://docs.rs/near-sdk/3.1.0/near_sdk/enum.PromiseResult.html#variant.NotReady
             PromiseResult::NotReady => panic!("NotReady"),
             PromiseResult::Failed => panic!("Cross-contract call failed"),
-            PromiseResult::Successful(cross_call_result) => pool.rates_callback(&cross_call_result)
+            PromiseResult::Successful(cross_call_result) => pool.updates_callback(&cross_call_result)
         };
 
         if result {
