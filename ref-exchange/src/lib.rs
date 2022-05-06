@@ -424,20 +424,16 @@ impl Contract {
     ///
     #[private]
     pub fn update_pool_rates_callback(&mut self, pool_id: u64) -> bool {
-        assert_eq!(env::promise_results_count(), 1, "Too many results");
-        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        let result = match env::promise_result(0) {
-            // Current version of protocol never return `NotReady`
-            // https://docs.rs/near-sdk/3.1.0/near_sdk/enum.PromiseResult.html#variant.NotReady
-            PromiseResult::NotReady => panic!("NotReady"),
-            PromiseResult::Failed => panic!("Cross-contract call failed"),
-            PromiseResult::Successful(cross_call_result) => pool.updates_callback(&cross_call_result)
+        assert_eq!(env::promise_results_count(), 1, "Cross-contract call should have exactly one promise result");
+        let cross_call_result = match env::promise_result(0) {
+            PromiseResult::Successful(result) => result,
+            _ => panic!("Cross-contract call failed"),
         };
 
-        if result {
-            self.pools.replace(pool_id, &pool);
-        }
-        result
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        assert!(pool.updates_callback(&cross_call_result), "Failed to apply new rates");
+        self.pools.replace(pool_id, &pool);
+        true
     }
 }
 
