@@ -1,4 +1,5 @@
 use super::{rates::RatesTrait, PRECISION};
+use crate::errors::ERR126_FAILED_TO_PARSE_RESULT;
 use crate::utils::{GAS_FOR_BASIC_OP, NO_DEPOSIT};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{
@@ -40,7 +41,7 @@ impl RatesTrait for StnearRates {
             self.stored_rates = vec![price, 1 * PRECISION];
             self.rates_updated_at = env::epoch_height();
         } else {
-            panic!("Failed to parse cross-contract call result");
+            env::panic(ERR126_FAILED_TO_PARSE_RESULT.as_bytes());
         }
         true
     }

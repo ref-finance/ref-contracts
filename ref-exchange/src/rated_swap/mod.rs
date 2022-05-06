@@ -140,7 +140,7 @@ impl RatedSwapPool {
         assert!(
             self.rates.are_actual(),
             "{}",
-            ERR111_RATES_EXPIRED
+            ERR120_RATES_EXPIRED
         );
     }
 
@@ -588,7 +588,7 @@ impl RatedSwapPool {
         assert!(
             amount_swapped > 0,
             "{}",
-            ERR112_SWAPPED_AMOUNT_EQUALS_0
+            ERR121_SWAPPED_AMOUNT_EQUALS_0
         );
         env::log(
             format!(

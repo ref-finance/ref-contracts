@@ -412,22 +412,23 @@ impl Contract {
                 ))
                 .into()
             },
-            PromiseOrValue::Value(false) => panic!("Failed to update rates"),
+            PromiseOrValue::Value(false) => env::panic(ERR122_FAILED_TO_UPDATE_RATES.as_bytes()),
             _ => PromiseOrValue::Value(true),
         }
+        
     }
 
     ///
     #[private]
     pub fn update_pool_rates_callback(&mut self, pool_id: u64) -> bool {
-        assert_eq!(env::promise_results_count(), 1, "Cross-contract call should have exactly one promise result");
+        assert_eq!(env::promise_results_count(), 1, "{}", ERR123_ONE_PROMISE_RESULT);
         let cross_call_result = match env::promise_result(0) {
             PromiseResult::Successful(result) => result,
-            _ => panic!("Cross-contract call failed"),
+            _ => env::panic(ERR124_CROSS_CALL_FAILED.as_bytes()),
         };
 
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        assert!(pool.update_callback(&cross_call_result), "Failed to apply new rates");
+        assert!(pool.update_callback(&cross_call_result), "{}", ERR125_FAILED_TO_APPLY_RATES);
         self.pools.replace(pool_id, &pool);
         true
     }
