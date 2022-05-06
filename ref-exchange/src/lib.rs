@@ -169,6 +169,7 @@ impl Contract {
         decimals: Vec<u8>,
         fee: u32,
         amp_factor: u64,
+        rates_type: String,
         contract_id: ValidAccountId,
     ) -> u64 {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
@@ -179,6 +180,7 @@ impl Contract {
             decimals,
             amp_factor as u128,
             fee,
+            rates_type,
             contract_id.as_ref().clone(),
         )))
     }
@@ -409,7 +411,7 @@ impl Contract {
     #[payable]
     pub fn update_pool_rates(&mut self, pool_id: u64) -> PromiseOrValue<bool> {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        match pool.update_pool_rates() {
+        match pool.update_rates() {
             PromiseOrValue::Promise(promise) => {
                 promise.then(ext_self::rates_callback(
                     pool_id,
@@ -1418,7 +1420,7 @@ mod tests {
             .predecessor_account_id(accounts(0))
             .attached_deposit(env::storage_byte_cost() * 388) // required storage depends on contract_id length
             .build());
-        let pool_id = contract.add_rated_swap_pool(tokens, vec![18, 18], 25, 240, ValidAccountId::try_from("remote").unwrap());
+        let pool_id = contract.add_rated_swap_pool(tokens, vec![18, 18], 25, 240, "STNEAR".to_owned(), ValidAccountId::try_from("remote").unwrap());
         println!("{:?}", contract.version());
         println!("{:?}", contract.get_rated_pool(pool_id));
         println!("{:?}", contract.get_pools(0, 100));

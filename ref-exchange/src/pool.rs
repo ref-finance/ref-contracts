@@ -5,6 +5,7 @@ use crate::admin_fee::AdminFees;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
 use crate::rated_swap::RatedSwapPool;
+use crate::rated_swap::rates::RatesTrait;
 use crate::utils::SwapVolume;
 
 /// Generic Pool, providing wrapper around different implementations of swap pools.
@@ -281,11 +282,11 @@ impl Pool {
         }
     }
 
-    pub fn update_pool_rates(&self) -> PromiseOrValue<bool> {
+    pub fn update_rates(&self) -> PromiseOrValue<bool> {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
-            Pool::RatedSwapPool(pool) => pool.update_pool_rates(),
+            Pool::RatedSwapPool(pool) => pool.rates.update(),
         }
     }
 
@@ -293,7 +294,7 @@ impl Pool {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
-            Pool::RatedSwapPool(pool) => pool.rates_callback(cross_call_result),
+            Pool::RatedSwapPool(pool) => pool.rates.update_callback(cross_call_result),
         }
     }
 }
