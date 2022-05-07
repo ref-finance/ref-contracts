@@ -8,9 +8,9 @@ pub enum Rates {
 }
 
 pub trait RatesTrait {
-    /// Check chached rates are actual
+    /// Check that cached rates are actual
     fn are_actual(&self) -> bool;
-    /// Get chached rates vector
+    /// Get cached rates vector
     fn get(&self) -> &Vec<Balance>;
     /// Update cached rates
     ///  if cached rates are actual returns true
