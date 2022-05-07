@@ -8,9 +8,17 @@ pub enum Rates {
 }
 
 pub trait RatesTrait {
+    /// Check chached rates are actual
     fn are_actual(&self) -> bool;
+    /// Get chached rates vector
     fn get(&self) -> &Vec<Balance>;
+    /// Update cached rates
+    ///  if cached rates are actual returns true
+    ///  else returns cross-contract call promise
     fn update(&self) -> PromiseOrValue<bool>;
+    /// Update callback
+    ///  receives JSON encoded cross-contract call result
+    ///  and updates cached rates
     fn update_callback(&mut self, cross_call_result: &Vec<u8>) -> bool;
 }
 
