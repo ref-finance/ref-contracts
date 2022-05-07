@@ -10,8 +10,9 @@ use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
-    PromiseResult, StorageUsage, BorshStorageKey
+    PromiseResult, StorageUsage, BorshStorageKey, PromiseOrValue, ext_contract
 };
+use utils::{NO_DEPOSIT, GAS_FOR_BASIC_OP};
 
 use crate::account_deposit::{VAccount, Account};
 pub use crate::action::SwapAction;
@@ -67,6 +68,11 @@ impl fmt::Display for RunningState {
             RunningState::Paused => write!(f, "Paused"),
         }
     }
+}
+
+#[ext_contract(ext_self)]
+pub trait SelfCallbacks {
+    fn update_pool_rates_callback(&mut self, pool_id: u64) -> bool;
 }
 
 #[near_bindgen]
@@ -154,6 +160,7 @@ impl Contract {
         decimals: Vec<u8>,
         fee: u32,
         amp_factor: u64,
+        rates_type: String,
         contract_id: ValidAccountId,
     ) -> u64 {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
@@ -164,6 +171,7 @@ impl Contract {
             decimals,
             amp_factor as u128,
             fee,
+            rates_type,
             contract_id.as_ref().clone(),
         )))
     }
@@ -388,6 +396,41 @@ impl Contract {
         self.internal_save_account(&sender_id, deposits);
 
         burn_shares.into()
+    }
+
+    ///
+    #[payable]
+    pub fn update_pool_rates(&mut self, pool_id: u64) -> PromiseOrValue<bool> {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        match pool.update_rates() {
+            PromiseOrValue::Promise(promise) => {
+                promise.then(ext_self::update_pool_rates_callback(
+                    pool_id,
+                    &env::current_account_id(),
+                    NO_DEPOSIT,
+                    GAS_FOR_BASIC_OP,
+                ))
+                .into()
+            },
+            PromiseOrValue::Value(false) => env::panic(ERR122_FAILED_TO_UPDATE_RATES.as_bytes()),
+            _ => PromiseOrValue::Value(true),
+        }
+        
+    }
+
+    ///
+    #[private]
+    pub fn update_pool_rates_callback(&mut self, pool_id: u64) -> bool {
+        assert_eq!(env::promise_results_count(), 1, "{}", ERR123_ONE_PROMISE_RESULT);
+        let cross_call_result = match env::promise_result(0) {
+            PromiseResult::Successful(result) => result,
+            _ => env::panic(ERR124_CROSS_CALL_FAILED.as_bytes()),
+        };
+
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        assert!(pool.update_callback(&cross_call_result), "{}", ERR125_FAILED_TO_APPLY_RATES);
+        self.pools.replace(pool_id, &pool);
+        true
     }
 }
 
@@ -1362,9 +1405,9 @@ mod tests {
         assert_eq!(0, contract.get_user_whitelisted_tokens(accounts(3)).len());
         testing_env!(context
             .predecessor_account_id(accounts(0))
-            .attached_deposit(env::storage_byte_cost() * 388) // required storage depends on contract_id length
+            .attached_deposit(env::storage_byte_cost() * 389) // required storage depends on contract_id length
             .build());
-        let pool_id = contract.add_rated_swap_pool(tokens, vec![18, 18], 25, 240, ValidAccountId::try_from("remote").unwrap());
+        let pool_id = contract.add_rated_swap_pool(tokens, vec![18, 18], 25, 240, "STNEAR".to_owned(), ValidAccountId::try_from("remote").unwrap());
         println!("{:?}", contract.version());
         println!("{:?}", contract.get_rated_pool(pool_id));
         println!("{:?}", contract.get_pools(0, 100));
@@ -1380,7 +1423,11 @@ mod tests {
         deposit_tokens(&mut context, &mut contract, accounts(3), token_amounts.clone());
         deposit_tokens(&mut context, &mut contract, accounts(0), vec![]);
 
-        contract.internal_update_pool_rates(pool_id, 2_000000000000000000000000); // set token1/token2 rate = 2.0
+        // set token1/token2 rate = 2.0
+        let mut pool = contract.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let cross_call_result = near_sdk::serde_json::to_vec(&U128(2_000000000000000000000000)).unwrap();
+        pool.update_callback(&cross_call_result);
+        contract.pools.replace(pool_id, &pool);
 
         let pool_info = contract.get_rated_pool(pool_id);
         assert_eq!(pool_info.rates, vec![U128(2_000000000000000000000000), U128(1_000000000000000000000000)]);

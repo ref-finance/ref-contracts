@@ -86,5 +86,10 @@ pub const ERR103_NOT_INITIALIZED: &str = "E103: contract is not initialized";
 pub const ERR110_INVALID_REGISTER: &str = "E110: Invalid register";
 
 // rated pool
-pub const ERR111_RATES_EXPIRED: &str = "E120: Rates expired";
-pub const ERR112_SWAPPED_AMOUNT_EQUALS_0: &str = "E121: Swapped amount equals 0";
+pub const ERR120_RATES_EXPIRED: &str = "E120: Rates expired";
+pub const ERR121_SWAPPED_AMOUNT_EQUALS_0: &str = "E121: Swapped amount equals 0";
+pub const ERR122_FAILED_TO_UPDATE_RATES: &str = "E122: Failed to update rates";
+pub const ERR123_ONE_PROMISE_RESULT: &str = "E123: Cross-contract call should have exactly one promise result";
+pub const ERR124_CROSS_CALL_FAILED: &str = "E124: Cross-contract call failed";
+pub const ERR125_FAILED_TO_APPLY_RATES: &str = "E125: Failed to apply new rates";
+pub const ERR126_FAILED_TO_PARSE_RESULT: &str = "E126: Failed to parse cross-contract call result";

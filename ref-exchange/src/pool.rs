@@ -1,10 +1,11 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{AccountId, Balance};
+use near_sdk::{AccountId, Balance, PromiseOrValue};
 
 use crate::admin_fee::AdminFees;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
 use crate::rated_swap::RatedSwapPool;
+use crate::rated_swap::rates::RatesTrait;
 use crate::utils::SwapVolume;
 
 /// Generic Pool, providing wrapper around different implementations of swap pools.
@@ -278,6 +279,22 @@ impl Pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(pool) => pool.get_rated_return(token_in, amount_in, token_out, rates, fees),
+        }
+    }
+
+    pub fn update_rates(&self) -> PromiseOrValue<bool> {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.rates.update(),
+        }
+    }
+
+    pub fn update_callback(&mut self, cross_call_result: &Vec<u8>) -> bool {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.rates.update_callback(cross_call_result),
         }
     }
 }
