@@ -1,9 +1,11 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{AccountId, Balance};
+use near_sdk::{AccountId, Balance, PromiseOrValue};
 
 use crate::admin_fee::AdminFees;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
+use crate::rated_swap::RatedSwapPool;
+use crate::rated_swap::rates::RatesTrait;
 use crate::utils::SwapVolume;
 
 /// Generic Pool, providing wrapper around different implementations of swap pools.
@@ -12,6 +14,7 @@ use crate::utils::SwapVolume;
 pub enum Pool {
     SimplePool(SimplePool),
     StableSwapPool(StableSwapPool),
+    RatedSwapPool(RatedSwapPool),
 }
 
 impl Pool {
@@ -20,6 +23,7 @@ impl Pool {
         match self {
             Pool::SimplePool(_) => "SIMPLE_POOL".to_string(),
             Pool::StableSwapPool(_) => "STABLE_SWAP".to_string(),
+            Pool::RatedSwapPool(_) => "RATED_SWAP".to_string(),
         }
     }
 
@@ -28,6 +32,7 @@ impl Pool {
         match self {
             Pool::SimplePool(pool) => pool.tokens(),
             Pool::StableSwapPool(pool) => pool.tokens(),
+            Pool::RatedSwapPool(pool) => pool.tokens(),
         }
     }
 
@@ -41,6 +46,7 @@ impl Pool {
         match self {
             Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts),
             Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(_) => unimplemented!(),
         }
     }
 
@@ -54,6 +60,7 @@ impl Pool {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee),
+            Pool::RatedSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee),
         }
     }
 
@@ -67,6 +74,9 @@ impl Pool {
         match self {
             Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts),
             Pool::StableSwapPool(pool) => {
+                pool.remove_liquidity_by_shares(sender_id, shares, min_amounts)
+            },
+            Pool::RatedSwapPool(pool) => {
                 pool.remove_liquidity_by_shares(sender_id, shares, min_amounts)
             }
         }
@@ -84,6 +94,9 @@ impl Pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => {
                 pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee)
+            },
+            Pool::RatedSwapPool(pool) => {
+                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee)
             }
         }
     }
@@ -99,6 +112,7 @@ impl Pool {
         match self {
             Pool::SimplePool(pool) => pool.get_return(token_in, amount_in, token_out),
             Pool::StableSwapPool(pool) => pool.get_return(token_in, amount_in, token_out, fees),
+            Pool::RatedSwapPool(pool) => pool.get_return(token_in, amount_in, token_out, fees),
         }
     }
 
@@ -107,6 +121,7 @@ impl Pool {
         match self {
             Pool::SimplePool(_) => 24,
             Pool::StableSwapPool(_) => 18,
+            Pool::RatedSwapPool(_) => 24,
         }
     }
 
@@ -115,6 +130,7 @@ impl Pool {
         match self {
             Pool::SimplePool(pool) => pool.get_fee(),
             Pool::StableSwapPool(pool) => pool.get_fee(),
+            Pool::RatedSwapPool(pool) => pool.get_fee(),
         }
     }
 
@@ -123,6 +139,7 @@ impl Pool {
         match self {
             Pool::SimplePool(pool) => pool.get_volumes(),
             Pool::StableSwapPool(pool) => pool.get_volumes(),
+            Pool::RatedSwapPool(pool) => pool.get_volumes(),
         }
     }
 
@@ -131,6 +148,7 @@ impl Pool {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => pool.get_share_price(),
+            Pool::RatedSwapPool(pool) => pool.get_share_price(),
         }
     }
 
@@ -150,6 +168,9 @@ impl Pool {
             Pool::StableSwapPool(pool) => {
                 pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
             }
+            Pool::RatedSwapPool(pool) => {
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
+            }
         }
     }
 
@@ -157,6 +178,7 @@ impl Pool {
         match self {
             Pool::SimplePool(pool) => pool.share_total_balance(),
             Pool::StableSwapPool(pool) => pool.share_total_balance(),
+            Pool::RatedSwapPool(pool) => pool.share_total_balance(),
         }
     }
 
@@ -164,6 +186,7 @@ impl Pool {
         match self {
             Pool::SimplePool(pool) => pool.share_balance_of(account_id),
             Pool::StableSwapPool(pool) => pool.share_balance_of(account_id),
+            Pool::RatedSwapPool(pool) => pool.share_balance_of(account_id),
         }
     }
 
@@ -171,6 +194,7 @@ impl Pool {
         match self {
             Pool::SimplePool(pool) => pool.share_transfer(sender_id, receiver_id, amount),
             Pool::StableSwapPool(pool) => pool.share_transfer(sender_id, receiver_id, amount),
+            Pool::RatedSwapPool(pool) => pool.share_transfer(sender_id, receiver_id, amount),
         }
     }
 
@@ -178,6 +202,7 @@ impl Pool {
         match self {
             Pool::SimplePool(pool) => pool.share_register(account_id),
             Pool::StableSwapPool(pool) => pool.share_register(account_id),
+            Pool::RatedSwapPool(pool) => pool.share_register(account_id),
         }
     }
 
@@ -189,6 +214,7 @@ impl Pool {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => pool.predict_add_stable_liquidity(amounts, fees),
+            Pool::RatedSwapPool(_) => unimplemented!(),
         }
     }
 
@@ -199,6 +225,7 @@ impl Pool {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => pool.predict_remove_liquidity(shares),
+            Pool::RatedSwapPool(pool) => pool.predict_remove_liquidity(shares),
         }
     }
 
@@ -210,6 +237,64 @@ impl Pool {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => pool.predict_remove_liquidity_by_tokens(amounts, fees),
+            Pool::RatedSwapPool(pool) => pool.predict_remove_liquidity_by_tokens(amounts, fees),
+        }
+    }
+
+    pub fn predict_add_rated_liquidity(
+        &self,
+        amounts: &Vec<Balance>,
+        rates: &Option<Vec<Balance>>,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.predict_add_rated_liquidity(amounts, rates, fees),
+        }
+    }
+
+    pub fn predict_remove_rated_liquidity_by_tokens(
+        &self,
+        amounts: &Vec<Balance>,
+        rates: &Option<Vec<Balance>>,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.predict_remove_rated_liquidity_by_tokens(amounts, rates, fees),
+        }
+    }
+
+    pub fn get_rated_return(
+        &self,
+        token_in: &AccountId,
+        amount_in: Balance,
+        token_out: &AccountId,
+        rates: &Option<Vec<Balance>>,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.get_rated_return(token_in, amount_in, token_out, rates, fees),
+        }
+    }
+
+    pub fn update_rates(&self) -> PromiseOrValue<bool> {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.rates.update(),
+        }
+    }
+
+    pub fn update_callback(&mut self, cross_call_result: &Vec<u8>) -> bool {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.rates.update_callback(cross_call_result),
         }
     }
 }
