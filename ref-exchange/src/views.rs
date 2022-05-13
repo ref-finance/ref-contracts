@@ -5,8 +5,6 @@ use std::collections::HashMap;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
-
-use crate::rated_swap::rates::RatesTrait;
 use crate::utils::SwapVolume;
 use crate::*;
 
@@ -133,7 +131,6 @@ pub struct RatedPoolInfo {
     pub shares_total_supply: U128,
     pub amp: u64,
     pub rates: Vec<U128>,
-    // pub rates_updated_at: u64,
 }
 
 impl From<Pool> for RatedPoolInfo {
@@ -142,6 +139,7 @@ impl From<Pool> for RatedPoolInfo {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(pool) => Self {
+                rates: pool.get_rates().into_iter().map(|a| U128(a)).collect(),
                 amp: pool.get_amp(),
                 amounts: pool.get_amounts().into_iter().map(|a| U128(a)).collect(),
                 decimals: pool.token_decimals,
@@ -149,8 +147,7 @@ impl From<Pool> for RatedPoolInfo {
                 token_account_ids: pool.token_account_ids,
                 total_fee: pool.total_fee,
                 shares_total_supply: U128(pool.shares_total_supply),
-                rates: pool.rates.get().into_iter().map(|&a| U128(a)).collect(),
-                // rates_updated_at: pool.rates_updated_at,
+                
             },
         }
     }

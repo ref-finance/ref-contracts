@@ -2319,6 +2319,7 @@ dependencies = [
  "near-contract-standards",
  "near-sdk",
  "near-sdk-sim",
+ "once_cell",
  "rand 0.8.4",
  "rand_pcg",
  "test-token",

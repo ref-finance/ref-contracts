@@ -4,6 +4,7 @@ use near_sdk::json_types::WrappedTimestamp;
 use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 
 use crate::*;
+use crate::rated_swap::rate::global_add_rate;
 use crate::utils::{FEE_DIVISOR, GAS_FOR_BASIC_OP};
 
 #[near_bindgen]
@@ -222,6 +223,14 @@ impl Contract {
     #[payable]
     pub fn rated_swap_stop_ramp_amp(&mut self, pool_id: u64) {
         self.stable_swap_stop_ramp_amp(pool_id)
+    }
+
+    /// add new rated token.
+    #[payable]
+    pub fn add_rated_token(&mut self, rate_type: String, token_id: ValidAccountId) {
+        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
+        let token_id: AccountId = token_id.into();
+        global_add_rate(&rate_type, &token_id);
     }
 
     pub(crate) fn assert_owner(&self) {

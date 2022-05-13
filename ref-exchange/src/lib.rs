@@ -22,7 +22,7 @@ use crate::admin_fee::AdminFees;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
-use crate::rated_swap::RatedSwapPool;
+use crate::rated_swap::{RatedSwapPool, rate::{RateTrait, global_get_rate, global_set_rate, global_add_rate}};
 use crate::utils::check_token_duplicates;
 pub use crate::views::{PoolInfo, ContractMetadata};
 
@@ -72,7 +72,7 @@ impl fmt::Display for RunningState {
 
 #[ext_contract(ext_self)]
 pub trait SelfCallbacks {
-    fn update_pool_rates_callback(&mut self, pool_id: u64) -> bool;
+    fn update_token_rate_callback(&mut self, token_id: AccountId);
 }
 
 #[near_bindgen]
@@ -160,19 +160,19 @@ impl Contract {
         decimals: Vec<u8>,
         fee: u32,
         amp_factor: u64,
-        rates_type: String,
+        rate_type: String,
         contract_id: ValidAccountId,
     ) -> u64 {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         check_token_duplicates(&tokens);
+        let token_id: AccountId = contract_id.into();
+        global_add_rate(&rate_type, &token_id);
         self.internal_add_pool(Pool::RatedSwapPool(RatedSwapPool::new(
             self.pools.len() as u32,
             tokens,
             decimals,
             amp_factor as u128,
             fee,
-            rates_type,
-            contract_id.as_ref().clone(),
         )))
     }
 
@@ -398,39 +398,41 @@ impl Contract {
         burn_shares.into()
     }
 
-    ///
-    #[payable]
-    pub fn update_pool_rates(&mut self, pool_id: u64) -> PromiseOrValue<bool> {
-        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        match pool.update_rates() {
-            PromiseOrValue::Promise(promise) => {
-                promise.then(ext_self::update_pool_rates_callback(
-                    pool_id,
-                    &env::current_account_id(),
-                    NO_DEPOSIT,
-                    GAS_FOR_BASIC_OP,
-                ))
-                .into()
-            },
-            PromiseOrValue::Value(false) => env::panic(ERR122_FAILED_TO_UPDATE_RATES.as_bytes()),
-            _ => PromiseOrValue::Value(true),
+    /// anyone can trigger an update for some rated token
+    pub fn update_token_rate(& self, token_id: ValidAccountId) -> PromiseOrValue<bool> {
+        let caller = env::predecessor_account_id();
+        let token_id: AccountId = token_id.into();
+        if let Some(rate) = global_get_rate(&token_id) {
+            log!("Caller {} invokes token {} rait async-update.", caller, token_id);
+            rate.async_update().then(ext_self::update_token_rate_callback(
+                token_id,
+                &env::current_account_id(),
+                NO_DEPOSIT,
+                GAS_FOR_BASIC_OP,
+            )).into()
+        } else {
+            log!("Caller {} invokes token {} rait async-update but it is not a valid token.", caller, token_id);
+            PromiseOrValue::Value(true)
         }
-        
     }
 
-    ///
+    /// the async return of update_token_rate
     #[private]
-    pub fn update_pool_rates_callback(&mut self, pool_id: u64) -> bool {
+    pub fn update_token_rate_callback(&mut self, token_id: AccountId) {
         assert_eq!(env::promise_results_count(), 1, "{}", ERR123_ONE_PROMISE_RESULT);
         let cross_call_result = match env::promise_result(0) {
             PromiseResult::Successful(result) => result,
             _ => env::panic(ERR124_CROSS_CALL_FAILED.as_bytes()),
         };
 
-        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        assert!(pool.update_callback(&cross_call_result), "{}", ERR125_FAILED_TO_APPLY_RATES);
-        self.pools.replace(pool_id, &pool);
-        true
+        if let Some(mut rate) = global_get_rate(&token_id) {
+            let new_rate = rate.set(&cross_call_result);
+            global_set_rate(&token_id, &rate);
+            log!(
+                "Token {} got new rate {} from cross-contract call.",
+                token_id, new_rate
+            );
+        }
     }
 }
 
@@ -1407,7 +1409,7 @@ mod tests {
             .predecessor_account_id(accounts(0))
             .attached_deposit(env::storage_byte_cost() * 389) // required storage depends on contract_id length
             .build());
-        let pool_id = contract.add_rated_swap_pool(tokens, vec![18, 18], 25, 240, "STNEAR".to_owned(), ValidAccountId::try_from("remote").unwrap());
+        let pool_id = contract.add_rated_swap_pool(tokens, vec![18, 18], 25, 240, "STNEAR".to_owned(), accounts(1));
         println!("{:?}", contract.version());
         println!("{:?}", contract.get_rated_pool(pool_id));
         println!("{:?}", contract.get_pools(0, 100));
@@ -1424,10 +1426,11 @@ mod tests {
         deposit_tokens(&mut context, &mut contract, accounts(0), vec![]);
 
         // set token1/token2 rate = 2.0
-        let mut pool = contract.pools.get(pool_id).expect(ERR85_NO_POOL);
         let cross_call_result = near_sdk::serde_json::to_vec(&U128(2_000000000000000000000000)).unwrap();
-        pool.update_callback(&cross_call_result);
-        contract.pools.replace(pool_id, &pool);
+        if let Some(mut rate) = global_get_rate(accounts(1).as_ref()) {
+            rate.set(&cross_call_result);
+            global_set_rate(accounts(1).as_ref(), &rate);
+        }
 
         let pool_info = contract.get_rated_pool(pool_id);
         assert_eq!(pool_info.rates, vec![U128(2_000000000000000000000000), U128(1_000000000000000000000000)]);
