@@ -1,4 +1,4 @@
-//! This modules captures all the code needed to migrate from previous version.
+//! This module captures all the code needed to migrate from previous version.
 use std::collections::HashMap;
 use near_sdk::collections::{UnorderedMap, Vector, LookupMap, UnorderedSet};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
