@@ -63,16 +63,19 @@ pub fn global_add_rate(rate_type: &String, token_id: &AccountId) {
         HashMap::new()
     };
 
-    if rates.contains_key(token_id) {
-        env::panic(format!("Already has token {}.", token_id.clone()).as_bytes());
+    // if rates.contains_key(token_id) {
+    //     env::panic(format!("Already has token {}.", token_id.clone()).as_bytes());
+    // }
+    if !rates.contains_key(token_id) {
+        rates.insert(token_id.clone(), Rate::new(rate_type.clone(), token_id.clone()));
+
+        // save back to storage
+        env::storage_write(
+            RATE_STORAGE_KEY.as_bytes(), 
+            &rates.try_to_vec().unwrap(),
+        );
     }
-    rates.insert(token_id.clone(), Rate::new(rate_type.clone(), token_id.clone()));
     
-    // save back to storage
-    env::storage_write(
-        RATE_STORAGE_KEY.as_bytes(), 
-        &rates.try_to_vec().unwrap(),
-    );
 }
 
 pub fn global_get_rate(token_id: &AccountId) -> Option<Rate> {
