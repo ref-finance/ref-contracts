@@ -19,6 +19,7 @@ impl Contract {
         self.assert_owner();
         let mut farm_seed = self.get_seed(&seed_id);
         farm_seed.get_ref_mut().min_deposit = min_deposit.into();
+        self.data_mut().seeds.insert(&seed_id, &farm_seed);
     }
 
 
