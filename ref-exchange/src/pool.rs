@@ -213,7 +213,7 @@ impl Pool {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => pool.predict_add_stable_liquidity(amounts, fees),
-            Pool::RatedSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => pool.predict_add_rated_liquidity(amounts, &None, fees),
         }
     }
 
