@@ -1,4 +1,5 @@
 use super::stnear_rate::StnearRate;
+use super::linear_rate::LinearRate;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{env, AccountId, Balance, Promise};
 use crate::ERR127_INVALID_RATE_TYPE;
@@ -15,6 +16,7 @@ pub const RATE_STORAGE_KEY: &str = "rate_key";
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
 pub enum Rate {
     Stnear(StnearRate),
+    Linear(LinearRate),
 }
 
 pub trait RateTrait {
@@ -29,26 +31,31 @@ impl RateTrait for Rate {
     fn are_actual(&self) -> bool {
         match self {
             Rate::Stnear(rates) => rates.are_actual(),
+            Rate::Linear(rates) => rates.are_actual(),
         }
     }
     fn get(&self) -> Balance {
         match self {
             Rate::Stnear(rates) => rates.get(),
+            Rate::Linear(rates) => rates.get(),
         }
     }
     fn last_update_ts(&self) -> u64 {
         match self {
             Rate::Stnear(rates) => rates.last_update_ts(),
+            Rate::Linear(rates) => rates.last_update_ts(),
         }
     }
     fn async_update(&self) -> Promise {
         match self {
             Rate::Stnear(rates) => rates.async_update(),
+            Rate::Linear(rates) => rates.async_update(),
         }
     }
     fn set(&mut self, cross_call_result: &Vec<u8>) -> u128 {
         match self {
             Rate::Stnear(rates) => rates.set(cross_call_result),
+            Rate::Linear(rates) => rates.set(cross_call_result),
         }
     }
 }
@@ -57,6 +64,7 @@ impl Rate {
     pub fn new(rates_type: String, contract_id: AccountId) -> Self {
         match rates_type.as_str() {
             "STNEAR" => Rate::Stnear(StnearRate::new(contract_id)),
+            "LINEAR" => Rate::Linear(LinearRate::new(contract_id)),
             _ => unimplemented!(),
         }
     }
@@ -64,12 +72,14 @@ impl Rate {
     pub fn get_type(&self) -> String {
         match self {
             Rate::Stnear(_) => "STNEAR".to_string(),
+            Rate::Linear(_) => "LINEAR".to_string(),
         }
     }
 
     pub fn is_valid_rate_type(rates_type: &str) -> bool {
         match rates_type {
             "STNEAR" => true,
+            "LINEAR" => true,
             _ => false,
         }
     }

@@ -16,6 +16,7 @@ use self::rate::*;
 mod math;
 pub mod rate;
 mod stnear_rate;
+mod linear_rate;
 
 pub const TARGET_DECIMAL: u8 = 24;
 pub const MIN_DECIMAL: u8 = 1;
