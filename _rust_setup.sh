@@ -4,3 +4,4 @@ rustup toolchain install stable-$VER
 rustup default stable-$VER
 rustup target add wasm32-unknown-unknown
 cargo build -p ref-exchange --target wasm32-unknown-unknown --release
+cargo build -p ref_farming --target wasm32-unknown-unknown --release
