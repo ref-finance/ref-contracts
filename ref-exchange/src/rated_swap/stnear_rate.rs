@@ -32,6 +32,9 @@ impl RateTrait for StnearRate {
     fn get(&self) -> Balance {
         self.stored_rates
     }
+    fn last_update_ts(&self) -> u64 {
+        self.rates_updated_at
+    }
     fn async_update(&self) -> Promise {
         ext_metapool::get_st_near_price(&self.contract_id, NO_DEPOSIT, GAS_FOR_BASIC_OP)
     }

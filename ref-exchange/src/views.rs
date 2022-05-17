@@ -2,10 +2,11 @@
 
 use std::collections::HashMap;
 
-use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::json_types::{ValidAccountId, U128, U64};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
 use crate::utils::SwapVolume;
+use crate::rated_swap::rate::{Rate, RATE_STORAGE_KEY};
 use crate::*;
 
 #[derive(Serialize)]
@@ -27,6 +28,16 @@ pub struct ContractMetadata {
 pub struct RefStorageState {
     pub deposit: U128,
     pub usage: U128,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub struct RatedTokenInfo {
+    pub rate_type: String,
+    pub rate_price: U128,
+    pub last_update_ts: U64,
+    pub is_valid: bool
 }
 
 #[derive(Serialize, Deserialize)]
@@ -328,7 +339,28 @@ impl Contract {
             .into()
     }
 
-    ///
+    pub fn list_rated_tokens(&self) -> HashMap<String, RatedTokenInfo> {
+        // read from storage
+        let rates: HashMap<String, Rate> = if let Some(content) = env::storage_read(RATE_STORAGE_KEY.as_bytes()) {
+            HashMap::try_from_slice(&content).expect("deserialize failed.")
+        } else {
+            HashMap::new()
+        };
+        rates
+        .iter()
+        .map(|(k, v)| {
+            (k.clone(), 
+            RatedTokenInfo {
+                rate_type: v.get_type(),
+                rate_price: v.get().into(),
+                last_update_ts: v.last_update_ts().into(),
+                is_valid: v.are_actual(),
+            })
+        })
+        .collect()
+    }
+
+    /// get predicted result of add_liquidity for a given rated token price
     pub fn predict_add_rated_liquidity(
         &self,
         pool_id: u64,
@@ -347,7 +379,7 @@ impl Contract {
         ).into()
     }
 
-    ///
+    /// get predicted result of remove_liquidity_by_tokens for a given rated token price 
     pub fn predict_remove_rated_liquidity_by_tokens(
         &self,
         pool_id: u64,
@@ -363,7 +395,7 @@ impl Contract {
             .into()
     }
 
-    ///
+    /// get predicted swap result of a rated stable swap pool for given rated token price 
     pub fn get_rated_return(
         &self,
         pool_id: u64,

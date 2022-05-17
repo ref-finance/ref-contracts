@@ -553,7 +553,7 @@ impl RatedSwapPool {
         self.get_rated_return(token_in, amount_in, token_out, &None, fees)
     }
 
-    ///
+    /// predict swap result with given rate token price
     pub fn get_rated_return(
         &self,
         token_in: &AccountId,
@@ -828,7 +828,7 @@ mod tests {
     }
 
     fn new_rated_stnear_pool(decimals: u8, amp_factor: u128, total_fee: u32) -> RatedSwapPool {
-        global_add_rate(&"STNEAR".to_string(), accounts(1).as_ref());
+        global_register_rate(&"STNEAR".to_string(), accounts(1).as_ref());
         RatedSwapPool::new(
             0,
             vec![accounts(1), accounts(2)],

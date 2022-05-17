@@ -4,7 +4,7 @@ use near_sdk::json_types::WrappedTimestamp;
 use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 
 use crate::*;
-use crate::rated_swap::rate::global_add_rate;
+use crate::rated_swap::rate::{global_register_rate, global_unregister_rate};
 use crate::utils::{FEE_DIVISOR, GAS_FOR_BASIC_OP};
 
 #[near_bindgen]
@@ -125,7 +125,7 @@ impl Contract {
     #[payable]
     pub fn remove_exchange_fee_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) {
         assert_one_yocto();
-        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         self.assert_contract_running();
         let ex_id = env::current_account_id();
         let owner_id = self.owner_id.clone();
@@ -156,7 +156,7 @@ impl Contract {
         amount: U128,
     ) -> Promise {
         assert_one_yocto();
-        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         self.assert_contract_running();
         let token_id: AccountId = token_id.into();
         let amount: u128 = amount.into();
@@ -208,29 +208,30 @@ impl Contract {
         self.pools.replace(pool_id, &pool);
     }
 
-    ///
+    /// Register new rated token.
     #[payable]
-    pub fn rated_swap_ramp_amp(
-        &mut self,
-        pool_id: u64,
-        future_amp_factor: u64,
-        future_amp_time: WrappedTimestamp,
-    ) {
-        self.stable_swap_ramp_amp(pool_id, future_amp_factor, future_amp_time)
-    }
-
-    ///
-    #[payable]
-    pub fn rated_swap_stop_ramp_amp(&mut self, pool_id: u64) {
-        self.stable_swap_stop_ramp_amp(pool_id)
-    }
-
-    /// add new rated token.
-    #[payable]
-    pub fn add_rated_token(&mut self, rate_type: String, token_id: ValidAccountId) {
-        assert!(self.is_owner_or_guardians(), "ERR_NOT_ALLOWED");
+    pub fn register_rated_token(&mut self, rate_type: String, token_id: ValidAccountId) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         let token_id: AccountId = token_id.into();
-        global_add_rate(&rate_type, &token_id);
+        if global_register_rate(&rate_type, &token_id) {
+            log!("New {} typed rated token {} registered by {}", rate_type, token_id, env::predecessor_account_id());
+        } else {
+            env::panic(format!("Rated token {} already exist", token_id).as_bytes());
+        }
+    }
+
+    /// Remove rated token, incase mistaken add operation. Only owner can call.
+    #[payable]
+    pub fn unregister_rated_token(&mut self, token_id: ValidAccountId) {
+        assert_one_yocto();
+        self.assert_owner();
+        let token_id: AccountId = token_id.into();
+        if global_unregister_rate(&token_id) {
+            log!("Rated token {} removed.", token_id);
+        } else {
+            log!("Rated token {} not exist in rate list.", token_id);
+        }
     }
 
     pub(crate) fn assert_owner(&self) {

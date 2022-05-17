@@ -22,7 +22,7 @@ use crate::admin_fee::AdminFees;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
-use crate::rated_swap::{RatedSwapPool, rate::{RateTrait, global_get_rate, global_set_rate, global_add_rate}};
+use crate::rated_swap::{RatedSwapPool, rate::{RateTrait, global_get_rate, global_set_rate, global_register_rate}};
 use crate::utils::check_token_duplicates;
 pub use crate::views::{PoolInfo, ContractMetadata};
 
@@ -166,7 +166,7 @@ impl Contract {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         check_token_duplicates(&tokens);
         let token_id: AccountId = contract_id.into();
-        global_add_rate(&rate_type, &token_id);
+        global_register_rate(&rate_type, &token_id);
         self.internal_add_pool(Pool::RatedSwapPool(RatedSwapPool::new(
             self.pools.len() as u32,
             tokens,
@@ -312,15 +312,15 @@ impl Contract {
         mint_shares.into()
     }
 
-    #[payable]
-    pub fn add_rated_liquidity(
-        &mut self,
-        pool_id: u64,
-        amounts: Vec<U128>,
-        min_shares: U128,
-    ) -> U128 {
-        self.add_stable_liquidity(pool_id, amounts, min_shares)
-    }
+    // #[payable]
+    // pub fn add_rated_liquidity(
+    //     &mut self,
+    //     pool_id: u64,
+    //     amounts: Vec<U128>,
+    //     min_shares: U128,
+    // ) -> U128 {
+    //     self.add_stable_liquidity(pool_id, amounts, min_shares)
+    // }
 
     /// Remove liquidity from the pool into general pool of liquidity.
     #[payable]
@@ -1440,7 +1440,7 @@ mod tests {
             .predecessor_account_id(accounts(3))
             .attached_deposit(to_yocto("0.0007"))
             .build());
-        let add_liq = contract.add_rated_liquidity(
+        let add_liq = contract.add_stable_liquidity(
             pool_id,
             vec![to_yocto("2").into(), to_yocto("4").into()],
             U128(1),
@@ -1495,9 +1495,9 @@ mod tests {
         testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
         contract.withdraw_owner_token(accounts(1), to_yocto("0.00001").into());
         testing_env!(context.predecessor_account_id(accounts(0)).block_timestamp(2*86400 * 1_000_000_000).attached_deposit(1).build());
-        contract.rated_swap_ramp_amp(0,250, (3*86400 * 1_000_000_000).into());
+        contract.stable_swap_ramp_amp(0,250, (3*86400 * 1_000_000_000).into());
         testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
-        contract.rated_swap_stop_ramp_amp(0);
+        contract.stable_swap_stop_ramp_amp(0);
     }
 
     #[test]
