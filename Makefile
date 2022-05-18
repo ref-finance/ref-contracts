@@ -33,6 +33,12 @@ mock-ft: test-token
 	mkdir -p res
 	cp target/wasm32-unknown-unknown/release/test_token.wasm ./res/test_token.wasm
 
+mock-rated: test-rated-token
+	rustup target add wasm32-unknown-unknown
+	RUSTFLAGS=$(RFLAGS) cargo build -p test-rated-token --target wasm32-unknown-unknown --release
+	mkdir -p res
+	cp target/wasm32-unknown-unknown/release/test_rated_token.wasm ./res/test_rated_token.wasm
+
 release:
 	$(call docker_build,_rust_setup.sh)
 	mkdir -p res
