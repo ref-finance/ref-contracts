@@ -2322,7 +2322,6 @@ dependencies = [
  "once_cell",
  "rand 0.8.4",
  "rand_pcg",
- "test-rated-token",
  "test-token",
  "uint",
 ]
@@ -2721,7 +2720,7 @@ dependencies = [
 
 [[package]]
 name = "test-rated-token"
-version = "0.0.1"
+version = "0.1.1"
 dependencies = [
  "near-contract-standards",
  "near-sdk",

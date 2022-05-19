@@ -1,6 +1,6 @@
 [package]
 name = "test-rated-token"
-version = "0.0.1"
+version = "0.1.1"
 authors = ["Marco Sun <sun.dsk1@gmail.com>", "MagicGordon"]
 edition = "2018"
 publish = false
