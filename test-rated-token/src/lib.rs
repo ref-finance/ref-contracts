@@ -1,5 +1,5 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{env, log, near_bindgen, AccountId, Balance, PanicOnDefault};
+use near_sdk::{near_bindgen, Balance, PanicOnDefault};
 use near_sdk::json_types::U128;
 
 #[near_bindgen]
@@ -32,8 +32,8 @@ impl Contract {
 
 #[cfg(test)]
 mod tests {
-    use near_sdk::test_utils::VMContextBuilder;
-    use near_sdk::testing_env;
+    use near_sdk::test_utils::{VMContextBuilder};
+    use near_sdk::{testing_env, MockedBlockchain};
 
     use super::*;
 
