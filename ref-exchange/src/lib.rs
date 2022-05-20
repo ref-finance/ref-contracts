@@ -22,9 +22,10 @@ use crate::admin_fee::AdminFees;
 use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
-use crate::rated_swap::{RatedSwapPool, rate::{RateTrait, global_get_rate, global_set_rate, global_register_rate}};
+use crate::rated_swap::{RatedSwapPool, rate::{RateTrait, global_get_rate, global_set_rate}};
 use crate::utils::check_token_duplicates;
-pub use crate::views::{PoolInfo, ContractMetadata};
+pub use crate::custom_keys::*;
+pub use crate::views::{PoolInfo, RatedPoolInfo, ContractMetadata, RatedTokenInfo};
 
 mod account_deposit;
 mod action;
@@ -41,6 +42,7 @@ mod storage_impl;
 mod token_receiver;
 mod utils;
 mod views;
+mod custom_keys;
 
 near_sdk::setup_alloc!();
 
@@ -160,13 +162,9 @@ impl Contract {
         decimals: Vec<u8>,
         fee: u32,
         amp_factor: u64,
-        rate_type: String,
-        contract_id: ValidAccountId,
     ) -> u64 {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         check_token_duplicates(&tokens);
-        let token_id: AccountId = contract_id.into();
-        global_register_rate(&rate_type, &token_id);
         self.internal_add_pool(Pool::RatedSwapPool(RatedSwapPool::new(
             self.pools.len() as u32,
             tokens,
@@ -1409,7 +1407,7 @@ mod tests {
             .predecessor_account_id(accounts(0))
             .attached_deposit(env::storage_byte_cost() * 389) // required storage depends on contract_id length
             .build());
-        let pool_id = contract.add_rated_swap_pool(tokens, vec![18, 18], 25, 240, "STNEAR".to_owned(), accounts(1));
+        let pool_id = contract.add_rated_swap_pool(tokens, vec![18, 18], 25, 240);
         println!("{:?}", contract.version());
         println!("{:?}", contract.get_rated_pool(pool_id));
         println!("{:?}", contract.get_pools(0, 100));

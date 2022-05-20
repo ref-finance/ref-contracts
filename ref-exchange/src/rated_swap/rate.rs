@@ -8,8 +8,9 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+use crate::RATE_STORAGE_KEY;
+
 pub static RATES: Lazy<Mutex<HashMap<AccountId, Rate>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-pub const RATE_STORAGE_KEY: &str = "rate_key";
 
 
 

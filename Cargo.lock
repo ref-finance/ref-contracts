@@ -2314,7 +2314,7 @@ dependencies = [
 
 [[package]]
 name = "ref-exchange"
-version = "1.4.5"
+version = "1.5.0"
 dependencies = [
  "near-contract-standards",
  "near-sdk",
@@ -2322,6 +2322,7 @@ dependencies = [
  "once_cell",
  "rand 0.8.4",
  "rand_pcg",
+ "test-rated-token",
  "test-token",
  "uint",
 ]

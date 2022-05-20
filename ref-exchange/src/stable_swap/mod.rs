@@ -196,7 +196,7 @@ impl StableSwapPool {
             .checked_mul(100000000.into())
             .unwrap()
             .checked_div(self.shares_total_supply.into())
-            .unwrap()
+            .unwrap_or(100000000.into())
             .as_u128()
     }
 

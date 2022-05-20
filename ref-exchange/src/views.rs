@@ -6,7 +6,7 @@ use near_sdk::json_types::{ValidAccountId, U128, U64};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
 use crate::utils::SwapVolume;
-use crate::rated_swap::rate::{Rate, RATE_STORAGE_KEY};
+use crate::rated_swap::rate::Rate;
 use crate::*;
 
 #[derive(Serialize)]

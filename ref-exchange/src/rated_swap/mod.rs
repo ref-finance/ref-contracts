@@ -195,7 +195,7 @@ impl RatedSwapPool {
             .checked_mul(100000000.into())
             .unwrap()
             .checked_div(self.shares_total_supply.into())
-            .unwrap()
+            .unwrap_or(100000000.into())
             .as_u128()
     }
 
@@ -596,11 +596,6 @@ impl RatedSwapPool {
             "{}",
             ERR68_SLIPPAGE
         );
-        assert!(
-            amount_swapped > 0,
-            "{}",
-            ERR121_SWAPPED_AMOUNT_EQUALS_0
-        );
         env::log(
             format!(
                 "Swapped {} {} for {} {}, total fee {}, admin fee {}",
@@ -809,7 +804,6 @@ mod tests {
     use near_sdk::test_utils::{accounts, VMContextBuilder};
     use near_sdk::{testing_env, MockedBlockchain};
     use near_sdk::json_types::U128;
-    use std::convert::TryInto;
 
     use super::*;
 

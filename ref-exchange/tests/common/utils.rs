@@ -11,9 +11,11 @@ use near_sdk_sim::{
 
 use ref_exchange::{ContractContract as Exchange, PoolInfo, ContractMetadata};
 use test_token::ContractContract as TestToken;
+use test_rated_token::ContractContract as TestRatedToken;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
+    TEST_RATED_TOKEN_WASM_BYTES => "../res/test_rated_token.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
 }
 
@@ -75,6 +77,40 @@ pub fn test_token(
         signer_account: root
     );
     call!(root, t.new()).assert_success();
+    call!(
+        root,
+        t.mint(to_va(root.account_id.clone()), to_yocto("1000000000").into())
+    )
+    .assert_success();
+    for account_id in accounts_to_register {
+        call!(
+            root,
+            t.storage_deposit(Some(to_va(account_id)), None),
+            deposit = to_yocto("1")
+        )
+        .assert_success();
+    }
+    t
+}
+
+pub fn test_rated_token(
+    root: &UserAccount,
+    token_id: AccountId,
+    accounts_to_register: Vec<AccountId>,
+) -> ContractAccount<TestRatedToken> {
+    let t = deploy!(
+        contract: TestRatedToken,
+        contract_id: token_id,
+        bytes: &TEST_RATED_TOKEN_WASM_BYTES,
+        signer_account: root
+    );
+    call!(root, t.new(token_id.clone(), token_id.clone(), 24, U128(10u128.pow(24)))).assert_success();
+    call!(
+        root,
+        t.storage_deposit(Some(to_va(root.account_id.clone())), None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
     call!(
         root,
         t.mint(to_va(root.account_id.clone()), to_yocto("1000000000").into())
@@ -231,6 +267,18 @@ pub fn usdc() -> AccountId {
 
 pub fn swap() -> AccountId {
     "swap".to_string()
+}
+
+pub fn near() -> AccountId {
+    "near".to_string()
+}
+
+pub fn stnear() -> AccountId {
+    "stnear".to_string()
+}
+
+pub fn linear() -> AccountId {
+    "linear".to_string()
 }
 
 pub fn to_va(a: AccountId) -> ValidAccountId {
@@ -415,6 +463,252 @@ pub fn setup_stable_pool_with_liquidity(
     )
     .assert_success();
     (root, owner, pool, token_contracts)
+}
+
+pub fn setup_rated_pool_with_liquidity(
+    tokens: Vec<String>,
+    reated_tokens: Vec<String>,
+    amounts: Vec<u128>,
+    reated_amounts: Vec<u128>,
+    decimals: Vec<u8>,
+    pool_fee: u32,
+    amp: u64,
+) -> (
+    UserAccount,
+    UserAccount,
+    ContractAccount<Exchange>,
+    Vec<ContractAccount<TestToken>>,
+    Vec<ContractAccount<TestRatedToken>>,
+) {
+    use near_sdk_sim::runtime::GenesisConfig;
+    pub const GENESIS_TIMESTAMP: u64 = 1_600_000_000 * 10u64.pow(9);
+    let mut genesis_config = GenesisConfig::default();
+    genesis_config.genesis_time = GENESIS_TIMESTAMP;
+    genesis_config.block_prod_time = 0;
+    let root = init_simulator(Some(genesis_config));
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let pool = deploy!(
+        contract: Exchange,
+        contract_id: swap(),
+        bytes: &EXCHANGE_WASM_BYTES,
+        signer_account: root,
+        init_method: new(owner.valid_account_id(), 1600, 400)
+    );
+
+    let mut pool_tokens = vec![];
+
+    let mut token_contracts: Vec<ContractAccount<TestToken>> = vec![];
+    for token_name in &tokens {
+        pool_tokens.push(to_va(token_name.clone()));
+        token_contracts.push(test_token(&root, token_name.clone(), vec![swap()]));
+    }
+
+    let mut token_rated_contracts: Vec<ContractAccount<TestRatedToken>> = vec![];
+    for token_name in &reated_tokens {
+        pool_tokens.push(to_va(token_name.clone()));
+        token_rated_contracts.push(test_rated_token(&root, token_name.clone(), vec![swap()]));
+    }
+
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(
+            (&token_contracts).into_iter().map(|x| x.valid_account_id()).collect()
+        ),
+        deposit=1
+    );
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(
+            (&token_rated_contracts).into_iter().map(|x| x.valid_account_id()).collect()
+        ),
+        deposit=1
+    );
+
+    call!(
+        owner,
+        pool.add_rated_swap_pool(
+            pool_tokens, 
+            decimals,
+            pool_fee,
+            amp
+        ),
+        deposit = to_yocto("1"))
+    .assert_success();
+
+    call!(
+        root,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    for (idx, amount) in amounts.clone().into_iter().enumerate() {
+        let c = token_contracts.get(idx).unwrap();
+        call!(
+            root,
+            c.ft_transfer_call(
+                pool.valid_account_id(), 
+                U128(amount), 
+                None, 
+                "".to_string()
+            ),
+            deposit = 1
+        )
+        .assert_success();
+    }
+
+    for (idx, amount) in reated_amounts.clone().into_iter().enumerate() {
+        let c = token_rated_contracts.get(idx).unwrap();
+        call!(
+            root,
+            c.ft_transfer_call(
+                pool.valid_account_id(), 
+                U128(amount), 
+                None, 
+                "".to_string()
+            ),
+            deposit = 1
+        )
+        .assert_success();
+    }
+
+    assert_eq!(100000000, view!(pool.get_pool_share_price(0)).unwrap_json::<U128>().0);
+    let all_amounts = amounts.iter().chain(reated_amounts.iter());
+    call!(
+        root,
+        pool.add_stable_liquidity(0, all_amounts.map(|x| U128(*x)).collect(), U128(1)),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+    assert_eq!(100000000, view!(pool.get_pool_share_price(0)).unwrap_json::<U128>().0);
+    (root, owner, pool, token_contracts, token_rated_contracts)
+}
+
+pub fn setup_rated_pool(
+    tokens: Vec<String>,
+    reated_tokens: Vec<String>,
+    decimals: Vec<u8>,
+    pool_fee: u32,
+    amp: u64,
+) -> (
+    UserAccount,
+    UserAccount,
+    ContractAccount<Exchange>,
+    Vec<ContractAccount<TestToken>>,
+    Vec<ContractAccount<TestRatedToken>>,
+) {
+    use near_sdk_sim::runtime::GenesisConfig;
+    pub const GENESIS_TIMESTAMP: u64 = 1_600_000_000 * 10u64.pow(9);
+    let mut genesis_config = GenesisConfig::default();
+    genesis_config.genesis_time = GENESIS_TIMESTAMP;
+    genesis_config.block_prod_time = 0;
+    let root = init_simulator(Some(genesis_config));
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let pool = deploy!(
+        contract: Exchange,
+        contract_id: swap(),
+        bytes: &EXCHANGE_WASM_BYTES,
+        signer_account: root,
+        init_method: new(owner.valid_account_id(), 1600, 400)
+    );
+
+    let mut pool_tokens = vec![];
+
+    let mut token_contracts: Vec<ContractAccount<TestToken>> = vec![];
+    for token_name in &tokens {
+        pool_tokens.push(to_va(token_name.clone()));
+        token_contracts.push(test_token(&root, token_name.clone(), vec![swap()]));
+    }
+
+    let mut token_rated_contracts: Vec<ContractAccount<TestRatedToken>> = vec![];
+    for token_name in &reated_tokens {
+        pool_tokens.push(to_va(token_name.clone()));
+        token_rated_contracts.push(test_rated_token(&root, token_name.clone(), vec![swap()]));
+    }
+
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(
+            (&token_contracts).into_iter().map(|x| x.valid_account_id()).collect()
+        ),
+        deposit=1
+    );
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(
+            (&token_rated_contracts).into_iter().map(|x| x.valid_account_id()).collect()
+        ),
+        deposit=1
+    );
+
+    call!(
+        owner,
+        pool.add_rated_swap_pool(
+            pool_tokens, 
+            decimals,
+            pool_fee,
+            amp
+        ),
+        deposit = to_yocto("1"))
+    .assert_success();
+
+    call!(
+        root,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    (root, owner, pool, token_contracts, token_rated_contracts)
+}
+
+pub fn mint_and_deposit_rated_token(
+    user: &UserAccount,
+    token: &ContractAccount<TestRatedToken>,
+    ex: &ContractAccount<Exchange>,
+    amount: u128,
+) {
+    call!(
+        user,
+        token.storage_deposit(Some(to_va(user.account_id.clone())), None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        user,
+        ex.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        user,
+        token.mint(user.valid_account_id(), U128(amount))
+    )
+    .assert_success();
+    call!(
+        user,
+        token.ft_transfer_call(
+            ex.valid_account_id(), 
+            U128(amount), 
+            None, 
+            "".to_string()
+        ),
+        deposit = 1
+    )
+    .assert_success();
 }
 
 pub fn mint_and_deposit_token(
