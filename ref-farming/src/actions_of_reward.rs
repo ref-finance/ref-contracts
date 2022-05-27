@@ -46,7 +46,7 @@ impl Contract {
 
     /// Withdraws given reward token of given user.
     #[payable]
-    pub fn withdraw_reward(&mut self, token_id: ValidAccountId, amount: Option<U128>) {
+    pub fn withdraw_reward(&mut self, token_id: ValidAccountId, amount: Option<U128>) -> Promise {
         assert_one_yocto();
 
         let token_id: AccountId = token_id.into();
@@ -74,7 +74,7 @@ impl Contract {
             &env::current_account_id(),
             0,
             GAS_FOR_RESOLVE_TRANSFER,
-        ));
+        ))
     }
 
     #[private]

@@ -16,7 +16,7 @@ use crate::*;
 impl Contract {
 
     #[payable]
-    pub fn withdraw_seed(&mut self, seed_id: SeedId, amount: U128) {
+    pub fn withdraw_seed(&mut self, seed_id: SeedId, amount: U128) -> Promise {
         assert_one_yocto();
         let sender_id = env::predecessor_account_id();
 
@@ -42,7 +42,7 @@ impl Contract {
                     &env::current_account_id(),
                     0,
                     GAS_FOR_RESOLVE_WITHDRAW_SEED,
-                ));
+                ))
             }
             SeedType::MFT => {
                 let (receiver_id, token_id) = parse_seed_id(&seed_id);
@@ -62,7 +62,7 @@ impl Contract {
                     &env::current_account_id(),
                     0,
                     GAS_FOR_RESOLVE_WITHDRAW_SEED,
-                ));
+                ))
             }
         }
         
