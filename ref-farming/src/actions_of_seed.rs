@@ -1,7 +1,7 @@
 
 use std::convert::TryInto;
 use near_sdk::json_types::{U128};
-use near_sdk::{AccountId, Balance, PromiseResult};
+use near_sdk::{AccountId, Balance, PromiseResult, Promise};
 
 use crate::utils::{
     assert_one_yocto, ext_multi_fungible_token, ext_fungible_token, 
