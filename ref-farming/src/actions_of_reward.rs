@@ -1,7 +1,7 @@
 
 use std::convert::TryInto;
 use near_sdk::json_types::{ValidAccountId, U128};
-use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult};
+use near_sdk::{assert_one_yocto, env, near_bindgen, AccountId, Balance, PromiseResult, Promise};
 
 use crate::utils::{ext_fungible_token, ext_self, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER, parse_farm_id};
 use crate::errors::*;
@@ -46,7 +46,7 @@ impl Contract {
 
     /// Withdraws given reward token of given user.
     #[payable]
-    pub fn withdraw_reward(&mut self, token_id: ValidAccountId, amount: Option<U128>) {
+    pub fn withdraw_reward(&mut self, token_id: ValidAccountId, amount: Option<U128>) -> Promise {
         assert_one_yocto();
 
         let token_id: AccountId = token_id.into();
@@ -74,7 +74,7 @@ impl Contract {
             &env::current_account_id(),
             0,
             GAS_FOR_RESOLVE_TRANSFER,
-        ));
+        ))
     }
 
     #[private]
