@@ -290,7 +290,7 @@ impl Contract {
         token_id: AccountId,
         sender_id: AccountId,
         amount: U128,
-    ) {
+    ) -> U128 {
         assert_eq!(
             env::promise_results_count(),
             1,
@@ -299,7 +299,7 @@ impl Contract {
         );
         match env::promise_result(0) {
             PromiseResult::NotReady => unreachable!(),
-            PromiseResult::Successful(_) => {}
+            PromiseResult::Successful(_) => amount,
             PromiseResult::Failed => {
                 // This reverts the changes from withdraw function.
                 // If account doesn't exit, deposits to the owner's account as lostfound.
@@ -334,8 +334,9 @@ impl Contract {
                 if failed {
                     self.internal_lostfound(&token_id, amount.0);
                 }
+                0.into()
             }
-        };
+        }
     }
 }
 
