@@ -46,7 +46,7 @@ fn test_upgrade() {
     .assert_success();
     let metadata = get_metadata(&pool);
     // println!("{:#?}", metadata);
-    assert_eq!(metadata.version, "1.5.0".to_string());
+    assert_eq!(metadata.version, "1.5.1".to_string());
     assert_eq!(metadata.exchange_fee, 4);
     assert_eq!(metadata.referral_fee, 1);
     assert_eq!(metadata.state, RunningState::Running);
