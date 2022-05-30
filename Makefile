@@ -16,7 +16,7 @@ build-farm: ref-farming
 
 test: test-exchange test-farm
 
-test-exchange: build-exchange mock-ft
+test-exchange: build-exchange mock-ft mock-rated
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange 
 
 test-farm: build-farm mock-ft
