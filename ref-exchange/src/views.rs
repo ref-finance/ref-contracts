@@ -2,11 +2,11 @@
 
 use std::collections::HashMap;
 
-use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::json_types::{ValidAccountId, U128, U64};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
-
 use crate::utils::SwapVolume;
+use crate::rated_swap::rate::Rate;
 use crate::*;
 
 #[derive(Serialize)]
@@ -28,6 +28,16 @@ pub struct ContractMetadata {
 pub struct RefStorageState {
     pub deposit: U128,
     pub usage: U128,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub struct RatedTokenInfo {
+    pub rate_type: String,
+    pub rate_price: U128,
+    pub last_update_ts: U64,
+    pub is_valid: bool
 }
 
 #[derive(Serialize, Deserialize)]
@@ -60,6 +70,14 @@ impl From<Pool> for PoolInfo {
                 shares_total_supply: U128(pool.shares_total_supply),
             },
             Pool::StableSwapPool(pool) => Self {
+                pool_kind,
+                amp: pool.get_amp(),
+                amounts: pool.get_amounts().into_iter().map(|a| U128(a)).collect(),
+                token_account_ids: pool.token_account_ids,
+                total_fee: pool.total_fee,
+                shares_total_supply: U128(pool.shares_total_supply),
+            },
+            Pool::RatedSwapPool(pool) => Self {
                 pool_kind,
                 amp: pool.get_amp(),
                 amounts: pool.get_amounts().into_iter().map(|a| U128(a)).collect(),
@@ -101,6 +119,46 @@ impl From<Pool> for StablePoolInfo {
                 token_account_ids: pool.token_account_ids,
                 total_fee: pool.total_fee,
                 shares_total_supply: U128(pool.shares_total_supply),
+            },
+            Pool::RatedSwapPool(_) => unimplemented!(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
+pub struct RatedPoolInfo {
+    /// List of tokens in the pool.
+    pub token_account_ids: Vec<AccountId>,
+    pub decimals: Vec<u8>,
+    /// backend tokens.
+    pub amounts: Vec<U128>,
+    /// backend tokens in comparable precision
+    pub c_amounts: Vec<U128>,
+    /// Fee charged for swap.
+    pub total_fee: u32,
+    /// Total number of shares.
+    pub shares_total_supply: U128,
+    pub amp: u64,
+    pub rates: Vec<U128>,
+}
+
+impl From<Pool> for RatedPoolInfo {
+    fn from(pool: Pool) -> Self {
+        match pool {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(pool) => Self {
+                rates: pool.get_rates().into_iter().map(|a| U128(a)).collect(),
+                amp: pool.get_amp(),
+                amounts: pool.get_amounts().into_iter().map(|a| U128(a)).collect(),
+                decimals: pool.token_decimals,
+                c_amounts: pool.c_amounts.into_iter().map(|a| U128(a)).collect(),
+                token_account_ids: pool.token_account_ids,
+                total_fee: pool.total_fee,
+                shares_total_supply: U128(pool.shares_total_supply),
+                
             },
         }
     }
@@ -151,6 +209,11 @@ impl Contract {
 
     /// Returns stable pool information about specified pool.
     pub fn get_stable_pool(&self, pool_id: u64) -> StablePoolInfo {
+        self.pools.get(pool_id).expect(ERR85_NO_POOL).into()
+    }
+
+    /// Returns rated pool information about specified pool.
+    pub fn get_rated_pool(&self, pool_id: u64) -> RatedPoolInfo {
         self.pools.get(pool_id).expect(ERR85_NO_POOL).into()
     }
 
@@ -246,6 +309,7 @@ impl Contract {
         }
     }
 
+    ///
     pub fn predict_add_stable_liquidity(
         &self,
         pool_id: u64,
@@ -272,6 +336,80 @@ impl Contract {
     ) -> U128 {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         pool.predict_remove_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
+            .into()
+    }
+
+    pub fn list_rated_tokens(&self) -> HashMap<String, RatedTokenInfo> {
+        // read from storage
+        let rates: HashMap<String, Rate> = if let Some(content) = env::storage_read(RATE_STORAGE_KEY.as_bytes()) {
+            HashMap::try_from_slice(&content).expect("deserialize failed.")
+        } else {
+            HashMap::new()
+        };
+        rates
+        .iter()
+        .map(|(k, v)| {
+            (k.clone(), 
+            RatedTokenInfo {
+                rate_type: v.get_type(),
+                rate_price: v.get().into(),
+                last_update_ts: v.last_update_ts().into(),
+                is_valid: v.are_actual(),
+            })
+        })
+        .collect()
+    }
+
+    /// get predicted result of add_liquidity for a given rated token price
+    pub fn predict_add_rated_liquidity(
+        &self,
+        pool_id: u64,
+        amounts: &Vec<U128>,
+        rates: &Option<Vec<U128>>,
+    ) -> U128 {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let rates = match rates {
+            Some(rates) => Some(rates.into_iter().map(|x| x.0).collect()),
+            _ => None
+        };
+        pool.predict_add_rated_liquidity(
+            &amounts.into_iter().map(|x| x.0).collect(),
+            &rates,
+            &AdminFees::new(self.exchange_fee)
+        ).into()
+    }
+
+    /// get predicted result of remove_liquidity_by_tokens for a given rated token price 
+    pub fn predict_remove_rated_liquidity_by_tokens(
+        &self,
+        pool_id: u64,
+        amounts: &Vec<U128>,
+        rates: &Option<Vec<U128>>,
+    ) -> U128 {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let rates = match rates {
+            Some(rates) => Some(rates.into_iter().map(|x| x.0).collect()),
+            _ => None
+        };
+        pool.predict_remove_rated_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &rates, &AdminFees::new(self.exchange_fee))
+            .into()
+    }
+
+    /// get predicted swap result of a rated stable swap pool for given rated token price 
+    pub fn get_rated_return(
+        &self,
+        pool_id: u64,
+        token_in: ValidAccountId,
+        amount_in: U128,
+        token_out: ValidAccountId,
+        rates: &Option<Vec<U128>>,
+    ) -> U128 {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let rates = match rates {
+            Some(rates) => Some(rates.into_iter().map(|x| x.0).collect()),
+            _ => None
+        };
+        pool.get_rated_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &rates, &AdminFees::new(self.exchange_fee))
             .into()
     }
 }

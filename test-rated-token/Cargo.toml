@@ -1,0 +1,13 @@
+[package]
+name = "test-rated-token"
+version = "0.1.1"
+authors = ["Marco Sun <sun.dsk1@gmail.com>", "MagicGordon"]
+edition = "2018"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = "3.1.0"
+near-contract-standards = "3.1.0"

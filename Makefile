@@ -1,17 +1,25 @@
 RFLAGS="-C link-arg=-s"
 
-build: ref-exchange 
+build: build-exchange build-farm
+
+build-exchange: ref-exchange
 	rustup target add wasm32-unknown-unknown
 	RUSTFLAGS=$(RFLAGS) cargo build -p ref-exchange --target wasm32-unknown-unknown --release
-	RUSTFLAGS=$(RFLAGS) cargo build -p ref_farming --target wasm32-unknown-unknown --release
 	mkdir -p res
 	cp target/wasm32-unknown-unknown/release/ref_exchange.wasm ./res/ref_exchange.wasm
+
+build-farm: ref-farming
+	rustup target add wasm32-unknown-unknown
+	RUSTFLAGS=$(RFLAGS) cargo build -p ref_farming --target wasm32-unknown-unknown --release
+	mkdir -p res
 	cp target/wasm32-unknown-unknown/release/ref_farming.wasm ./res/ref_farming.wasm
 
-test: build mock-ft
+test: test-exchange test-farm
+
+test-exchange: build-exchange mock-ft mock-rated
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange 
 
-test-farm: build mock-ft
+test-farm: build-farm mock-ft
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref_farming 
 
 test-release: mock-ft
@@ -24,6 +32,12 @@ mock-ft: test-token
 	RUSTFLAGS=$(RFLAGS) cargo build -p test-token --target wasm32-unknown-unknown --release
 	mkdir -p res
 	cp target/wasm32-unknown-unknown/release/test_token.wasm ./res/test_token.wasm
+
+mock-rated: test-rated-token
+	rustup target add wasm32-unknown-unknown
+	RUSTFLAGS=$(RFLAGS) cargo build -p test-rated-token --target wasm32-unknown-unknown --release
+	mkdir -p res
+	cp target/wasm32-unknown-unknown/release/test_rated_token.wasm ./res/test_rated_token.wasm
 
 release:
 	$(call docker_build,_rust_setup.sh)

@@ -1,5 +1,9 @@
 # Release Notes
 
+### Version 1.5.1
+1. Import rated stable pool;
+2. Add return value to withdraw callback;
+
 ### Version 1.4.5
 1. Fix off-by-one issue in stable-swap;
 2. Support up to 24 decimal tokens in stable-swap;

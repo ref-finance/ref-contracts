@@ -33,6 +33,11 @@ construct_uint! {
     pub struct U256(4);
 }
 
+construct_uint! {
+    /// 384-bit unsigned integer.
+    pub struct U384(6);
+}
+
 /// Volume of swap on the given token.
 #[derive(Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]

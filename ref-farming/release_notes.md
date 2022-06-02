@@ -1,5 +1,8 @@
 # Release Notes
 
+### Version 1.0.4
+1. Return promise in withdraw reward and seed;
+
 ### Version 1.0.3
 1. Fix bug on modify_seed_min_deposit;
 

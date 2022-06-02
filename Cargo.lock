@@ -2314,20 +2314,22 @@ dependencies = [
 
 [[package]]
 name = "ref-exchange"
-version = "1.4.5"
+version = "1.5.1"
 dependencies = [
  "near-contract-standards",
  "near-sdk",
  "near-sdk-sim",
+ "once_cell",
  "rand 0.8.4",
  "rand_pcg",
+ "test-rated-token",
  "test-token",
  "uint",
 ]
 
 [[package]]
 name = "ref_farming"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
  "near-contract-standards",
  "near-sdk",
@@ -2715,6 +2717,14 @@ dependencies = [
  "redox_syscall 0.2.10",
  "remove_dir_all",
  "winapi",
+]
+
+[[package]]
+name = "test-rated-token"
+version = "0.1.1"
+dependencies = [
+ "near-contract-standards",
+ "near-sdk",
 ]
 
 [[package]]
