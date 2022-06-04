@@ -19,6 +19,7 @@ impl FungibleTokenReceiver for Contract {
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
+        assert!(self.data().state == RunningState::Running, "{}", ERR600_CONTRACT_PAUSED);
 
         let sender: AccountId = sender_id.into();
         let amount: u128 = amount.into();
@@ -131,7 +132,8 @@ impl MFTTokenReceiver for Contract {
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
- 
+        assert!(self.data().state == RunningState::Running, "{}", ERR600_CONTRACT_PAUSED);
+        
         let seed_id: String;
         match parse_token_id(token_id.clone()) {
             TokenOrPool::Pool(pool_id) => {

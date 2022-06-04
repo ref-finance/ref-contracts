@@ -18,6 +18,8 @@ impl Contract {
     #[payable]
     pub fn withdraw_seed(&mut self, seed_id: SeedId, amount: U128) -> Promise {
         assert_one_yocto();
+        assert!(self.data().state == RunningState::Running, "{}", ERR600_CONTRACT_PAUSED);
+
         let sender_id = env::predecessor_account_id();
 
         let amount: Balance = amount.into();

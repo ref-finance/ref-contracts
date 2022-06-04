@@ -25,3 +25,5 @@ pub const ERR43_INVALID_FARM_STATUS: &str = "E43: invalid farm status";
 pub const ERR44_INVALID_FARM_REWARD: &str = "E44: invalid reward token for this farm";
 
 pub const ERR500: &str = "E500: Internal ERROR!";
+
+pub const ERR600_CONTRACT_PAUSED: &str = "E600: contract paused";

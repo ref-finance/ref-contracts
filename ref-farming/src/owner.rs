@@ -1,5 +1,5 @@
 use crate::*;
-
+use near_sdk::assert_one_yocto;
 use near_sdk::json_types::U128;
 
 #[near_bindgen]
@@ -22,18 +22,44 @@ impl Contract {
         self.data_mut().seeds.insert(&seed_id, &farm_seed);
     }
 
+    #[payable]
+    pub fn pause_contract(&mut self) {
+        assert_one_yocto();
+        self.assert_owner();
+
+        if self.data().state == RunningState::Running {
+            env::log(format!("Contract paused by {}", env::predecessor_account_id()).as_bytes());       
+            self.data_mut().state = RunningState::Paused;
+        } else {
+            env::log("Contract state is already in Paused".as_bytes());
+        }
+    }
+
+    #[payable]
+    pub fn resume_contract(&mut self) {
+        assert_one_yocto();
+        self.assert_owner();
+
+        if self.data().state == RunningState::Paused {
+            env::log(format!("Contract resumed by {}", env::predecessor_account_id()).as_bytes());       
+            self.data_mut().state = RunningState::Running;
+        } else {
+            env::log("Contract state is already in Running".as_bytes());
+        }
+    }
 
     /// Migration function between versions.
     /// For next version upgrades, change this function.
     #[init(ignore_state)]
     #[private]
     pub fn migrate() -> Self {
-        assert_eq!(
-            env::predecessor_account_id(),
-            env::current_account_id(),
-            "ERR_NOT_ALLOWED"
-        );
-        let contract: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
+        let mut contract: Contract = env::state_read().expect("ERR_NOT_INITIALIZED");
+        // see if ContractData need upgrade
+        contract.data = 
+        match contract.data {
+            VersionedContractData::V0104(data) => VersionedContractData::V0110(data.into()),
+            VersionedContractData::V0110(data) => VersionedContractData::V0110(data),
+        };
         contract
     }
 

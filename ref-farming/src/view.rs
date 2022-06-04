@@ -27,6 +27,7 @@ pub struct Metadata {
     pub farm_count: U64,
     pub seed_count: U64,
     pub reward_count: U64,
+    pub state: RunningState,
 }
 
 #[derive(Serialize, Deserialize, PartialEq)]
@@ -121,6 +122,7 @@ impl Contract {
             farm_count: self.data().farms.len().into(),
             seed_count: self.data().seeds.len().into(),
             reward_count: self.data().reward_info.len().into(),
+            state: self.data().state.clone()
         }
     }
 
