@@ -7,7 +7,7 @@ use near_sdk_sim::{deploy, init_simulator, to_yocto, view};
 use ref_farming::ContractContract as Farming;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    PREV_FARMING_WASM_BYTES => "../res/ref_farming_v104.wasm",
+    PREV_FARMING_WASM_BYTES => "../res/ref_farming_v0104.wasm",
     FARMING_WASM_BYTES => "../res/ref_farming.wasm",
 }
 
