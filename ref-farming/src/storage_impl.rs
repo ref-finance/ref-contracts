@@ -23,6 +23,7 @@ impl StorageManagement for Contract {
         account_id: Option<ValidAccountId>,
         registration_only: Option<bool>,
     ) -> StorageBalance {
+        assert!(self.data().state == RunningState::Running, "{}", ERR600_CONTRACT_PAUSED);
 
         let amount = env::attached_deposit();
         let account_id = account_id
@@ -60,6 +61,7 @@ impl StorageManagement for Contract {
     #[payable]
     fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
         assert_one_yocto();
+        assert!(self.data().state == RunningState::Running, "{}", ERR600_CONTRACT_PAUSED);
 
         let account_id = env::predecessor_account_id();        
         let (locked, deposited) = self.internal_farmer_storage(&account_id);
@@ -84,6 +86,7 @@ impl StorageManagement for Contract {
     #[payable]
     fn storage_unregister(&mut self, force: Option<bool>) -> bool {
         assert_one_yocto();
+        assert!(self.data().state == RunningState::Running, "{}", ERR600_CONTRACT_PAUSED);
 
         // force option is useless, leave it for compatible consideration.
         // User should withdraw all his rewards and seeds token before unregister!

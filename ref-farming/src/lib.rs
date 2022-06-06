@@ -3,6 +3,7 @@
 *
 * lib.rs is the main entry point.
 */
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{ValidAccountId};
 use near_sdk::collections::{LookupMap, UnorderedMap};
@@ -13,6 +14,8 @@ use crate::farm::{Farm, FarmId};
 use crate::simple_farm::{RPS};
 use crate::farm_seed::{VersionedFarmSeed, SeedId};
 use crate::farmer::{VersionedFarmer, Farmer};
+use crate::errors::ERR600_CONTRACT_PAUSED;
+use crate::legacy::ContractDataV0104;
 
 // for simulator test
 pub use crate::simple_farm::HRSimpleFarmTerms;
@@ -34,6 +37,7 @@ mod actions_of_reward;
 mod view;
 
 mod owner;
+mod legacy;
 
 near_sdk::setup_alloc!();
 
@@ -46,6 +50,13 @@ pub enum StorageKeys {
     Farmer,
     RewardInfo,
     UserRps { account_id: AccountId },
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub enum RunningState {
+    Running, Paused
 }
 
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -68,12 +79,16 @@ pub struct ContractData {
     // for statistic
     farmer_count: u64,
     reward_info: UnorderedMap<AccountId, Balance>,
+
+    /// Running state
+    state: RunningState,
 }
 
 /// Versioned contract data. Allows to easily upgrade contracts.
 #[derive(BorshSerialize, BorshDeserialize)]
 pub enum VersionedContractData {
-    Current(ContractData),
+    V0104(ContractDataV0104),
+    V0110(ContractData),
 }
 
 impl VersionedContractData {}
@@ -91,7 +106,7 @@ impl Contract {
     pub fn new(owner_id: ValidAccountId) -> Self {
         assert!(!env::state_exists(), "Already initialized");
         Self {
-            data: VersionedContractData::Current(ContractData {
+            data: VersionedContractData::V0110(ContractData {
                 owner_id: owner_id.into(),
                 farmer_count: 0,
                 seeds: UnorderedMap::new(StorageKeys::Seed),
@@ -99,6 +114,7 @@ impl Contract {
                 farms: UnorderedMap::new(StorageKeys::Farm),
                 outdated_farms: UnorderedMap::new(StorageKeys::OutdatedFarm),
                 reward_info: UnorderedMap::new(StorageKeys::RewardInfo),
+                state: RunningState::Running,
             }),
         }
     }
@@ -107,13 +123,15 @@ impl Contract {
 impl Contract {
     fn data(&self) -> &ContractData {
         match &self.data {
-            VersionedContractData::Current(data) => data,
+            VersionedContractData::V0110(data) => data,
+            _ => unimplemented!(),
         }
     }
 
     fn data_mut(&mut self) -> &mut ContractData {
         match &mut self.data {
-            VersionedContractData::Current(data) => data,
+            VersionedContractData::V0110(data) => data,
+            _ => unimplemented!(),
         }
     }
 }

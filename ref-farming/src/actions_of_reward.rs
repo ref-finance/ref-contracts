@@ -19,6 +19,8 @@ impl Contract {
     /// Clean invalid rps,
     /// return false if the rps is still valid.
     pub fn remove_user_rps_by_farm(&mut self, farm_id: FarmId) -> bool {
+        assert!(self.data().state == RunningState::Running, "{}", ERR600_CONTRACT_PAUSED);
+
         let sender_id = env::predecessor_account_id();
         let mut farmer = self.get_farmer(&sender_id);
         let (seed_id, _) = parse_farm_id(&farm_id);
@@ -33,12 +35,16 @@ impl Contract {
     }
 
     pub fn claim_reward_by_farm(&mut self, farm_id: FarmId) {
+        assert!(self.data().state == RunningState::Running, "{}", ERR600_CONTRACT_PAUSED);
+
         let sender_id = env::predecessor_account_id();
         self.internal_claim_user_reward_by_farm_id(&sender_id, &farm_id);
         self.assert_storage_usage(&sender_id);
     }
 
     pub fn claim_reward_by_seed(&mut self, seed_id: SeedId) {
+        assert!(self.data().state == RunningState::Running, "{}", ERR600_CONTRACT_PAUSED);
+
         let sender_id = env::predecessor_account_id();
         self.internal_claim_user_reward_by_seed_id(&sender_id, &seed_id);
         self.assert_storage_usage(&sender_id);
@@ -48,6 +54,7 @@ impl Contract {
     #[payable]
     pub fn withdraw_reward(&mut self, token_id: ValidAccountId, amount: Option<U128>) -> Promise {
         assert_one_yocto();
+        assert!(self.data().state == RunningState::Running, "{}", ERR600_CONTRACT_PAUSED);
 
         let token_id: AccountId = token_id.into();
         let amount: u128 = amount.unwrap_or(U128(0)).into(); 
