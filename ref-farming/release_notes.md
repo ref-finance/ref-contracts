@@ -1,5 +1,8 @@
 # Release Notes
 
+### Version 1.1.0
+1. Add state control by owner;
+
 ### Version 1.0.4
 1. Return promise in withdraw reward and seed;
 
