@@ -56,6 +56,7 @@ fn generate_fuzzy_seed() -> Vec<u64>{
 }
 
 #[test]
+#[ignore]
 fn test_fuzzy_amm(){
 
     let seeds = generate_fuzzy_seed();
