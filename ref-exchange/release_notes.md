@@ -1,5 +1,8 @@
 # Release Notes
 
+### Version 1.5.2
+1. Lower MIN_RESERVE to 1*10**16;
+
 ### Version 1.5.1
 1. Import rated stable pool;
 2. Add return value to withdraw callback;
