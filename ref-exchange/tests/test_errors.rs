@@ -438,7 +438,7 @@ fn sim_stable_e69 () {
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
-    deposit_token(&root, &ex, vec![&token1, &token2], vec![101*ONE_DAI, 101*ONE_USDT]);
+    deposit_token(&root, &ex, vec![&token1, &token2], vec![101*ONE_DAI, 1001*ONE_USDT]);
 
     call!(
         owner,
@@ -479,15 +479,28 @@ fn sim_stable_e69 () {
         deposit = 1
     )
     .assert_success();
-
+    call!(
+        root,
+        ex.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in: usdt(),
+                amount_in: Some(U128(99*ONE_USDT)),
+                token_out: dai(),
+                min_amount_out: U128(1)
+            }],
+            None
+        ),
+        deposit = 1
+    ).assert_success();
     let outcome = call!(
         root,
         ex.swap(
             vec![SwapAction {
                 pool_id: 0,
-                token_in: dai(),
-                amount_in: Some(U128(99*ONE_DAI)),
-                token_out: usdt(),
+                token_in: usdt(),
+                amount_in: Some(U128(99*ONE_USDT)),
+                token_out: dai(),
                 min_amount_out: U128(1)
             }],
             None
