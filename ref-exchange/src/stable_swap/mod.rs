@@ -16,7 +16,7 @@ mod math;
 pub const MIN_DECIMAL: u8 = 1;
 pub const MAX_DECIMAL: u8 = 24;
 pub const TARGET_DECIMAL: u8 = 18;
-pub const MIN_RESERVE: u128 = 1_000_000_000_000_000_000;
+pub const MIN_RESERVE: u128 = 10_000_000_000_000_000;
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct StableSwapPool {
@@ -954,6 +954,40 @@ mod tests {
         let out = swap(&mut pool, 1, 99999000000000000000000, 2);
         assert_eq!(out, 98443167413204135506296000000);
         assert_eq!(pool.c_amounts, vec![199999000000000000000000, 1556832586795864493704]);
+    }
+
+    #[test]
+    fn test_min_reserve_by_shares() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let fees = AdminFees::zero();
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![18, 18], 1000, 0);
+        assert_eq!(
+            pool.tokens(),
+            vec![accounts(1).to_string(), accounts(2).to_string()]
+        );
+
+        let mut amounts = vec![1000000000000000000, 1000000000000000000];
+        let shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        pool.remove_liquidity_by_shares(accounts(0).as_ref(), shares - 2 * MIN_RESERVE, vec![0, 0]);
+        assert_eq!(vec![MIN_RESERVE, MIN_RESERVE], pool.c_amounts);
+    }
+
+    #[test]
+    fn test_min_reserve_by_tokens() {
+        let mut context = VMContextBuilder::new();
+        testing_env!(context.predecessor_account_id(accounts(0)).build());
+        let fees = AdminFees::zero();
+        let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![18, 18], 1000, 0);
+        assert_eq!(
+            pool.tokens(),
+            vec![accounts(1).to_string(), accounts(2).to_string()]
+        );
+
+        let mut amounts = vec![100000000000000000000000, 100000000000000000000000000000];
+        let shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        pool.remove_liquidity_by_tokens(accounts(0).as_ref(), vec![amounts[0] - MIN_RESERVE, amounts[1] - MIN_RESERVE], shares, &AdminFees::zero());
+        assert_eq!(vec![MIN_RESERVE, MIN_RESERVE], pool.c_amounts);
     }
 
     #[test]
