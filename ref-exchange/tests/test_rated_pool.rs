@@ -15,6 +15,7 @@ const ONE_LPT: u128 = 10u128.pow(24 as u32);
 const ONE_NEAR: u128 = 10u128.pow(24 as u32);
 const ONE_STNEAR: u128 = 10u128.pow(24 as u32);
 const ONE_LINEAR: u128 = 10u128.pow(24 as u32);
+const ONE_NEARX: u128 = 10u128.pow(24 as u32);
 
 #[test]
 fn sim_rated_swap_liquidity_two() {
@@ -1344,4 +1345,385 @@ fn sim_rated_swap_lp_storage() {
     let sb = get_storage_balance(&pool, user.valid_account_id()).unwrap();
     assert_eq!(sb.total.0, to_yocto("0.00546"));
     assert_eq!(sb.available.0, 0);
+}
+
+#[test]
+fn sim_rated_swap_liquidity_two_with_nearx() {
+    let (root, owner, pool, tokens, token_rated_contracts) = 
+        setup_rated_pool(
+            vec![near()],
+            vec![nearx()],
+            vec![24, 24],
+            25,
+            10000,
+        );
+
+    let nearx_contract = &token_rated_contracts[0];
+
+    call!(
+        owner,
+        pool.register_rated_token(
+            "NEARX".to_string(),
+            token_rated_contracts[0].valid_account_id()
+        ),
+        deposit = 1
+    ).assert_success();
+
+    call!(
+        root,
+        nearx_contract.set_price(U128(2 * 10u128.pow(24)))
+    ).assert_success();
+
+    call!(
+        owner,
+        pool.update_token_rate(
+            nearx_contract.valid_account_id()
+        ),
+        deposit = 1
+    ).assert_success();
+
+    let user = root.create_user("user".to_string(), to_yocto("100"));
+    mint_and_deposit_token(&user, &tokens[0], &pool, 100000*ONE_NEAR);
+    mint_and_deposit_rated_token(&user, &token_rated_contracts[0], &pool, 100000*ONE_NEARX);
+    let out_come = call!(
+        user,
+        pool.add_stable_liquidity(0, vec![
+            U128(100000*ONE_NEAR), U128(50000*ONE_NEARX)], U128(1)),
+        deposit = to_yocto("0.0007") 
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+    assert_eq!(mft_balance_of(&pool, ":0", &user.account_id()), 200000*ONE_LPT);
+    assert_eq!(mft_total_supply(&pool, ":0"), 200000*ONE_LPT);
+    let last_share_price = pool_share_price(&pool, 0);
+    assert_eq!(100000000, last_share_price);
+
+    let user1 = root.create_user("user1".to_string(), to_yocto("100"));
+    mint_and_deposit_token(&user1, &tokens[0], &pool, 100000*ONE_NEAR);
+    mint_and_deposit_rated_token(&user1, &token_rated_contracts[0], &pool, 100000*ONE_NEARX);
+    let out_come = call!(
+        user1,
+        pool.add_stable_liquidity(0, vec![
+            U128(100000*ONE_NEAR), U128(50000*ONE_NEARX)], U128(1)),
+        deposit = to_yocto("0.0007") 
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 200000*ONE_LPT);
+    assert_eq!(mft_total_supply(&pool, ":0"), 400000*ONE_LPT);
+    let last_share_price = pool_share_price(&pool, 0);
+    assert_eq!(100000000, last_share_price);
+
+    let out_come = call!(
+        user1,
+        pool.remove_liquidity(0, U128(200000*ONE_LPT), vec![U128(1*ONE_NEAR), U128(1*ONE_NEARX)]),
+        deposit = 1 
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 0);
+    assert_eq!(mft_total_supply(&pool, ":0"), 200000*ONE_LPT);
+    assert_eq!(100000000, pool_share_price(&pool, 0));
+
+    let out_come = call!(
+        user,
+        pool.remove_liquidity(0, U128(200000*ONE_LPT), vec![U128(1*ONE_NEAR), U128(1*ONE_NEARX)]),
+        deposit = 1 
+    );
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E69: pool reserved token balance less than MIN_RESERVE"));
+
+}
+
+#[test]
+fn sim_rated_swap_two_no_rated_with_nearx() {
+    let (root, _owner, pool, tokens, _token_rated_contracts) = 
+        setup_rated_pool_with_liquidity(
+            vec![near()],
+            vec![nearx()],
+            vec![100000*ONE_NEAR],
+            vec![100000*ONE_NEARX],
+            vec![24, 24],
+            25,
+            10000,
+        );
+    assert_eq!(
+        view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
+        PoolInfo {
+            pool_kind: "RATED_SWAP".to_string(),
+            amp: 10000,
+            token_account_ids: vec![near(), nearx()],
+            amounts: vec![U128(100000*ONE_NEAR), U128(100000*ONE_NEARX)],
+            total_fee: 25,
+            shares_total_supply: U128(200000*ONE_LPT),
+        }
+    );
+    assert_eq!(
+        view!(pool.mft_metadata(":0".to_string()))
+            .unwrap_json::<FungibleTokenMetadata>()
+            .name,
+        "ref-pool-0"
+    );
+    assert_eq!(
+        view!(pool.mft_balance_of(":0".to_string(), to_va(root.account_id.clone())))
+            .unwrap_json::<U128>()
+            .0,
+        200000*ONE_LPT
+    );
+    let balances = view!(pool.get_deposits(root.valid_account_id()))
+        .unwrap_json::<HashMap<AccountId, U128>>();
+    let balances = balances.values().cloned().collect::<Vec<_>>();
+    assert_eq!(balances, vec![U128(0), U128(0)]);
+
+    let c = tokens.get(0).unwrap();
+    call!(
+        root,
+        c.ft_transfer_call(pool.valid_account_id(), U128(ONE_NEAR), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+
+    let out_come = call!(
+        root,
+        pool.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in: near(),
+                amount_in: Some(U128(ONE_NEAR)),
+                token_out: nearx(),
+                min_amount_out: U128(1)
+            }],
+            None
+        ),
+        deposit = 1
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+
+    let balances = view!(pool.get_deposits(root.valid_account_id()))
+        .unwrap_json::<HashMap<AccountId, U128>>();
+    assert_eq!(balances[&near()].0, 0);
+    assert_eq!(balances[&nearx()].0, 997499999501274936452669);
+
+    assert_eq!(
+        view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
+        PoolInfo {
+            pool_kind: "RATED_SWAP".to_string(),
+            amp: 10000,
+            token_account_ids: vec![near(), nearx()],
+            amounts: vec![U128(100001*ONE_NEAR), U128(99999*ONE_NEARX+2500000498725063547331)],
+            total_fee: 25,
+            shares_total_supply: U128(200000*ONE_LPT + 499999994999720058346),
+        }
+    );
+}
+
+#[test]
+fn sim_rated_swap_rate_one_with_fee_with_nearx() {
+    let (root, owner, pool, tokens, token_rated_contracts) = 
+        setup_rated_pool_with_liquidity(
+            vec![near()],
+            vec![nearx()],
+            vec![100000*ONE_NEAR],
+            vec![100000*ONE_NEARX],
+            vec![24, 24],
+            25,
+            10000,
+        );
+    let nearx_contract = &token_rated_contracts[0];
+    assert_eq!(
+        view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
+        PoolInfo {
+            pool_kind: "RATED_SWAP".to_string(),
+            amp: 10000,
+            token_account_ids: vec![near(), nearx()],
+            amounts: vec![U128(100000*ONE_NEAR), U128(100000*ONE_NEARX)],
+            total_fee: 25,
+            shares_total_supply: U128(200000*ONE_LPT),
+        }
+    );
+    assert_eq!(
+        view!(pool.mft_metadata(":0".to_string()))
+            .unwrap_json::<FungibleTokenMetadata>()
+            .name,
+        "ref-pool-0"
+    );
+    assert_eq!(
+        view!(pool.mft_balance_of(":0".to_string(), to_va(root.account_id.clone())))
+            .unwrap_json::<U128>()
+            .0,
+        200000*ONE_LPT
+    );
+    let balances = view!(pool.get_deposits(root.valid_account_id()))
+        .unwrap_json::<HashMap<AccountId, U128>>();
+    let balances = balances.values().cloned().collect::<Vec<_>>();
+    assert_eq!(balances, vec![U128(0), U128(0)]);
+
+    let c = tokens.get(0).unwrap();
+    call!(
+        root,
+        c.ft_transfer_call(pool.valid_account_id(), U128(ONE_NEAR), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.register_rated_token(
+            "NEARX".to_string(),
+            token_rated_contracts[0].valid_account_id()
+        ),
+        deposit = 1
+    ).assert_success();
+
+    call!(
+        owner,
+        pool.update_token_rate(
+            nearx_contract.valid_account_id()
+        ),
+        deposit = 1
+    ).assert_success();
+
+    let rated_infos = view!(pool.list_rated_tokens()).unwrap_json::<HashMap<String, RatedTokenInfo>>();
+
+    println!("{:?}", rated_infos);
+
+    let out_come = call!(
+        root,
+        pool.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in: near(),
+                amount_in: Some(U128(ONE_NEAR)),
+                token_out: nearx(),
+                min_amount_out: U128(1)
+            }],
+            None
+        ),
+        deposit = 1
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+
+    let balances = view!(pool.get_deposits(root.valid_account_id()))
+        .unwrap_json::<HashMap<AccountId, U128>>();
+    assert_eq!(balances[&near()].0, 0);
+    assert_eq!(balances[&nearx()].0, 997499999501274936452669);
+
+    assert_eq!(
+        view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
+        PoolInfo {
+            pool_kind: "RATED_SWAP".to_string(),
+            amp: 10000,
+            token_account_ids: vec![near(), nearx()],
+            amounts: vec![U128(100001*ONE_NEAR), U128(99999*ONE_NEARX+2500000498725063547331)],
+            total_fee: 25,
+            shares_total_supply: U128(200000*ONE_LPT + 499999994999720058346),
+        }
+    );
+}
+
+#[test]
+fn sim_rated_swap_rate_one_no_fee_with_nearx() {
+    let (root, owner, pool, tokens, token_rated_contracts) = 
+        setup_rated_pool_with_liquidity(
+            vec![near()],
+            vec![nearx()],
+            vec![100000*ONE_NEAR],
+            vec![100000*ONE_NEARX],
+            vec![24, 24],
+            0,
+            10000,
+        );
+    let nearx_contract = &token_rated_contracts[0];
+    assert_eq!(
+        view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
+        PoolInfo {
+            pool_kind: "RATED_SWAP".to_string(),
+            amp: 10000,
+            token_account_ids: vec![near(), nearx()],
+            amounts: vec![U128(100000*ONE_NEAR), U128(100000*ONE_NEARX)],
+            total_fee: 0,
+            shares_total_supply: U128(200000*ONE_LPT),
+        }
+    );
+    assert_eq!(
+        view!(pool.mft_metadata(":0".to_string()))
+            .unwrap_json::<FungibleTokenMetadata>()
+            .name,
+        "ref-pool-0"
+    );
+    assert_eq!(
+        view!(pool.mft_balance_of(":0".to_string(), to_va(root.account_id.clone())))
+            .unwrap_json::<U128>()
+            .0,
+        200000*ONE_LPT
+    );
+    let balances = view!(pool.get_deposits(root.valid_account_id()))
+        .unwrap_json::<HashMap<AccountId, U128>>();
+    let balances = balances.values().cloned().collect::<Vec<_>>();
+    assert_eq!(balances, vec![U128(0), U128(0)]);
+
+    let c = tokens.get(0).unwrap();
+    call!(
+        root,
+        c.ft_transfer_call(pool.valid_account_id(), U128(ONE_NEAR), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.register_rated_token(
+            "NEARX".to_string(),
+            token_rated_contracts[0].valid_account_id()
+        ),
+        deposit = 1
+    ).assert_success();
+
+    call!(
+        owner,
+        pool.update_token_rate(
+            nearx_contract.valid_account_id()
+        ),
+        deposit = 1
+    ).assert_success();
+
+    let rated_infos = view!(pool.list_rated_tokens()).unwrap_json::<HashMap<String, RatedTokenInfo>>();
+
+    println!("{:?}", rated_infos);
+
+    let out_come = call!(
+        root,
+        pool.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in: near(),
+                amount_in: Some(U128(ONE_NEAR)),
+                token_out: nearx(),
+                min_amount_out: U128(1)
+            }],
+            None
+        ),
+        deposit = 1
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+
+    let balances = view!(pool.get_deposits(root.valid_account_id()))
+        .unwrap_json::<HashMap<AccountId, U128>>();
+    assert_eq!(balances[&near()].0, 0);
+    assert_eq!(balances[&nearx()].0, 999999999500024998950044);
+
+    assert_eq!(
+        view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
+        PoolInfo {
+            pool_kind: "RATED_SWAP".to_string(),
+            amp: 10000,
+            token_account_ids: vec![near(), nearx()],
+            amounts: vec![U128(100001*ONE_NEAR), U128(99999*ONE_NEARX+499975001049956)],
+            total_fee: 0,
+            shares_total_supply: U128(200000*ONE_LPT),
+        }
+    );
 }

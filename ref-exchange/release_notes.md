@@ -1,5 +1,8 @@
 # Release Notes
 
+### Version 1.5.3
+1. Support nearx in rated stable pool;
+
 ### Version 1.5.2
 1. Lower MIN_RESERVE to 1*10**15;
 

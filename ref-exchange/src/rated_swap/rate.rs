@@ -1,5 +1,6 @@
 use super::stnear_rate::StnearRate;
 use super::linear_rate::LinearRate;
+use super::nearx_rate::NearxRate;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{env, AccountId, Balance, Promise};
 use crate::ERR127_INVALID_RATE_TYPE;
@@ -18,6 +19,7 @@ pub static RATES: Lazy<Mutex<HashMap<AccountId, Rate>>> = Lazy::new(|| Mutex::ne
 pub enum Rate {
     Stnear(StnearRate),
     Linear(LinearRate),
+    Nearx(NearxRate),
 }
 
 pub trait RateTrait {
@@ -33,30 +35,35 @@ impl RateTrait for Rate {
         match self {
             Rate::Stnear(rates) => rates.are_actual(),
             Rate::Linear(rates) => rates.are_actual(),
+            Rate::Nearx(rates) => rates.are_actual(),
         }
     }
     fn get(&self) -> Balance {
         match self {
             Rate::Stnear(rates) => rates.get(),
             Rate::Linear(rates) => rates.get(),
+            Rate::Nearx(rates) => rates.get(),
         }
     }
     fn last_update_ts(&self) -> u64 {
         match self {
             Rate::Stnear(rates) => rates.last_update_ts(),
             Rate::Linear(rates) => rates.last_update_ts(),
+            Rate::Nearx(rates) => rates.last_update_ts(),
         }
     }
     fn async_update(&self) -> Promise {
         match self {
             Rate::Stnear(rates) => rates.async_update(),
             Rate::Linear(rates) => rates.async_update(),
+            Rate::Nearx(rates) => rates.async_update(),
         }
     }
     fn set(&mut self, cross_call_result: &Vec<u8>) -> u128 {
         match self {
             Rate::Stnear(rates) => rates.set(cross_call_result),
             Rate::Linear(rates) => rates.set(cross_call_result),
+            Rate::Nearx(rates) => rates.set(cross_call_result),
         }
     }
 }
@@ -66,6 +73,7 @@ impl Rate {
         match rates_type.as_str() {
             "STNEAR" => Rate::Stnear(StnearRate::new(contract_id)),
             "LINEAR" => Rate::Linear(LinearRate::new(contract_id)),
+            "NEARX" => Rate::Nearx(NearxRate::new(contract_id)),
             _ => unimplemented!(),
         }
     }
@@ -74,6 +82,7 @@ impl Rate {
         match self {
             Rate::Stnear(_) => "STNEAR".to_string(),
             Rate::Linear(_) => "LINEAR".to_string(),
+            Rate::Nearx(_) => "NEARX".to_string(),
         }
     }
 
@@ -81,6 +90,7 @@ impl Rate {
         match rates_type {
             "STNEAR" => true,
             "LINEAR" => true,
+            "NEARX" => true,
             _ => false,
         }
     }

@@ -281,6 +281,10 @@ pub fn linear() -> AccountId {
     "linear".to_string()
 }
 
+pub fn nearx() -> AccountId {
+    "nearx".to_string()
+}
+
 pub fn to_va(a: AccountId) -> ValidAccountId {
     ValidAccountId::try_from(a).unwrap()
 }
