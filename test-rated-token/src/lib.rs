@@ -48,6 +48,10 @@ impl Contract {
         U128(self.price)
     }
 
+    pub fn get_nearx_price(&self) -> U128 {
+        U128(self.price)
+    }
+
     pub fn mint(&mut self, account_id: ValidAccountId, amount: U128) {
         self.token
             .internal_deposit(account_id.as_ref(), amount.into());
@@ -117,10 +121,12 @@ mod tests {
 
         assert_eq!(contract.ft_price().0, 10u128.pow(24 as u32));
         assert_eq!(contract.get_st_near_price().0, 10u128.pow(24 as u32));
+        assert_eq!(contract.get_nearx_price().0, 10u128.pow(24 as u32));
 
         contract.set_price(U128(2 * 10u128.pow(24 as u32)));
 
         assert_eq!(contract.ft_price().0, 2 * 10u128.pow(24 as u32));
         assert_eq!(contract.get_st_near_price().0, 2 * 10u128.pow(24 as u32));
+        assert_eq!(contract.get_nearx_price().0, 2 * 10u128.pow(24 as u32));
     }
 }

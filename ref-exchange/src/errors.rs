@@ -33,6 +33,7 @@ pub const ERR32_ZERO_SHARES: &str = "E32: minting zero shares";
 pub const ERR33_TRANSFER_TO_SELF: &str = "E33: transfer to self";
 pub const ERR34_INSUFFICIENT_LP_SHARES: &str = "E34: insufficient lp shares";
 pub const ERR35_AT_LEAST_ONE_YOCTO: &str = "E35: requires attached deposit of at least 1 yoctoNEAR";
+pub const ERR36_SHARES_TOTAL_SUPPLY_OVERFLOW: &str = "E36: shares_total_supply overflow";
 
 // Action result.
 

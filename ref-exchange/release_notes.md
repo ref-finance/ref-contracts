@@ -1,5 +1,10 @@
 # Release Notes
 
+### Version 1.5.3
+1. Support nearx in rated stable pool;
+2. Add check when initializing simple pool liquidity
+3. Add ERR36_SHARES_TOTAL_SUPPLY_OVERFLOW 
+
 ### Version 1.5.2
 1. Lower MIN_RESERVE to 1*10**15;
 
