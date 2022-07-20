@@ -133,6 +133,7 @@ impl SimplePool {
             fair_supply.as_u128()
         } else {
             for i in 0..self.token_account_ids.len() {
+                assert!(amounts[i] > 0, "{}", ERR31_ZERO_AMOUNT);
                 self.amounts[i] += amounts[i];
             }
             INIT_SHARES_SUPPLY
@@ -159,7 +160,7 @@ impl SimplePool {
         if shares == 0 {
             return;
         }
-        self.shares_total_supply += shares;
+        self.shares_total_supply = self.shares_total_supply.checked_add(shares).expect(ERR36_SHARES_TOTAL_SUPPLY_OVERFLOW);
         add_to_collection(&mut self.shares, &account_id, shares);
     }
 
