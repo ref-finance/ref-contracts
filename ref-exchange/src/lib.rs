@@ -781,6 +781,62 @@ mod tests {
         assert_eq!(amounts[1].0 + deposit2, to_yocto("100"));
     }
 
+    #[test]
+    #[should_panic(expected = "E31: adding zero amount")]
+    fn test_init_zero_liquidity() {
+        let (mut context, mut contract) = setup_contract();
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![
+                (accounts(1), to_yocto("1000000")),
+                (accounts(2), to_yocto("1000000")),
+            ],
+        );
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(to_yocto("1"))
+            .build());
+        let id0 = contract.add_simple_pool(vec![accounts(1), accounts(2)], 1);
+        testing_env!(context.attached_deposit(to_yocto("0.0007")).build());
+        contract.add_liquidity(id0, vec![U128(0), U128(0)], None);
+    }
+
+    #[test]
+    #[should_panic(expected = "E36: shares_total_supply overflow")]
+    fn test_shares_total_supply_overflow() {
+        let (mut context, mut contract) = setup_contract();
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![
+                (accounts(1), to_yocto("1000000")),
+                (accounts(2), to_yocto("1000000")),
+            ],
+        );
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(to_yocto("1"))
+            .build());
+        let id0 = contract.add_simple_pool(vec![accounts(1), accounts(2)], 1);
+        testing_env!(context.attached_deposit(to_yocto("0.0007")).build());
+        contract.add_liquidity(id0, vec![U128(4801823983302), U128(14399)], None);
+        testing_env!(context.attached_deposit(to_yocto("0.0007")).build());
+        contract.add_liquidity(id0, vec![U128(340282366920167 * 4801823983302), U128(340282366920167 * 14399)], None);
+        contract.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in: accounts(1).into(),
+                amount_in: Some(U128(12446461932933863316530306u128)),
+                token_out: accounts(2).into(),
+                min_amount_out: U128(0),
+            }],
+            None,
+        );
+    }
+
     /// Should deny creating a pool with duplicate tokens.
     #[test]
     #[should_panic(expected = "E92: token duplicated")]
