@@ -1,6 +1,6 @@
 RFLAGS="-C link-arg=-s"
 
-build: build-exchange build-farm
+build: build-exchange
 
 build-exchange: ref-exchange
 	rustup target add wasm32-unknown-unknown
@@ -14,7 +14,7 @@ build-farm: ref-farming
 	mkdir -p res
 	cp target/wasm32-unknown-unknown/release/ref_farming.wasm ./res/ref_farming.wasm
 
-test: test-exchange test-farm
+test: test-exchange
 
 test-exchange: build-exchange mock-ft mock-rated
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange 

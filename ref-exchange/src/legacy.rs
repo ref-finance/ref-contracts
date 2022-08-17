@@ -2,10 +2,11 @@
 use std::collections::HashMap;
 use near_sdk::collections::{UnorderedMap, Vector, LookupMap, UnorderedSet};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{AccountId, Balance, StorageUsage, near_bindgen, PanicOnDefault};
+use near_sdk::{AccountId, Balance, StorageUsage};
 use crate::account_deposit::{Account, VAccount};
 use crate::StorageKey;
 use crate::pool::Pool;
+use crate::RunningState;
 
 /// Account deposits information and storage cost.
 #[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
@@ -31,8 +32,7 @@ impl AccountV1 {
     }
 }
 
-#[near_bindgen]
-#[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
+#[derive(BorshDeserialize)]
 pub struct ContractV1 {
     /// Account of the owner.
     pub owner_id: AccountId,
@@ -46,4 +46,8 @@ pub struct ContractV1 {
     pub accounts: LookupMap<AccountId, VAccount>,
     /// Set of whitelisted tokens by "owner".
     pub whitelisted_tokens: UnorderedSet<AccountId>,
+    /// Set of guardians.
+    pub guardians: UnorderedSet<AccountId>,
+    /// Running state
+    pub state: RunningState,
 }

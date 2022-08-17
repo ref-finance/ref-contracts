@@ -265,6 +265,8 @@ impl Contract {
         assert_one_yocto();
         self.assert_contract_running();
         let token_id: AccountId = token_id.into();
+        // feature frozenlist
+        self.assert_no_frozen_tokens(&[token_id.clone()]);
         let sender_id = env::predecessor_account_id();
         let mut account = self.internal_unwrap_account(&sender_id);
         

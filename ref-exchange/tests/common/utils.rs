@@ -182,6 +182,11 @@ pub fn get_deposits(
     view!(pool.get_deposits(account_id)).unwrap_json::<HashMap<String, U128>>()
 }
 
+/// get ref-exchange's frozenlist tokens
+pub fn get_frozenlist(pool: &ContractAccount<Exchange>) -> Vec<String> {
+    view!(pool.get_frozenlist_tokens()).unwrap_json::<Vec<String>>()
+}
+
 /// get ref-exchange's whitelisted tokens
 pub fn get_whitelist(pool: &ContractAccount<Exchange>) -> Vec<String> {
     view!(pool.get_whitelisted_tokens()).unwrap_json::<Vec<String>>()

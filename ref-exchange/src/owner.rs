@@ -6,6 +6,7 @@ use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 use crate::*;
 use crate::rated_swap::rate::{global_register_rate, global_unregister_rate};
 use crate::utils::{FEE_DIVISOR, GAS_FOR_BASIC_OP};
+use crate::legacy::ContractV1;
 
 #[near_bindgen]
 impl Contract {
@@ -108,6 +109,26 @@ impl Contract {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         for token in tokens {
             self.whitelisted_tokens.remove(token.as_ref());
+        }
+    }
+
+    /// Extend frozenlist tokens with new tokens.
+    #[payable]
+    pub fn extend_frozenlist_tokens(&mut self, tokens: Vec<ValidAccountId>) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        for token in tokens {
+            self.frozen_tokens.insert(token.as_ref());
+        }
+    }
+
+    /// Remove frozenlist token.
+    #[payable]
+    pub fn remove_frozenlist_tokens(&mut self, tokens: Vec<ValidAccountId>) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        for token in tokens {
+            self.frozen_tokens.remove(token.as_ref());
         }
     }
 
@@ -247,14 +268,24 @@ impl Contract {
             || self.guardians.contains(&env::predecessor_account_id())
     }
 
-    /// Migration function from v2 to v2.
+    /// Migration function from v1.5.x to v1.6.0.
     /// For next version upgrades, change this function.
     #[init(ignore_state)]
     // [AUDIT_09]
     #[private]
     pub fn migrate() -> Self {
-        let contract: Contract = env::state_read().expect(ERR103_NOT_INITIALIZED);
-        contract
+        let old: ContractV1 = env::state_read().expect(ERR103_NOT_INITIALIZED);
+        Self { 
+            owner_id: old.owner_id.clone(), 
+            exchange_fee: old.exchange_fee, 
+            referral_fee: old.referral_fee, 
+            pools: old.pools, 
+            accounts: old.accounts, 
+            whitelisted_tokens: old.whitelisted_tokens, 
+            guardians: old.guardians, 
+            state: old.state, 
+            frozen_tokens: UnorderedSet::new(StorageKey::Frozenlist), 
+        }
     }
 }
 
