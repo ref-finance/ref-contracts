@@ -16,7 +16,8 @@ use utils::{NO_DEPOSIT, GAS_FOR_BASIC_OP};
 
 use crate::account_deposit::{VAccount, Account};
 pub use crate::action::SwapAction;
-use crate::action::{Action, ActionResult};
+pub use crate::action::Action;
+use crate::action::ActionResult;
 use crate::errors::*;
 use crate::admin_fee::AdminFees;
 use crate::pool::Pool;

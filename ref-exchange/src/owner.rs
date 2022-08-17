@@ -108,7 +108,8 @@ impl Contract {
         assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         for token in tokens {
-            self.whitelisted_tokens.remove(token.as_ref());
+            let exist = self.whitelisted_tokens.remove(token.as_ref());
+            assert!(exist, "{}", ERR53_TOKEN_NOT_IN_LIST);
         }
     }
 
@@ -128,7 +129,8 @@ impl Contract {
         assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         for token in tokens {
-            self.frozen_tokens.remove(token.as_ref());
+            let exist = self.frozen_tokens.remove(token.as_ref());
+            assert!(exist, "{}", ERR53_TOKEN_NOT_IN_LIST);
         }
     }
 
