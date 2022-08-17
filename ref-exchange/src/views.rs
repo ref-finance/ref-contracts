@@ -282,6 +282,11 @@ impl Contract {
             .into()
     }
 
+    /// Get frozenlist tokens.
+    pub fn get_frozenlist_tokens(&self) -> Vec<AccountId> {
+        self.frozen_tokens.to_vec()
+    }
+
     /// Get contract level whitelisted tokens.
     pub fn get_whitelisted_tokens(&self) -> Vec<AccountId> {
         self.whitelisted_tokens.to_vec()

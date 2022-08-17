@@ -20,6 +20,7 @@ neardev
 
 res/*
 !res/ref_exchange_141.wasm
+!res/ref_exchange_153.wasm
 !res/ref_farming_v0104.wasm
 
 # res/ref_farming.wasm

@@ -1,5 +1,9 @@
 # Release Notes
 
+### Version 1.6.0
+1. Add frozenlist feature;
+2. panic if at least one token not exist in list when remove tokens from whitelist or frozenlist;
+
 ### Version 1.5.3
 1. Support nearx in rated stable pool;
 2. Add check when initializing simple pool liquidity

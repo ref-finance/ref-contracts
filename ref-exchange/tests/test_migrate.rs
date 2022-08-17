@@ -9,7 +9,7 @@ use crate::common::utils::*;
 pub mod common;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_141.wasm",
+    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_153.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
 }
 
@@ -24,6 +24,7 @@ fn test_upgrade() {
         signer_account: root,
         init_method: new(ValidAccountId::try_from(root.account_id.clone()).unwrap(), 4, 1)
     );
+
     // Failed upgrade with no permissions.
     let result = test_user
         .call(
@@ -34,7 +35,7 @@ fn test_upgrade() {
             0,
         )
         .status();
-    assert!(format!("{:?}", result).contains("ERR_NOT_ALLOWED"));
+    assert!(format!("{:?}", result).contains("E100"));
 
     root.call(
         pool.user_account.account_id.clone(),
@@ -46,7 +47,7 @@ fn test_upgrade() {
     .assert_success();
     let metadata = get_metadata(&pool);
     // println!("{:#?}", metadata);
-    assert_eq!(metadata.version, "1.5.3".to_string());
+    assert_eq!(metadata.version, "1.6.0".to_string());
     assert_eq!(metadata.exchange_fee, 4);
     assert_eq!(metadata.referral_fee, 1);
     assert_eq!(metadata.state, RunningState::Running);

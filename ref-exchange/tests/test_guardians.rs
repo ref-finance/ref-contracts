@@ -63,6 +63,15 @@ fn guardians_scenario_01() {
 
     let out_come = call!(
         owner,
+        pool.remove_whitelisted_tokens(vec![to_va(usdt())]),
+        deposit=1
+    );
+    assert!(!out_come.is_ok());
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E53: token not in list"));
+
+    let out_come = call!(
+        owner,
         pool.extend_whitelisted_tokens(vec![to_va(dai())]),
         deposit=1
     );

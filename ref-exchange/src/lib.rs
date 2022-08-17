@@ -16,7 +16,8 @@ use utils::{NO_DEPOSIT, GAS_FOR_BASIC_OP};
 
 use crate::account_deposit::{VAccount, Account};
 pub use crate::action::SwapAction;
-use crate::action::{Action, ActionResult};
+pub use crate::action::Action;
+use crate::action::ActionResult;
 use crate::errors::*;
 use crate::admin_fee::AdminFees;
 use crate::pool::Pool;
@@ -54,6 +55,7 @@ pub(crate) enum StorageKey {
     Whitelist,
     Guardian,
     AccountTokens {account_id: AccountId},
+    Frozenlist,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]
@@ -96,6 +98,8 @@ pub struct Contract {
     guardians: UnorderedSet<AccountId>,
     /// Running state
     state: RunningState,
+    /// Set of frozenlist tokens
+    frozen_tokens: UnorderedSet<AccountId>,
 }
 
 #[near_bindgen]
@@ -111,6 +115,7 @@ impl Contract {
             whitelisted_tokens: UnorderedSet::new(StorageKey::Whitelist),
             guardians: UnorderedSet::new(StorageKey::Guardian),
             state: RunningState::Running,
+            frozen_tokens: UnorderedSet::new(StorageKey::Frozenlist),
         }
     }
 
@@ -245,6 +250,8 @@ impl Contract {
         let sender_id = env::predecessor_account_id();
         let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        // feature frozenlist
+        self.assert_no_frozen_tokens(pool.tokens());
         // Add amounts given to liquidity first. It will return the balanced amounts.
         let shares = pool.add_liquidity(
             &sender_id,
@@ -290,6 +297,8 @@ impl Contract {
         let sender_id = env::predecessor_account_id();
         let amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        // feature frozenlist
+        self.assert_no_frozen_tokens(pool.tokens());
         // Add amounts given to liquidity first. It will return the balanced amounts.
         let mint_shares = pool.add_stable_liquidity(
             &sender_id,
@@ -328,6 +337,8 @@ impl Contract {
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        // feature frozenlist
+        self.assert_no_frozen_tokens(pool.tokens());
         let amounts = pool.remove_liquidity(
             &sender_id,
             shares.into(),
@@ -370,6 +381,8 @@ impl Contract {
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        // feature frozenlist
+        self.assert_no_frozen_tokens(pool.tokens());
         let burn_shares = pool.remove_liquidity_by_tokens(
             &sender_id,
             amounts
@@ -444,6 +457,15 @@ impl Contract {
         };
     }
 
+    fn assert_no_frozen_tokens(&self, tokens: &[AccountId]) {
+        let frozens: Vec<&String> = tokens.iter()
+        .filter(
+            |token| self.frozen_tokens.contains(*token)
+        )
+        .collect();
+        assert_eq!(frozens.len(), 0, "{}", ERR52_FROZEN_TOKEN);
+    }
+
     /// Check how much storage taken costs and refund the left over back.
     fn internal_check_storage(&self, prev_storage: StorageUsage) {
         let storage_cost = env::storage_usage()
@@ -503,6 +525,8 @@ impl Contract {
     ) -> ActionResult {
         match action {
             Action::Swap(swap_action) => {
+                // feature frozenlist
+                self.assert_no_frozen_tokens(&[swap_action.token_in.clone(), swap_action.token_out.clone()]);
                 let amount_in = swap_action
                     .amount_in
                     .map(|value| value.0)

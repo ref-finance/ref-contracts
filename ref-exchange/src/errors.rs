@@ -41,6 +41,8 @@ pub const ERR41_WRONG_ACTION_RESULT: &str = "E41: wrong action result type";
 
 // Contract Level
 pub const ERR51_CONTRACT_PAUSED: &str = "E51: contract paused";
+pub const ERR52_FROZEN_TOKEN: &str = "E52: token frozen";
+pub const ERR53_TOKEN_NOT_IN_LIST: &str = "E53: token not in list";
 
 // Swap
 pub const ERR60_DECIMAL_ILLEGAL: &str = "E60: illegal decimal";
