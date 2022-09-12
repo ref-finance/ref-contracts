@@ -7,7 +7,7 @@ This mono repo contains the source code for the smart contracts of Ref Finance o
 | Contract | Reference | Description |
 | - | - | - |
 | [test-token](test-token/src/lib.rs) | - | Test token contract |
-| [ref-exchange](ref-exchange/src/lib.rs) | [docs](https://ref-finance.gitbook.io/ref-finance/smart-contracts/ref-exchange) | Main exchange contract, that allows to deposit and withdraw tokens, exchange them via various pools |
+| [ref-exchange](ref-exchange/src/lib.rs) | [docs](https://guide.ref.finance) | Main exchange contract, that allows to deposit and withdraw tokens, exchange them via various pools |
 
 ## Development
 
