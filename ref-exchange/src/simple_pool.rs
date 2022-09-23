@@ -119,13 +119,13 @@ impl SimplePool {
                 assert!(amounts[i] > 0, "{}", ERR31_ZERO_AMOUNT);
                 fair_supply = min(
                     fair_supply,
-                    U256::from(amounts[i]) * U256::from(self.shares_total_supply) / self.amounts[i],
+                    U256::from(amounts[i] - 1) * U256::from(self.shares_total_supply) / self.amounts[i],
                 );
             }
             for i in 0..self.token_account_ids.len() {
                 let amount = (U256::from(self.amounts[i]) * fair_supply
                     / U256::from(self.shares_total_supply))
-                .as_u128();
+                .as_u128() + 1;
                 assert!(amount > 0, "{}", ERR31_ZERO_AMOUNT);
                 self.amounts[i] += amount;
                 amounts[i] = amount;
@@ -423,7 +423,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "E31: adding zero amount")]
+    #[should_panic(expected = "E32: minting zero shares")]
     fn test_rounding() {
         testing_env!(VMContextBuilder::new().build());
         let mut pool = SimplePool {
