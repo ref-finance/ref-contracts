@@ -2314,7 +2314,7 @@ dependencies = [
 
 [[package]]
 name = "ref-exchange"
-version = "1.6.0"
+version = "1.6.1"
 dependencies = [
  "near-contract-standards",
  "near-sdk",

@@ -806,6 +806,78 @@ mod tests {
     }
 
     #[test]
+    fn test_add_liquidity_rounding() {
+        let (mut context, mut contract) = setup_contract();
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![
+                (accounts(1), to_yocto("100")),
+                (accounts(2), to_yocto("100")),
+            ],
+        );
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(to_yocto("1"))
+            .build());
+        let id = contract.add_simple_pool(vec![accounts(1), accounts(2)], 25);
+        testing_env!(context.attached_deposit(to_yocto("0.0007")).build());
+        contract.add_liquidity(id, vec![U128(1000), U128(1000)], None);
+        assert_eq!(1000000000000000000000000u128, contract.get_pool(id).shares_total_supply.0);
+
+        deposit_tokens(
+            &mut context,
+            &mut contract,
+            accounts(4),
+            vec![
+                (accounts(1), to_yocto("100")),
+                (accounts(2), to_yocto("100")),
+            ],
+        );
+        testing_env!(context
+            .predecessor_account_id(accounts(4))
+            .attached_deposit(to_yocto("1"))
+            .build());
+        contract.add_liquidity(id, vec![U128(2), U128(2)], None);
+        assert_eq!(1000000000000000000000u128, contract.get_pool_shares(id, accounts(4)).0);
+
+        let pool_info = contract.get_pool(id);
+        assert_eq!(1001000000000000000000000u128, pool_info.shares_total_supply.0);
+        assert_eq!(vec![U128(1002), U128(1002)], pool_info.amounts);
+
+        testing_env!(context
+            .attached_deposit(1)
+            .build());
+        let remvoe_tokens = contract.remove_liquidity(id, U128(1000000000000000000000u128 - 1), vec![U128(0), U128(0)]);
+        assert_eq!(vec![U128(1), U128(1)], remvoe_tokens);
+
+        let pool_info = contract.get_pool(id);
+        assert_eq!(1000000000000000000000001u128, pool_info.shares_total_supply.0);
+        assert_eq!(vec![U128(1001), U128(1001)], pool_info.amounts);
+
+        testing_env!(context
+            .attached_deposit(to_yocto("1"))
+            .build());
+
+        contract.add_liquidity(id, vec![U128(50), U128(50)], None);
+        assert_eq!(48951048951048951048952u128, contract.get_pool_shares(id, accounts(4)).0);
+
+        let pool_info = contract.get_pool(id);
+        assert_eq!(vec![U128(1050), U128(1050)], pool_info.amounts);
+
+        testing_env!(context
+            .attached_deposit(1)
+            .build());
+        let remvoe_tokens = contract.remove_liquidity(id, U128(48951048951048951048952u128 - 1), vec![U128(0), U128(0)]);
+        assert_eq!(vec![U128(48), U128(48)], remvoe_tokens);
+
+        let pool_info = contract.get_pool(id);
+        assert_eq!(1000000000000000000000001u128, pool_info.shares_total_supply.0);
+        assert_eq!(vec![U128(1002), U128(1002)], pool_info.amounts);
+    }
+    
+    #[test]
     #[should_panic(expected = "E31: adding zero amount")]
     fn test_init_zero_liquidity() {
         let (mut context, mut contract) = setup_contract();
@@ -1101,9 +1173,9 @@ mod tests {
         contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("50"))], None);
         assert_eq!(
             contract.mft_balance_of(":0".to_string(), accounts(3)).0,
-            to_yocto("2")
+            to_yocto("2") - 1
         );
-        assert_eq!(contract.mft_total_supply(":0".to_string()).0, to_yocto("2"));
+        assert_eq!(contract.mft_total_supply(":0".to_string()).0, to_yocto("2") - 1);
 
         // register another user
         testing_env!(context
@@ -1119,13 +1191,13 @@ mod tests {
         contract.mft_transfer(":0".to_string(), accounts(4), U128(to_yocto("1")), None);
         assert_eq!(
             contract.mft_balance_of(":0".to_string(), accounts(3)).0,
-            to_yocto("1")
+            to_yocto("1") - 1
         );
         assert_eq!(
             contract.mft_balance_of(":0".to_string(), accounts(4)).0,
             to_yocto("1")
         );
-        assert_eq!(contract.mft_total_supply(":0".to_string()).0, to_yocto("2"));
+        assert_eq!(contract.mft_total_supply(":0".to_string()).0, to_yocto("2") - 1);
         // remove lpt for account 3
         testing_env!(context
             .predecessor_account_id(accounts(3))
@@ -1134,11 +1206,11 @@ mod tests {
         contract.remove_liquidity(id, U128(to_yocto("0.6")), vec![U128(1), U128(1)]);
         assert_eq!(
             contract.mft_balance_of(":0".to_string(), accounts(3)).0,
-            to_yocto("0.4")
+            to_yocto("0.4") - 1
         );
         assert_eq!(
             contract.mft_total_supply(":0".to_string()).0,
-            to_yocto("1.4")
+            to_yocto("1.4") - 1
         );
         // remove lpt for account 4 who got lpt from others
         if contract.storage_balance_of(accounts(4)).is_none() {
@@ -1159,7 +1231,7 @@ mod tests {
         );
         assert_eq!(
             contract.mft_total_supply(":0".to_string()).0,
-            to_yocto("0.4")
+            to_yocto("0.4") - 1
         );
 
         // [AUDIT_13]
@@ -1204,7 +1276,7 @@ mod tests {
         contract.add_liquidity(id, vec![U128(to_yocto("50")), U128(to_yocto("50"))], None);
         assert_eq!(
             contract.mft_balance_of(":0".to_string(), accounts(3)).0,
-            to_yocto("2")
+            to_yocto("2") - 1
         );
 
         // make transfer to self
