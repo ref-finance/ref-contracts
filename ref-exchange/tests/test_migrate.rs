@@ -9,7 +9,7 @@ use crate::common::utils::*;
 pub mod common;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange_153.wasm",
+    PREV_EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
 }
 

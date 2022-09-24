@@ -1,5 +1,8 @@
 # Release Notes
 
+### Version 1.6.1
+1. fix a rounding bug when adding liquidity
+
 ### Version 1.6.0
 1. Add frozenlist feature;
 2. panic if at least one token not exist in list when remove tokens from whitelist or frozenlist;
