@@ -62,7 +62,7 @@ impl StorageManagement for Contract {
         if let Some(account_deposit) = self.internal_get_account(&account_id) {
             // TODO: figure out force option logic.
             assert!(
-                account_deposit.tokens.is_empty(),
+                account_deposit.tokens.is_empty() && account_deposit.legacy_tokens.is_empty(),
                 "{}", ERR18_TOKENS_NOT_EMPTY
             );
             self.accounts.remove(&account_id);
