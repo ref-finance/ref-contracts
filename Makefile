@@ -14,6 +14,13 @@ build-farm: ref-farming
 	mkdir -p res
 	cp target/wasm32-unknown-unknown/release/ref_farming.wasm ./res/ref_farming.wasm
 
+unittest: build-exchange
+ifdef TC
+	RUSTFLAGS=$(RFLAGS) cargo test $(TC) -p ref-exchange --lib -- --nocapture
+else
+	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange --lib -- --nocapture
+endif
+
 test: test-exchange
 
 test-exchange: build-exchange mock-ft mock-rated

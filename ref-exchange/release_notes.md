@@ -1,5 +1,8 @@
 # Release Notes
 
+### Version 1.6.2
+1. add view interface get_pool_by_ids
+
 ### Version 1.6.1
 1. fix a rounding bug when adding liquidity
 

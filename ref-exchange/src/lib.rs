@@ -1675,4 +1675,30 @@ mod tests {
         assert_eq!(20, contract.metadata().exchange_fee);
         assert_eq!(50, contract.metadata().referral_fee);
     }
+
+    #[test]
+    fn test_view_pool() {
+        let (mut context, mut contract) = setup_contract();
+        // add liquidity of (1,2) tokens
+        create_pool_with_liquidity(
+            &mut context,
+            &mut contract,
+            accounts(3),
+            vec![(accounts(1), to_yocto("5")), (accounts(2), to_yocto("10"))],
+        );
+        testing_env!(context
+            .predecessor_account_id(accounts(0))
+            .attached_deposit(env::storage_byte_cost() * 335)
+            .build());
+        contract.add_stable_swap_pool(vec![accounts(4), accounts(5)], vec![18, 18], 25, 240);
+        testing_env!(context
+            .predecessor_account_id(accounts(0))
+            .attached_deposit(env::storage_byte_cost() * 389) // required storage depends on contract_id length
+            .build());
+        contract.add_rated_swap_pool(vec![accounts(4), accounts(5)], vec![18, 18], 25, 240);
+
+        println!("{:?}", contract.get_pools(0, 100));
+        println!("{:?}", contract.get_pool(0));
+        println!("{:?}", contract.get_pool_by_ids(vec![0,2]));
+    }
 }
