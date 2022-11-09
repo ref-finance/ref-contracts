@@ -134,6 +134,59 @@ impl Contract {
         }
     }
 
+    /// insert referral with given fee_bps
+    #[payable]
+    pub fn insert_referral(&mut self, referral_id: ValidAccountId, fee_bps: u32) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        let referral_id: AccountId = referral_id.into();
+        assert!(fee_bps > 0 && fee_bps < FEE_DIVISOR, "{}", ERR132_ILLEGAL_REFERRAL_FEE);
+        let old_fee_bps = self.referrals.insert(&referral_id, &fee_bps);
+        assert!(old_fee_bps.is_none(), "{}", ERR130_REFERRAL_EXIST);
+        env::log(
+            format!(
+                "Insert referral {} with fee_bps {}",
+                referral_id, fee_bps
+            )
+            .as_bytes(),
+        );     
+    }
+
+    /// update referral with given fee_bps
+    #[payable]
+    pub fn update_referral(&mut self, referral_id: ValidAccountId, fee_bps: u32) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        let referral_id: AccountId = referral_id.into();
+        assert!(fee_bps > 0 && fee_bps < FEE_DIVISOR, "{}", ERR132_ILLEGAL_REFERRAL_FEE);
+        let old_fee_bps = self.referrals.insert(&referral_id, &fee_bps);
+        assert!(old_fee_bps.is_some(), "{}", ERR131_REFERRAL_NOT_EXIST);
+        env::log(
+            format!(
+                "Update referral {} with new fee_bps {} where old fee_bps {}",
+                referral_id, fee_bps, old_fee_bps.unwrap()
+            )
+            .as_bytes(),
+        );     
+    }
+
+    /// remove referral
+    #[payable]
+    pub fn remove_referral(&mut self, referral_id: ValidAccountId) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        let referral_id: AccountId = referral_id.into();
+        let old_fee_bps = self.referrals.remove(&referral_id);
+        assert!(old_fee_bps.is_some(), "{}", ERR131_REFERRAL_NOT_EXIST);
+        env::log(
+            format!(
+                "Remove referral {} where fee_bps {}",
+                referral_id, old_fee_bps.unwrap()
+            )
+            .as_bytes(),
+        );     
+    }
+
     #[payable]
     pub fn modify_admin_fee(&mut self, exchange_fee: u32, referral_fee: u32) {
         assert_one_yocto();
@@ -270,14 +323,25 @@ impl Contract {
             || self.guardians.contains(&env::predecessor_account_id())
     }
 
-    /// Migration function from v1.5.x to v1.6.0.
+    /// Migration function from v1.6.x to v1.7.0.
     /// For next version upgrades, change this function.
     #[init(ignore_state)]
     // [AUDIT_09]
     #[private]
     pub fn migrate() -> Self {
-        let contract: Contract = env::state_read().expect(ERR103_NOT_INITIALIZED);
-        contract
+        let old: ContractV1 = env::state_read().expect(ERR103_NOT_INITIALIZED);
+        Self { 
+            owner_id: old.owner_id.clone(), 
+            exchange_fee: old.exchange_fee, 
+            referral_fee: old.referral_fee, 
+            pools: old.pools, 
+            accounts: old.accounts, 
+            whitelisted_tokens: old.whitelisted_tokens, 
+            guardians: old.guardians, 
+            state: old.state, 
+            frozen_tokens: old.frozen_tokens,
+            referrals: UnorderedMap::new(StorageKey::Referral), 
+        }
     }
 }
 

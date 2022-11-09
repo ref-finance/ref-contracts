@@ -88,6 +88,10 @@ pub fn integer_sqrt(value: U256) -> U256 {
     res
 }
 
+pub fn u128_ratio(a: u128, num: u128, denom: u128) -> u128 {
+    (U256::from(a) * U256::from(num) / U256::from(denom)).as_u128()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

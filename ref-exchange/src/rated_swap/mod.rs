@@ -8,7 +8,7 @@ use crate::errors::*;
 use crate::rated_swap::math::{
     Fees, RatedSwap, SwapResult, MAX_AMP, MAX_AMP_CHANGE, MIN_AMP, MIN_RAMP_DURATION,
 };
-use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR, U256};
+use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR, U256, u128_ratio};
 use crate::StorageKey;
 
 use self::rate::*;
@@ -293,23 +293,32 @@ impl RatedSwapPool {
         );
 
         if fee_part > 0 {
-            // referral fee
-            if let Some(referral) = &fees.referral_id {
-                if self.shares.get(referral).is_some() {
-                    let referral_share = fee_part * fees.referral_fee as u128 / FEE_DIVISOR as u128;
-                    self.mint_shares(referral, referral_share);
-                    env::log(
-                        format!("Referral {} got {} shares", referral, referral_share).as_bytes(),
-                    );
-                }
+            let admin_share = u128_ratio(fee_part, fees.admin_fee_bps as u128, FEE_DIVISOR as u128);
+            let (mut referral_share, referral) = fees.calc_referral_share(admin_share);
+
+            if referral_share > 0 && self.shares.get(&referral).is_none() {
+                referral_share = 0;
             }
-            // exchange fee
-            let exchange_share = fee_part * fees.exchange_fee as u128 / FEE_DIVISOR as u128;
-            self.mint_shares(&fees.exchange_id, exchange_share);
-            env::log(
-                format!("Admin {} got {} shares", &fees.exchange_id, exchange_share).as_bytes(),
-            );
+            self.mint_shares(&referral, referral_share);
+            self.mint_shares(&fees.exchange_id, admin_share - referral_share);
+
+            if referral_share > 0 {
+                env::log(
+                    format!(
+                        "Exchange {} got {} shares, Referral {} got {} shares, from add_liquidity", 
+                        &fees.exchange_id, admin_share - referral_share, referral, referral_share
+                    ).as_bytes(),
+                );
+            } else {
+                env::log(
+                    format!(
+                        "Exchange {} got {} shares, No referral fee, from add_liquidity", 
+                        &fees.exchange_id, admin_share
+                    ).as_bytes(),
+                );
+            }
         }
+
         new_shares
     }
 
@@ -485,22 +494,30 @@ impl RatedSwapPool {
         );
 
         if fee_part > 0 {
-            // referral fee
-            if let Some(referral) = &fees.referral_id {
-                if self.shares.get(referral).is_some() {
-                    let referral_share = fee_part * fees.referral_fee as u128 / FEE_DIVISOR as u128;
-                    self.mint_shares(referral, referral_share);
-                    env::log(
-                        format!("Referral {} got {} shares", referral, referral_share).as_bytes(),
-                    );
-                }
+            let admin_share = u128_ratio(fee_part, fees.admin_fee_bps as u128, FEE_DIVISOR as u128);
+            let (mut referral_share, referral) = fees.calc_referral_share(admin_share);
+
+            if referral_share > 0 && self.shares.get(&referral).is_none() {
+                referral_share = 0;
             }
-            // exchange fee
-            let exchange_share = fee_part * fees.exchange_fee as u128 / FEE_DIVISOR as u128;
-            self.mint_shares(&fees.exchange_id, exchange_share);
-            env::log(
-                format!("Admin {} got {} shares", &fees.exchange_id, exchange_share).as_bytes(),
-            );
+            self.mint_shares(&referral, referral_share);
+            self.mint_shares(&fees.exchange_id, admin_share - referral_share);
+
+            if referral_share > 0 {
+                env::log(
+                    format!(
+                        "Exchange {} got {} shares, Referral {} got {} shares, from remove_liquidity_by_tokens", 
+                        &fees.exchange_id, admin_share - referral_share, referral, referral_share
+                    ).as_bytes(),
+                );
+            } else {
+                env::log(
+                    format!(
+                        "Exchange {} got {} shares, No referral fee, from remove_liquidity_by_tokens", 
+                        &fees.exchange_id, admin_share
+                    ).as_bytes(),
+                );
+            }
         }
 
         burn_shares
@@ -600,9 +617,7 @@ impl RatedSwapPool {
         env::log(
             format!(
                 "Swapped {} {} for {} {}, total fee {}, admin fee {}",
-                amount_in, token_in, 
-                amount_swapped, 
-                token_out, 
+                amount_in, token_in, amount_swapped, token_out, 
                 self.c_amount_to_amount(result.fee, out_idx), 
                 self.c_amount_to_amount(result.admin_fee, out_idx)
             )
@@ -617,42 +632,31 @@ impl RatedSwapPool {
         self.volumes[in_idx].input.0 += amount_in;
         self.volumes[out_idx].output.0 += amount_swapped;
 
-        // handle admin / referral fee.
-        if fees.referral_fee + fees.exchange_fee > 0 {
-            let mut fee_token = 0_u128;
-            // referral fee
-            if let Some(referral) = &fees.referral_id {
-                if self.shares.get(referral).is_some() {
-                    fee_token = result.admin_fee * fees.referral_fee as u128
-                        / (fees.referral_fee + fees.exchange_fee) as u128;
-                    if fee_token > 0 {
-                        let referral_share =
-                            self.admin_fee_to_liquidity(referral, out_idx, fee_token);
-                        env::log(
-                            format!(
-                                "Referral {} got {} shares from {} {}",
-                                referral,
-                                referral_share,
-                                self.c_amount_to_amount(fee_token, out_idx),
-                                self.token_account_ids[out_idx]
-                            )
-                            .as_bytes(),
-                        );
-                    }
+        // handle admin fee.
+        if fees.admin_fee_bps > 0 {
+            let (exchange_share, referral_share) = if let Some((referral_id, referral_fee)) = &fees.referral_info {
+                if self.shares.contains_key(referral_id)
+                {
+                    self.distribute_admin_fee(&fees.exchange_id, referral_id, *referral_fee, out_idx, result.admin_fee)
+                } else {
+                    self.distribute_admin_fee(&fees.exchange_id, referral_id, 0, out_idx, result.admin_fee)
                 }
-            }
-            // exchange fee = admin_fee - referral_fee
-            fee_token = result.admin_fee - fee_token;
-            if fee_token > 0 {
-                let exchange_share =
-                    self.admin_fee_to_liquidity(&fees.exchange_id, out_idx, fee_token);
+            } else {
+                self.distribute_admin_fee(&fees.exchange_id, &fees.exchange_id, 0, out_idx, result.admin_fee)
+            };
+            if referral_share > 0 {
                 env::log(
                     format!(
-                        "Admin {} got {} shares from {} {}",
-                        &fees.exchange_id,
-                        exchange_share,
-                        self.c_amount_to_amount(fee_token, out_idx),
-                        self.token_account_ids[out_idx]
+                        "Exchange {} got {} shares, Referral {} got {} shares",
+                        &fees.exchange_id, exchange_share, &fees.referral_info.as_ref().unwrap().0, referral_share,
+                    )
+                    .as_bytes(),
+                );
+            } else {
+                env::log(
+                    format!(
+                        "Exchange {} got {} shares, No referral fee",
+                        &fees.exchange_id, exchange_share,
                     )
                     .as_bytes(),
                 );
@@ -664,12 +668,14 @@ impl RatedSwapPool {
 
     /// convert admin_fee into shares without any fee.
     /// return share minted this time for the admin/referrer.
-    fn admin_fee_to_liquidity(
+    fn distribute_admin_fee(
         &mut self,
-        sender_id: &AccountId,
+        exchange_id: &AccountId,
+        referral_id: &AccountId,
+        referral_fee_bps: u32,
         token_id: usize,
         c_amount: Balance,
-    ) -> Balance {
+    ) -> (Balance, Balance) {
         let invariant = self.get_invariant_with_rates(&self.get_rates());
 
         let mut c_amounts = vec![0_u128; self.c_amounts.len()];
@@ -685,8 +691,16 @@ impl RatedSwapPool {
             .expect(ERR67_LPSHARE_CALC_ERR);
         self.c_amounts[token_id] += c_amount;
 
-        self.mint_shares(sender_id, new_shares);
-        new_shares
+        let referral_share = if referral_fee_bps > 0 {
+            u128_ratio(new_shares, referral_fee_bps as u128, FEE_DIVISOR as u128)
+        } else {
+            0
+        };
+
+        self.mint_shares(referral_id, referral_share);
+        self.mint_shares(exchange_id, new_shares - referral_share);
+
+        (new_shares - referral_share, referral_share)
     }
 
     /// Mint new shares for given user.
@@ -834,141 +848,6 @@ mod tests {
         )
     }
 
-    // #[test]
-    // fn test_rated_julia_01() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let fees = AdminFees::zero();
-    //     let mut pool = new_rated_stnear_pool(6, 1000, 0);
-    //     assert_eq!(
-    //         pool.tokens(),
-    //         vec![accounts(1).to_string(), accounts(2).to_string()]
-    //     );
-
-    //     let cross_call_result = near_sdk::serde_json::to_vec(&U128(1_000000000000000000000000)).unwrap();
-    //     if let Some(mut rate) = global_get_rate(accounts(1).as_ref()) {
-    //         rate.set(&cross_call_result);
-    //         global_set_rate(accounts(1).as_ref(), &rate);
-    //     }
-
-    //     let mut amounts = vec![100000000000, 100000000000];
-    //     let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-
-    //     let out = swap(&mut pool, 1, 10000000000, 2);
-    //     assert_eq!(out, 9999495232);
-    //     assert_eq!(pool.c_amounts, vec![110000000000000000000000000000, 90000504767247802010004771578]);
-    // }
-
-    // #[test]
-    // #[should_panic(expected = "E120: Rates expired")]
-    // fn test_rated_initial_liqudity() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let fees = AdminFees::zero();
-    //     let mut pool = new_rated_stnear_pool(6, 1000, 0);
-    //     assert_eq!(
-    //         pool.tokens(),
-    //         vec![accounts(1).to_string(), accounts(2).to_string()]
-    //     );
-
-    //     testing_env!(context.block_timestamp(24 * 3600 * 10u64.pow(9) + 1).build());
-    //     let mut amounts = vec![100000000000, 100000000000];
-    //     let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-    // }
-
-    // #[test]
-    // #[should_panic(expected = "E121: Swapped amount equals 0")]
-    // fn test_rated_julia_02() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let fees = AdminFees::zero();
-    //     let mut pool = new_rated_stnear_pool(6, 1000, 0);
-    //     assert_eq!(
-    //         pool.tokens(),
-    //         vec![accounts(1).to_string(), accounts(2).to_string()]
-    //     );
-
-    //     let mut amounts = vec![100000000000, 100000000000];
-    //     let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-
-    //     swap(&mut pool, 1, 0, 2);
-    // }
-
-    // #[test]
-    // #[should_panic(expected = "E121: Swapped amount equals 0")]
-    // fn test_rated_julia_03() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let fees = AdminFees::zero();
-    //     let mut pool = new_rated_stnear_pool(6, 1000, 0);
-    //     assert_eq!(
-    //         pool.tokens(),
-    //         vec![accounts(1).to_string(), accounts(2).to_string()]
-    //     );
-
-    //     let mut amounts = vec![100000000000, 100000000000];
-    //     let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-
-    //     swap(&mut pool, 1, 1, 2);
-    // }
-
-    // #[test]
-    // fn test_rated_julia_04() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let fees = AdminFees::zero();
-    //     let mut pool = new_rated_stnear_pool(6, 1000, 0);
-    //     assert_eq!(
-    //         pool.tokens(),
-    //         vec![accounts(1).to_string(), accounts(2).to_string()]
-    //     );
-
-    //     let mut amounts = vec![100000000000, 100000000000];
-    //     let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-
-    //     let out = swap(&mut pool, 1, 100000000000, 2);
-    //     assert_eq!(out, 98443663539);
-    //     assert_eq!(pool.c_amounts, vec![200000000000000000000000000000, 1556336460086846919343293209]);
-    // }
-
-    // #[test]
-    // fn test_rated_julia_05() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let fees = AdminFees::zero();
-    //     let mut pool = new_rated_stnear_pool(6, 1000, 0);
-    //     assert_eq!(
-    //         pool.tokens(),
-    //         vec![accounts(1).to_string(), accounts(2).to_string()]
-    //     );
-
-    //     let mut amounts = vec![100000000000, 100000000000];
-    //     let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-
-    //     let out = swap(&mut pool, 1, 99999000000, 2);
-    //     assert_eq!(out, 98443167413);
-    //     assert_eq!(pool.c_amounts, vec![199999000000000000000000000000, 1556832586795864493703718004]);
-    // }
-
-    // #[test]
-    // #[should_panic(expected = "E120: Rates expired")]
-    // fn test_rated_julia_06() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let fees = AdminFees::zero();
-    //     let mut pool = new_rated_stnear_pool(6, 1000, 0);
-    //     assert_eq!(
-    //         pool.tokens(),
-    //         vec![accounts(1).to_string(), accounts(2).to_string()]
-    //     );
-
-    //     let mut amounts = vec![100000000000, 100000000000];
-    //     let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-
-    //     testing_env!(context.predecessor_account_id(accounts(0)).block_timestamp(24 * 3600 * 10u64.pow(9) + 1).build());
-    //     swap(&mut pool, 1, 1_000000, 2);
-    // }
-
     #[test]
     fn test_rated_julia_07() {
         let mut context = VMContextBuilder::new();
@@ -995,203 +874,5 @@ mod tests {
         assert_eq!(out, 1_999999990004997550200911);
         assert_eq!(pool.c_amounts, vec![100001 * PRECISION, 199998_000000009995002449799089]);
     }
-
-    // #[test]
-    // fn test_rated_max() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let fees = AdminFees::zero();
-    //     let mut pool = RatedSwapPool::new(
-    //         0, 
-    //         vec![
-    //             "aone.near".try_into().unwrap(),
-    //             "atwo.near".try_into().unwrap(),
-    //             "athree.near".try_into().unwrap(),
-    //             "afour.near".try_into().unwrap(),
-    //             "afive.near".try_into().unwrap(),
-    //             "asix.near".try_into().unwrap(),
-    //             "aseven.near".try_into().unwrap(),
-    //             "aeight.near".try_into().unwrap(),
-    //             "anine.near".try_into().unwrap(), 
-    //         ], 
-    //         vec![
-    //             6, 
-    //             6, 
-    //             6, 
-    //             6, 
-    //             6, 
-    //             6, 
-    //             6, 
-    //             6, 
-    //             6,
-    //         ], 
-    //         1000, 
-    //         0,
-    //         // "STNEAR".to_owned(),
-    //         // AccountId::from("remote")
-    //     );
-    //     assert_eq!(
-    //         pool.tokens(),
-    //         vec![
-    //             "aone.near".to_string(),
-    //             "atwo.near".to_string(),
-    //             "athree.near".to_string(),
-    //             "afour.near".to_string(),
-    //             "afive.near".to_string(),
-    //             "asix.near".to_string(),
-    //             "aseven.near".to_string(),
-    //             "aeight.near".to_string(),
-    //             "anine.near".to_string(), 
-    //         ]
-    //     );
-
-    //     let mut amounts = vec![
-    //         100000000000_000000, 
-    //         100000000000_000000, 
-    //         100000000000_000000, 
-    //         100000000000_000000, 
-    //         100000000000_000000,
-    //         100000000000_000000, 
-    //         100000000000_000000, 
-    //         100000000000_000000, 
-    //         100000000000_000000,
-    //     ];
-    //     let share = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-    //     assert_eq!(share, 900000000000_000000000000000000000000);
-    //     let out = pool.swap(
-    //         &String::from("aone.near"),
-    //         99999000000,
-    //         &String::from("atwo.near"),
-    //         0,
-    //         &AdminFees::zero(),
-    //     );
-    //     assert_eq!(out, 99998999999);
-    // }
-
-    // #[test]
-    // fn test_rated_basics() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let fees = AdminFees::zero();
-    //     let mut pool = new_rated_stnear_pool(6, 10000, 0);
-    //     assert_eq!(
-    //         pool.tokens(),
-    //         vec![accounts(1).to_string(), accounts(2).to_string()]
-    //     );
-
-    //     let mut amounts = vec![5000000, 10000000];
-    //     let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-
-    //     let out = swap(&mut pool, 1, 1000000, 2);
-    //     assert_eq!(out, 1000031);
-    //     assert_eq!(pool.c_amounts, vec![6000000000000000000000000, 8999968751649207660820809]);
-    //     let out2 = swap(&mut pool, 2, out, 1);
-    //     assert_eq!(out2, 999999); // due to precision difference.
-    //     assert_eq!(pool.c_amounts, vec![5000000248340316023057348, 9999999751649207660820809]);
-
-    //     // Add only one side of the capital.
-    //     let mut amounts2 = vec![5000000, 0];
-    //     let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, 1, &fees);
-
-    //     // Withdraw on same side of the capital.
-    //     let shares_burned = pool.remove_liquidity_by_tokens(
-    //         accounts(0).as_ref(),
-    //         vec![5000000, 0],
-    //         num_shares,
-    //         &fees,
-    //     );
-    //     assert_eq!(shares_burned, num_shares);
-
-    //     // Add only one side of the capital, and withdraw by share
-    //     let mut amounts2 = vec![5000000, 0];
-    //     let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, 1, &fees);
-
-    //     let tokens = pool.remove_liquidity_by_shares(accounts(0).as_ref(), num_shares, vec![1, 1]);
-    //     assert_eq!(tokens[0], 2500023);
-    //     assert_eq!(tokens[1], 2500023);
-
-    //     // Add only one side of the capital, and withdraw from another side
-    //     let mut amounts2 = vec![5000000, 0];
-    //     let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, 1, &fees);
-    //     let shares_burned = pool.remove_liquidity_by_tokens(
-    //         accounts(0).as_ref(),
-    //         vec![0, 5000000 - 1200],
-    //         num_shares,
-    //         &fees,
-    //     );
-    //     // as imbalance withdraw, will lose a little amount token
-    //     assert!(shares_burned < num_shares);
-    // }
-
-    // /// Test everything with fees.
-    // #[test]
-    // fn test_rated_with_fees() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let mut pool = new_rated_stnear_pool(6, 10000, 2000);
-    //     let mut amounts = vec![5000000, 10000000];
-    //     let fees = AdminFees::new(1000); // 10% exchange fee
-
-    //     let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-
-    //     let amount_out = pool.swap(
-    //         accounts(1).as_ref(),
-    //         1000000,
-    //         accounts(2).as_ref(),
-    //         1,
-    //         &fees,
-    //     );
-    //     println!("swap out: {}", amount_out);
-    //     let tokens = pool.remove_liquidity_by_shares(accounts(0).as_ref(), num_shares/2, vec![1, 1]);
-    //     assert_eq!(tokens[0], 2996052);
-    //     assert_eq!(tokens[1], 4593934);
-    // }
-
-    // /// Test that adding and then removing all of the liquidity leaves the pool empty and with no shares.
-    // #[test]
-    // #[should_panic(expected = "E69: pool reserved token balance less than MIN_RESERVE")]
-    // fn test_rated_add_transfer_remove_liquidity() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let mut pool = new_rated_stnear_pool(6, 10000, 0);
-    //     let mut amounts = vec![5000000, 10000000];
-    //     let fees = AdminFees::zero();
-    //     let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-    //     assert_eq!(amounts, vec![5000000, 10000000]);
-    //     assert!(num_shares > 1);
-    //     assert_eq!(num_shares, pool.share_balance_of(accounts(0).as_ref()));
-    //     assert_eq!(pool.share_total_balance(), num_shares);
-
-    //     // Move shares to another account.
-    //     pool.share_register(accounts(3).as_ref());
-    //     pool.share_transfer(accounts(0).as_ref(), accounts(3).as_ref(), num_shares);
-    //     assert_eq!(pool.share_balance_of(accounts(0).as_ref()), 0);
-    //     assert_eq!(pool.share_balance_of(accounts(3).as_ref()), num_shares);
-    //     assert_eq!(pool.share_total_balance(), num_shares);
-
-    //     // Remove all liquidity.
-    //     testing_env!(context.predecessor_account_id(accounts(3)).build());
-    //     pool.remove_liquidity_by_shares(accounts(3).as_ref(), num_shares, vec![1, 1]);
-    // }
-
-    // /// Test ramping up amplification factor, ramping it even more and then stopping.
-    // #[test]
-    // fn test_rated_ramp_amp() {
-    //     let mut context = VMContextBuilder::new();
-    //     testing_env!(context.predecessor_account_id(accounts(0)).build());
-    //     let mut pool = new_rated_stnear_pool(6, 10000, 0);
-
-    //     let start_ts = MIN_RAMP_DURATION + 1_000_000_000;
-    //     testing_env!(context.block_timestamp(start_ts).build());
-    //     pool.ramp_amplification(50000, start_ts + MIN_RAMP_DURATION * 10);
-    //     testing_env!(context
-    //         .block_timestamp(start_ts + MIN_RAMP_DURATION * 3)
-    //         .build());
-    //     pool.ramp_amplification(150000, start_ts + MIN_RAMP_DURATION * 20);
-    //     testing_env!(context
-    //         .block_timestamp(start_ts + MIN_RAMP_DURATION * 5)
-    //         .build());
-    //     pool.stop_ramp_amplification();
-    // }
 
 }

@@ -6,7 +6,7 @@ use near_contract_standards::storage_management::{
 };
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
+use near_sdk::collections::{LookupMap, UnorderedSet, Vector, UnorderedMap};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
@@ -56,6 +56,7 @@ pub(crate) enum StorageKey {
     Guardian,
     AccountTokens {account_id: AccountId},
     Frozenlist,
+    Referral,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]
@@ -100,6 +101,8 @@ pub struct Contract {
     state: RunningState,
     /// Set of frozenlist tokens
     frozen_tokens: UnorderedSet<AccountId>,
+    /// Map of referrals
+    referrals: UnorderedMap<AccountId, u32>,
 }
 
 #[near_bindgen]
@@ -116,6 +119,7 @@ impl Contract {
             guardians: UnorderedSet::new(StorageKey::Guardian),
             state: RunningState::Running,
             frozen_tokens: UnorderedSet::new(StorageKey::Frozenlist),
+            referrals: UnorderedMap::new(StorageKey::Referral),
         }
     }
 
@@ -207,9 +211,13 @@ impl Contract {
                 }
             }
         }
-        let referral_id = referral_id.map(|r| r.into());
+
+        let referral_info :Option<(AccountId, u32)> = referral_id
+            .as_ref().and_then(|rid| self.referrals.get(rid.as_ref()))
+            .map(|fee| (referral_id.unwrap().into(), fee));
+        
         let result =
-            self.internal_execute_actions(&mut account, &referral_id, &actions, ActionResult::None);
+            self.internal_execute_actions(&mut account, &referral_info, &actions, ActionResult::None);
         self.internal_save_account(&sender_id, account);
         result
     }
@@ -304,7 +312,7 @@ impl Contract {
             &sender_id,
             &amounts,
             min_shares.into(),
-            AdminFees::new(self.exchange_fee),
+            AdminFees::new(self.exchange_fee + self.referral_fee),
         );
         let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
         let tokens = pool.tokens();
@@ -391,7 +399,7 @@ impl Contract {
                 .map(|amount| amount.into())
                 .collect(),
             max_burn_shares.into(),
-            AdminFees::new(self.exchange_fee),
+            AdminFees::new(self.exchange_fee + self.referral_fee),
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
@@ -504,13 +512,13 @@ impl Contract {
     fn internal_execute_actions(
         &mut self,
         account: &mut Account,
-        referral_id: &Option<AccountId>,
+        referral_info: &Option<(AccountId, u32)>,
         actions: &[Action],
         prev_result: ActionResult,
     ) -> ActionResult {
         let mut result = prev_result;
         for action in actions {
-            result = self.internal_execute_action(account, referral_id, action, result);
+            result = self.internal_execute_action(account, referral_info, action, result);
         }
         result
     }
@@ -519,7 +527,7 @@ impl Contract {
     fn internal_execute_action(
         &mut self,
         account: &mut Account,
-        referral_id: &Option<AccountId>,
+        referral_info: &Option<(AccountId, u32)>,
         action: &Action,
         prev_result: ActionResult,
     ) -> ActionResult {
@@ -538,7 +546,7 @@ impl Contract {
                     amount_in,
                     &swap_action.token_out,
                     swap_action.min_amount_out.0,
-                    referral_id,
+                    referral_info,
                 );
                 account.deposit(&swap_action.token_out, amount_out);
                 // [AUDIT_02]
@@ -556,7 +564,7 @@ impl Contract {
         amount_in: u128,
         token_out: &AccountId,
         min_amount_out: u128,
-        referral_id: &Option<AccountId>,
+        referral_info: &Option<(AccountId, u32)>,
     ) -> u128 {
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         let amount_out = pool.swap(
@@ -565,10 +573,9 @@ impl Contract {
             token_out,
             min_amount_out,
             AdminFees {
-                exchange_fee: self.exchange_fee,
+                admin_fee_bps: self.exchange_fee + self.referral_fee,
                 exchange_id: env::current_account_id(),
-                referral_fee: self.referral_fee,
-                referral_id: referral_id.clone(),
+                referral_info: referral_info.clone(),
             },
         );
         self.pools.replace(pool_id, &pool);
@@ -760,9 +767,12 @@ mod tests {
             vec![1.into(), 2.into()],
         );
         // Exchange fees left in the pool as liquidity + 1m from transfer.
+        // 33336806279123620258 v1.6.2
+        // 41671007848904525323 refactor fee to support referral map
+        // 41679692022771629522 fix simple pool swap admin fee algorithm
         assert_eq!(
             contract.get_pool_total_shares(0).0,
-            33336806279123620258 + 1_000_000
+            41679692022771629522 + 1_000_000
         );
 
         contract.withdraw(

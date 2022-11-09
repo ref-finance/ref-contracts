@@ -285,7 +285,7 @@ impl Contract {
         token_out: ValidAccountId,
     ) -> U128 {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.get_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &AdminFees::new(self.exchange_fee))
+        pool.get_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &AdminFees::new(self.exchange_fee + self.referral_fee))
             .into()
     }
 
@@ -328,7 +328,7 @@ impl Contract {
         amounts: &Vec<U128>,
     ) -> U128 {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.predict_add_stable_liquidity(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
+        pool.predict_add_stable_liquidity(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee + self.referral_fee))
             .into()
     }
 
@@ -347,7 +347,7 @@ impl Contract {
         amounts: &Vec<U128>,
     ) -> U128 {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.predict_remove_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
+        pool.predict_remove_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee + self.referral_fee))
             .into()
     }
 
@@ -387,7 +387,7 @@ impl Contract {
         pool.predict_add_rated_liquidity(
             &amounts.into_iter().map(|x| x.0).collect(),
             &rates,
-            &AdminFees::new(self.exchange_fee)
+            &AdminFees::new(self.exchange_fee + self.referral_fee)
         ).into()
     }
 
@@ -403,7 +403,7 @@ impl Contract {
             Some(rates) => Some(rates.into_iter().map(|x| x.0).collect()),
             _ => None
         };
-        pool.predict_remove_rated_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &rates, &AdminFees::new(self.exchange_fee))
+        pool.predict_remove_rated_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &rates, &AdminFees::new(self.exchange_fee + self.referral_fee))
             .into()
     }
 
@@ -421,7 +421,7 @@ impl Contract {
             Some(rates) => Some(rates.into_iter().map(|x| x.0).collect()),
             _ => None
         };
-        pool.get_rated_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &rates, &AdminFees::new(self.exchange_fee))
+        pool.get_rated_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &rates, &AdminFees::new(self.exchange_fee + self.referral_fee))
             .into()
     }
 }

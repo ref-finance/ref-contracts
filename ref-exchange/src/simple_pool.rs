@@ -9,7 +9,7 @@ use crate::admin_fee::AdminFees;
 
 use crate::errors::*;
 use crate::utils::{
-    add_to_collection, integer_sqrt, SwapVolume, FEE_DIVISOR, INIT_SHARES_SUPPLY, U256,
+    add_to_collection, integer_sqrt, SwapVolume, FEE_DIVISOR, INIT_SHARES_SUPPLY, U256, u128_ratio,
 };
 
 const NUM_TOKENS: usize = 2;
@@ -296,26 +296,55 @@ impl SimplePool {
         // "Invariant" is by how much the dot product of amounts increased due to fees.
         let new_invariant =
             integer_sqrt(U256::from(self.amounts[in_idx]) * U256::from(self.amounts[out_idx]));
-
         // Invariant can not reduce (otherwise loosing balance of the pool and something it broken).
         assert!(new_invariant >= prev_invariant, "{}", ERR75_INVARIANT_REDUCE);
+
+        // Allocate admin fee as fraction of total fee by issuing LP shares proportionally.
         let numerator = (new_invariant - prev_invariant) * U256::from(self.shares_total_supply);
+        if admin_fee.admin_fee_bps > 0 && numerator > U256::zero() {
+            // First we convert all admin fee into shares, as invariant increase is caused by total fee, so:
+            //   total_fee_shares : prev_shares = (new_invariant - prev_invariant) : prev_invariant
+            //   admin_fee_shares = total_fee_shares * admin_fee_rate
+            //   Note: only part of total_fee_shares are used to mint share, so we have:
+            //   prev_shares / new_shares > prev_invariant / new_invariant
+            //   which means per share value increases due to (total_fee - admin_fee) part.
 
-        // Allocate exchange fee as fraction of total fee by issuing LP shares proportionally.
-        if admin_fee.exchange_fee > 0 && numerator > U256::zero() {
-            let denominator = new_invariant * FEE_DIVISOR / admin_fee.exchange_fee;
-            self.mint_shares(&admin_fee.exchange_id, (numerator / denominator).as_u128());
-        }
+            let denominator = prev_invariant * FEE_DIVISOR / admin_fee.admin_fee_bps;
+            // old version
+            // let denominator = new_invariant * FEE_DIVISOR / admin_fee.admin_fee_bps;
+            let admin_shares = (numerator / denominator).as_u128();
 
-        // If there is referral provided and the account already registered LP, allocate it % of LP rewards.
-        if let Some(referral_id) = &admin_fee.referral_id {
-            if admin_fee.referral_fee > 0
-                && numerator > U256::zero()
-                && self.shares.contains_key(referral_id)
-            {
-                let denominator = new_invariant * FEE_DIVISOR / admin_fee.referral_fee;
-                self.mint_shares(referral_id, (numerator / denominator).as_u128());
+            // Then, if there is valid referral and he has already registered as this pool LP, 
+            //   transfer corresponding minted shares to his account. 
+            let referral_share = if let Some((referral_id, referral_fee)) = &admin_fee.referral_info {
+                if self.shares.contains_key(referral_id) {
+                    u128_ratio(admin_shares, *referral_fee as u128, FEE_DIVISOR as u128)
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+            if referral_share > 0 {
+                self.mint_shares(&admin_fee.referral_info.as_ref().unwrap().0, referral_share);
+                env::log(
+                    format!(
+                        "Exchange {} got {} shares, Referral {} got {} shares",
+                        &admin_fee.exchange_id, admin_shares - referral_share, &admin_fee.referral_info.as_ref().unwrap().0, referral_share,
+                    )
+                    .as_bytes(),
+                );
+            } else {
+                env::log(
+                    format!(
+                        "Exchange {} got {} shares, No referral fee",
+                        &admin_fee.exchange_id, admin_shares,
+                    )
+                    .as_bytes(),
+                );
             }
+            // Finally, remaining admin shares belong to the exchange
+            self.mint_shares(&admin_fee.exchange_id, admin_shares - referral_share);
         }
 
         // Keeping track of volume per each input traded separately.
@@ -355,10 +384,9 @@ mod tests {
             accounts(2).as_ref(),
             1,
             &AdminFees {
-                exchange_fee: 0,
+                admin_fee_bps: 0,
                 exchange_id: accounts(3).as_ref().clone(),
-                referral_fee: 0,
-                referral_id: None,
+                referral_info: None,
             },
         );
         assert_eq!(
@@ -405,10 +433,9 @@ mod tests {
             accounts(2).as_ref(),
             1,
             &AdminFees {
-                exchange_fee: 100,
+                admin_fee_bps: 100,
                 exchange_id: accounts(3).as_ref().clone(),
-                referral_fee: 0,
-                referral_id: None,
+                referral_info: None,
             },
         );
         assert_eq!(

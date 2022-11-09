@@ -8,7 +8,7 @@ use crate::errors::*;
 use crate::stable_swap::math::{
     Fees, StableSwap, SwapResult, MAX_AMP, MAX_AMP_CHANGE, MIN_AMP, MIN_RAMP_DURATION,
 };
-use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR, U256};
+use crate::utils::{add_to_collection, SwapVolume, FEE_DIVISOR, U256, u128_ratio};
 use crate::StorageKey;
 
 mod math;
@@ -282,23 +282,32 @@ impl StableSwapPool {
         );
 
         if fee_part > 0 {
-            // referral fee
-            if let Some(referral) = &fees.referral_id {
-                if self.shares.get(referral).is_some() {
-                    let referral_share = fee_part * fees.referral_fee as u128 / FEE_DIVISOR as u128;
-                    self.mint_shares(referral, referral_share);
-                    env::log(
-                        format!("Referral {} got {} shares", referral, referral_share).as_bytes(),
-                    );
-                }
+            let admin_share = u128_ratio(fee_part, fees.admin_fee_bps as u128, FEE_DIVISOR as u128);
+            let (mut referral_share, referral) = fees.calc_referral_share(admin_share);
+
+            if referral_share > 0 && self.shares.get(&referral).is_none() {
+                referral_share = 0;
             }
-            // exchange fee
-            let exchange_share = fee_part * fees.exchange_fee as u128 / FEE_DIVISOR as u128;
-            self.mint_shares(&fees.exchange_id, exchange_share);
-            env::log(
-                format!("Admin {} got {} shares", &fees.exchange_id, exchange_share).as_bytes(),
-            );
+            self.mint_shares(&referral, referral_share);
+            self.mint_shares(&fees.exchange_id, admin_share - referral_share);
+
+            if referral_share > 0 {
+                env::log(
+                    format!(
+                        "Exchange {} got {} shares, Referral {} got {} shares, from add_liquidity", 
+                        &fees.exchange_id, admin_share - referral_share, referral, referral_share
+                    ).as_bytes(),
+                );
+            } else {
+                env::log(
+                    format!(
+                        "Exchange {} got {} shares, No referral fee, from add_liquidity", 
+                        &fees.exchange_id, admin_share
+                    ).as_bytes(),
+                );
+            }
         }
+
         new_shares
     }
 
@@ -442,22 +451,30 @@ impl StableSwapPool {
         );
 
         if fee_part > 0 {
-            // referral fee
-            if let Some(referral) = &fees.referral_id {
-                if self.shares.get(referral).is_some() {
-                    let referral_share = fee_part * fees.referral_fee as u128 / FEE_DIVISOR as u128;
-                    self.mint_shares(referral, referral_share);
-                    env::log(
-                        format!("Referral {} got {} shares", referral, referral_share).as_bytes(),
-                    );
-                }
+            let admin_share = u128_ratio(fee_part, fees.admin_fee_bps as u128, FEE_DIVISOR as u128);
+            let (mut referral_share, referral) = fees.calc_referral_share(admin_share);
+
+            if referral_share > 0 && self.shares.get(&referral).is_none() {
+                referral_share = 0;
             }
-            // exchange fee
-            let exchange_share = fee_part * fees.exchange_fee as u128 / FEE_DIVISOR as u128;
-            self.mint_shares(&fees.exchange_id, exchange_share);
-            env::log(
-                format!("Admin {} got {} shares", &fees.exchange_id, exchange_share).as_bytes(),
-            );
+            self.mint_shares(&referral, referral_share);
+            self.mint_shares(&fees.exchange_id, admin_share - referral_share);
+
+            if referral_share > 0 {
+                env::log(
+                    format!(
+                        "Exchange {} got {} shares, Referral {} got {} shares, from remove_liquidity_by_tokens", 
+                        &fees.exchange_id, admin_share - referral_share, referral, referral_share
+                    ).as_bytes(),
+                );
+            } else {
+                env::log(
+                    format!(
+                        "Exchange {} got {} shares, No referral fee, from remove_liquidity_by_tokens", 
+                        &fees.exchange_id, admin_share
+                    ).as_bytes(),
+                );
+            }
         }
 
         burn_shares
@@ -521,17 +538,16 @@ impl StableSwapPool {
         let in_idx = self.token_index(token_in);
         let out_idx = self.token_index(token_out);
         let result = self.internal_get_return(in_idx, amount_in, out_idx, &fees);
+        let amount_swapped = self.c_amount_to_amount(result.amount_swapped, out_idx);
         assert!(
-            self.c_amount_to_amount(result.amount_swapped, out_idx) >= min_amount_out,
+            amount_swapped >= min_amount_out,
             "{}",
             ERR68_SLIPPAGE
         );
         env::log(
             format!(
                 "Swapped {} {} for {} {}, total fee {}, admin fee {}",
-                amount_in, token_in, 
-                self.c_amount_to_amount(result.amount_swapped, out_idx), 
-                token_out, 
+                amount_in, token_in, amount_swapped, token_out, 
                 self.c_amount_to_amount(result.fee, out_idx), 
                 self.c_amount_to_amount(result.admin_fee, out_idx)
             )
@@ -544,61 +560,52 @@ impl StableSwapPool {
 
         // Keeping track of volume per each input traded separately.
         self.volumes[in_idx].input.0 += amount_in;
-        self.volumes[out_idx].output.0 += self.c_amount_to_amount(result.amount_swapped, out_idx);
+        self.volumes[out_idx].output.0 += amount_swapped;
 
-        // handle admin / referral fee.
-        if fees.referral_fee + fees.exchange_fee > 0 {
-            let mut fee_token = 0_u128;
-            // referral fee
-            if let Some(referral) = &fees.referral_id {
-                if self.shares.get(referral).is_some() {
-                    fee_token = result.admin_fee * fees.referral_fee as u128
-                        / (fees.referral_fee + fees.exchange_fee) as u128;
-                    if fee_token > 0 {
-                        let referral_share =
-                            self.admin_fee_to_liquidity(referral, out_idx, fee_token);
-                        env::log(
-                            format!(
-                                "Referral {} got {} shares from {} {}",
-                                referral,
-                                referral_share,
-                                self.c_amount_to_amount(fee_token, out_idx),
-                                self.token_account_ids[out_idx]
-                            )
-                            .as_bytes(),
-                        );
-                    }
+        // handle admin fee.
+        if fees.admin_fee_bps > 0 {
+            let (exchange_share, referral_share) = if let Some((referral_id, referral_fee)) = &fees.referral_info {
+                if self.shares.contains_key(referral_id)
+                {
+                    self.distribute_admin_fee(&fees.exchange_id, referral_id, *referral_fee, out_idx, result.admin_fee)
+                } else {
+                    self.distribute_admin_fee(&fees.exchange_id, referral_id, 0, out_idx, result.admin_fee)
                 }
-            }
-            // exchange fee = admin_fee - referral_fee
-            fee_token = result.admin_fee - fee_token;
-            if fee_token > 0 {
-                let exchange_share =
-                    self.admin_fee_to_liquidity(&fees.exchange_id, out_idx, fee_token);
+            } else {
+                self.distribute_admin_fee(&fees.exchange_id, &fees.exchange_id, 0, out_idx, result.admin_fee)
+            };
+            if referral_share > 0 {
                 env::log(
                     format!(
-                        "Admin {} got {} shares from {} {}",
-                        &fees.exchange_id,
-                        exchange_share,
-                        self.c_amount_to_amount(fee_token, out_idx),
-                        self.token_account_ids[out_idx]
+                        "Exchange {} got {} shares, Referral {} got {} shares",
+                        &fees.exchange_id, exchange_share, &fees.referral_info.as_ref().unwrap().0, referral_share,
+                    )
+                    .as_bytes(),
+                );
+            } else {
+                env::log(
+                    format!(
+                        "Exchange {} got {} shares, No referral fee",
+                        &fees.exchange_id, exchange_share,
                     )
                     .as_bytes(),
                 );
             }
         }
 
-        self.c_amount_to_amount(result.amount_swapped, out_idx)
+        amount_swapped
     }
 
     /// convert admin_fee into shares without any fee.
     /// return share minted this time for the admin/referrer.
-    fn admin_fee_to_liquidity(
+    fn distribute_admin_fee(
         &mut self,
-        sender_id: &AccountId,
+        exchange_id: &AccountId,
+        referral_id: &AccountId,
+        referral_fee_bps: u32,
         token_id: usize,
         c_amount: Balance,
-    ) -> Balance {
+    ) -> (Balance, Balance) {
         let invariant = self.get_invariant();
 
         let mut c_amounts = vec![0_u128; self.c_amounts.len()];
@@ -614,8 +621,16 @@ impl StableSwapPool {
             .expect(ERR67_LPSHARE_CALC_ERR);
         self.c_amounts[token_id] += c_amount;
 
-        self.mint_shares(sender_id, new_shares);
-        new_shares
+        let referral_share = if referral_fee_bps > 0 {
+            u128_ratio(new_shares, referral_fee_bps as u128, FEE_DIVISOR as u128)
+        } else {
+            0
+        };
+
+        self.mint_shares(referral_id, referral_share);
+        self.mint_shares(exchange_id, new_shares - referral_share);
+
+        (new_shares - referral_share, referral_share)
     }
 
     /// Mint new shares for given user.

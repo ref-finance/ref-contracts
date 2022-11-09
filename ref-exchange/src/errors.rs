@@ -96,3 +96,8 @@ pub const ERR124_CROSS_CALL_FAILED: &str = "E124: Cross-contract call failed";
 // pub const ERR125_FAILED_TO_APPLY_RATES: &str = "E125: Failed to apply new rates";
 pub const ERR126_FAILED_TO_PARSE_RESULT: &str = "E126: Failed to parse cross-contract call result";
 pub const ERR127_INVALID_RATE_TYPE: &str = "E127: Invalid rate type";
+
+// referrals
+pub const ERR130_REFERRAL_EXIST: &str = "E130: Referral already exist";
+pub const ERR131_REFERRAL_NOT_EXIST: &str = "E130: Referral not exist";
+pub const ERR132_ILLEGAL_REFERRAL_FEE: &str = "E130: Illegal referral fee";

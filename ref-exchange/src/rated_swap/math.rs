@@ -3,7 +3,7 @@
 use near_sdk::{Balance, Timestamp};
 
 use crate::admin_fee::AdminFees;
-use crate::utils::{FEE_DIVISOR, U384};
+use crate::utils::{FEE_DIVISOR, U384, u128_ratio};
 
 use super::PRECISION;
 
@@ -26,7 +26,7 @@ impl Fees {
     pub fn new(total_fee: u32, fees: &AdminFees) -> Self {
         Self {
             trade_fee: total_fee,
-            admin_fee: fees.exchange_fee + fees.referral_fee,
+            admin_fee: fees.admin_fee_bps,
         }
     }
 
@@ -38,18 +38,18 @@ impl Fees {
     }
 
     pub fn trade_fee(&self, amount: Balance) -> Balance {
-        amount * (self.trade_fee as u128) / (FEE_DIVISOR as u128)
+        u128_ratio(amount, self.trade_fee as u128, FEE_DIVISOR as u128)
     }
 
     pub fn admin_trade_fee(&self, amount: Balance) -> Balance {
-        amount * (self.admin_fee as u128) / (FEE_DIVISOR as u128)
+        u128_ratio(amount, self.admin_fee as u128, FEE_DIVISOR as u128)
     }
 
     /// Used to normalize fee applid on difference amount with ideal balance, This logic is from 
     /// https://github.com/saber-hq/stable-swap/blob/5db776fb0a41a0d1a23d46b99ef412ca7ccc5bf6/stable-swap-program/program/src/fees.rs#L73
     pub fn normalized_trade_fee(&self, num_coins: u32, amount: Balance) -> Balance {
         let adjusted_trade_fee = (self.trade_fee * num_coins) / (4 * (num_coins - 1));
-        amount * (adjusted_trade_fee as u128) / (FEE_DIVISOR as u128)
+        u128_ratio(amount, adjusted_trade_fee as u128, FEE_DIVISOR as u128)
     }
 }
 
