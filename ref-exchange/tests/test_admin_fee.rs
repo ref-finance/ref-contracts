@@ -181,3 +181,56 @@ fn modify_admin_fee() {
     assert_eq!(prev_eth, 73628097294839736303705386);
     assert_eq!(prev_usdt, to_yocto("89"));
 }
+
+
+#[test]
+fn referral_fee() {
+    // pool 0, 10 dai -> 20 eth; pool 1, 20 eth -> 10 usdt
+    let (root, owner, pool, _, _, _) = setup_pool_with_liquidity();
+    let referral1 = root.create_user("referral1".to_string(), to_yocto("100"));
+    // let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
+
+    call!(
+        owner,
+        pool.modify_admin_fee(1600, 400),
+        deposit=1
+    ).assert_success();
+
+    call!(
+        owner,
+        pool.insert_referral(referral1.valid_account_id(), 2000),
+        deposit=1
+    ).assert_success();
+
+    assert!(!mft_has_registered(&pool, ":1", referral1.valid_account_id()));
+
+    call!(
+        referral1,
+        pool.mft_register(":1".to_string(), referral1.valid_account_id()),
+        deposit=to_yocto("1")
+    ).assert_success();
+
+    assert!(mft_has_registered(&pool, ":1", referral1.valid_account_id()));
+
+    // swap in 1 usdt to get eth
+    let out_come = call!(
+        root,
+        pool.swap(
+            vec![SwapAction {
+                pool_id: 1,
+                token_in: usdt(),
+                amount_in: Some(U128(to_yocto("1"))),
+                token_out: eth(),
+                min_amount_out: U128(1)
+            }],
+            Some(referral1.valid_account_id())
+        ),
+        deposit = 1
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+    // "Swapped 1000000000000000000000000 usdt for 1814048647419868151852693 eth002",
+    // "Exchange swap got 18184917942453338844 shares, Referral referral1 got 4546229485613334710 shares",
+    assert_eq!(mft_balance_of(&pool, ":1", &pool.account_id()), 18184917942453338844);
+    assert_eq!(mft_balance_of(&pool, ":1", &referral1.account_id()), 4546229485613334710);
+}

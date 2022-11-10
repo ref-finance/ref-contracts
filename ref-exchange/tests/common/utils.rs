@@ -182,6 +182,10 @@ pub fn get_deposits(
     view!(pool.get_deposits(account_id)).unwrap_json::<HashMap<String, U128>>()
 }
 
+pub fn list_referrals(pool: &ContractAccount<Exchange>) -> HashMap<String, u32> {
+    view!(pool.list_referrals(None, None)).unwrap_json::<HashMap<String, u32>>()
+}
+
 /// get ref-exchange's frozenlist tokens
 pub fn get_frozenlist(pool: &ContractAccount<Exchange>) -> Vec<String> {
     view!(pool.get_frozenlist_tokens()).unwrap_json::<Vec<String>>()
@@ -232,6 +236,15 @@ pub fn mft_balance_of(
     view!(pool.mft_balance_of(token_or_pool.to_string(), to_va(account_id.clone())))
         .unwrap_json::<U128>()
         .0
+}
+
+pub fn mft_has_registered(
+    pool: &ContractAccount<Exchange>,
+    token_or_pool: &str,
+    account_id: ValidAccountId,
+) -> bool {
+    view!(pool.mft_has_registered(token_or_pool.to_string(), account_id))
+        .unwrap_json::<bool>()
 }
 
 pub fn mft_total_supply(

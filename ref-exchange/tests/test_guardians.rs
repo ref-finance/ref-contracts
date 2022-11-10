@@ -360,3 +360,113 @@ fn guardians_scenario_02() {
     assert_eq!(owner_deposits.get(&token2.account_id()).unwrap().0, 0);
     assert_eq!(balance_of(&token2, &owner.account_id()), 413378144755595527105);
 }
+
+#[test]
+fn guardians_scenario_03() {
+    let (root, owner, pool, _, _, _) = setup_pool_with_liquidity();
+    let guard1 = root.create_user("guard1".to_string(), to_yocto("100"));
+    let referral1 = root.create_user("referral1".to_string(), to_yocto("100"));
+    let referral2 = root.create_user("referral2".to_string(), to_yocto("100"));
+
+    call!(
+        owner,
+        pool.extend_guardians(vec![guard1.valid_account_id()]),
+        deposit=1
+    ).assert_success();
+
+    println!("Guardians Case 0301: only owner and guardians can manage referrals");
+    let out_come = call!(
+        root,
+        pool.insert_referral(referral1.valid_account_id(), 2000),
+        deposit=1
+    );
+    assert!(!out_come.is_ok());
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E100: no permission to invoke this"));
+
+    let out_come = call!(
+        guard1,
+        pool.insert_referral(referral1.valid_account_id(), 0),
+        deposit=1
+    );
+    assert!(!out_come.is_ok());
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E132: Illegal referral fee"));
+
+    let out_come = call!(
+        guard1,
+        pool.insert_referral(referral1.valid_account_id(), 10000),
+        deposit=1
+    );
+    assert!(!out_come.is_ok());
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E132: Illegal referral fee"));
+
+    let referrals = list_referrals(&pool);
+    assert_eq!(referrals.len(), 0);
+
+    call!(
+        guard1,
+        pool.insert_referral(referral1.valid_account_id(), 2000),
+        deposit=1
+    ).assert_success();
+    let referrals = list_referrals(&pool);
+    assert_eq!(referrals.len(), 1);
+    assert_eq!(referrals.get(&referral1.account_id()).unwrap(), &2000_u32);
+
+    let out_come = call!(
+        guard1,
+        pool.insert_referral(referral1.valid_account_id(), 1000),
+        deposit=1
+    );
+    assert!(!out_come.is_ok());
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E130: Referral already exist"));
+    let referrals = list_referrals(&pool);
+    assert_eq!(referrals.len(), 1);
+
+    let out_come = call!(
+        guard1,
+        pool.update_referral(referral2.valid_account_id(), 3000),
+        deposit=1
+    );
+    assert!(!out_come.is_ok());
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E131: Referral not exist"));
+    let referrals = list_referrals(&pool);
+    assert_eq!(referrals.len(), 1);
+
+    call!(
+        guard1,
+        pool.update_referral(referral1.valid_account_id(), 3000),
+        deposit=1
+    ).assert_success();
+    let referrals = list_referrals(&pool);
+    assert_eq!(referrals.len(), 1);
+    assert_eq!(referrals.get(&referral1.account_id()).unwrap(), &3000_u32);
+
+    let out_come = call!(
+        guard1,
+        pool.remove_referral(referral2.valid_account_id()),
+        deposit=1
+    );
+    assert!(!out_come.is_ok());
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E131: Referral not exist"));
+    let referrals = list_referrals(&pool);
+    assert_eq!(referrals.len(), 1);
+
+    call!(
+        guard1,
+        pool.insert_referral(referral2.valid_account_id(), 2000),
+        deposit=1
+    ).assert_success();
+    call!(
+        guard1,
+        pool.remove_referral(referral1.valid_account_id()),
+        deposit=1
+    ).assert_success();
+    let referrals = list_referrals(&pool);
+    assert_eq!(referrals.len(), 1);
+    assert_eq!(referrals.get(&referral2.account_id()).unwrap(), &2000_u32);
+}

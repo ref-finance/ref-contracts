@@ -99,5 +99,5 @@ pub const ERR127_INVALID_RATE_TYPE: &str = "E127: Invalid rate type";
 
 // referrals
 pub const ERR130_REFERRAL_EXIST: &str = "E130: Referral already exist";
-pub const ERR131_REFERRAL_NOT_EXIST: &str = "E130: Referral not exist";
-pub const ERR132_ILLEGAL_REFERRAL_FEE: &str = "E130: Illegal referral fee";
+pub const ERR131_REFERRAL_NOT_EXIST: &str = "E131: Referral not exist";
+pub const ERR132_ILLEGAL_REFERRAL_FEE: &str = "E132: Illegal referral fee";

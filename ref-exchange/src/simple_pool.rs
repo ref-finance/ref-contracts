@@ -66,6 +66,11 @@ impl SimplePool {
         }
     }
 
+    /// See if the given account has been registered as a LP
+    pub fn share_has_registered(&self, account_id: &AccountId) -> bool {
+        self.shares.contains_key(account_id)
+    }
+
     /// Register given account with 0 balance in shares.
     /// Storage payment should be checked by caller.
     pub fn share_register(&mut self, account_id: &AccountId) {

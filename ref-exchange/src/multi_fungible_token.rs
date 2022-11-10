@@ -131,6 +131,19 @@ impl Contract {
         }
     }
 
+    pub fn mft_has_registered(&self, token_id: String, account_id: ValidAccountId) -> bool {
+        match parse_token_id(token_id) {
+            TokenOrPool::Token(_) => false,
+            TokenOrPool::Pool(pool_id) => {
+                if let Some(pool) = self.pools.get(pool_id) {
+                    pool.share_has_registered(account_id.as_ref())
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
     /// Register LP token of given pool for given account.
     /// Fails if token_id is not a pool.
     #[payable]
