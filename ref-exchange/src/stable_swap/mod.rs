@@ -563,7 +563,7 @@ impl StableSwapPool {
         self.volumes[out_idx].output.0 += amount_swapped;
 
         // handle admin fee.
-        if fees.admin_fee_bps > 0 {
+        if fees.admin_fee_bps > 0 && result.admin_fee > 0 {
             let (exchange_share, referral_share) = if let Some((referral_id, referral_fee)) = &fees.referral_info {
                 if self.shares.contains_key(referral_id)
                 {

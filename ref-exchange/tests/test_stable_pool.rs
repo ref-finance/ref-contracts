@@ -179,6 +179,8 @@ fn sim_stable_lp() {
     );
     out_come.assert_success();
     println!("{:#?}", get_logs(&out_come));
+    // "Mint 699699997426210330025 shares for user2, fee is 299999998348895348 shares",
+    // "Exchange swap got 59999999669779069 shares, No referral fee, from add_liquidity",
 
     assert_eq!(
         view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
@@ -188,15 +190,15 @@ fn sim_stable_lp() {
             token_account_ids: tokens.into_iter().map(|x| x.account_id()).collect(),
             amounts: vec![U128(100500*ONE_DAI), U128(100600*ONE_USDT), U128(100800*ONE_USDC)],
             total_fee: 25,
-            shares_total_supply: U128(301200*ONE_LPT+699699997426210330025+47999999735823255),
+            shares_total_supply: U128(301200*ONE_LPT + 699699997426210330025 + 59999999669779069),
         }
     );
     assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1200*ONE_LPT);
     assert_eq!(mft_balance_of(&pool, ":0", &user2.account_id()), 699699997426210330025);
     assert!(pool_share_price(&pool, 0) > last_share_price);
     let last_share_price = pool_share_price(&pool, 0);
-    assert_eq!(mft_total_supply(&pool, ":0"), last_lpt_supply + 699699997426210330025 + 47999999735823255);
-    let last_lpt_supply = last_lpt_supply + 699699997426210330025 + 47999999735823255;
+    assert_eq!(mft_total_supply(&pool, ":0"), last_lpt_supply + 699699997426210330025 + 59999999669779069);
+    let last_lpt_supply = last_lpt_supply + 699699997426210330025 + 59999999669779069;
 
     // remove by tokens
     let out_come = call!(
@@ -206,7 +208,10 @@ fn sim_stable_lp() {
     );
     out_come.assert_success();
     println!("{:#?}", get_logs(&out_come));
-    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 697401508719920229455);
+    // "LP user1 removed 502598511257512352631 shares by given tokens, and fee is 598899301432400519 shares",
+    // "Exchange swap got 119779860286480103 shares, No referral fee, from remove_liquidity_by_tokens",
+
+    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1200*ONE_LPT - 502598511257512352631);
     let balances = view!(pool.get_deposits(user1.valid_account_id()))
         .unwrap_json::<HashMap<AccountId, U128>>();
     assert_eq!(balances[&dai()].0, 101*ONE_DAI);
@@ -220,14 +225,14 @@ fn sim_stable_lp() {
             token_account_ids: tokens.into_iter().map(|x| x.account_id()).collect(),
             amounts: vec![U128(100499*ONE_DAI), U128(100100*ONE_USDT), U128(100799*ONE_USDC)],
             total_fee: 25,
-            shares_total_supply: U128(last_lpt_supply-502598491280079770545+95823884420348155),
+            shares_total_supply: U128(last_lpt_supply - 502598511257512352631 + 119779860286480103),
         }
     );
-    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1200*ONE_LPT-502598491280079770545);
+    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1200*ONE_LPT - 502598511257512352631);
     assert_eq!(mft_balance_of(&pool, ":0", &user2.account_id()), 699699997426210330025);
     assert!(pool_share_price(&pool, 0) > last_share_price);
     let last_share_price = pool_share_price(&pool, 0);
-    let last_lpt_supply = last_lpt_supply - 502598491280079770545 + 95823884420348155;
+    let last_lpt_supply = last_lpt_supply - 502598511257512352631 + 119779860286480103;
 
     // tansfer some to other
     let out_come = call!(
@@ -237,8 +242,8 @@ fn sim_stable_lp() {
     );
     out_come.assert_success();
     println!("{:#?}", get_logs(&out_come));
-    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1100*ONE_LPT-502598491280079770545);
-    assert_eq!(mft_balance_of(&pool, ":0", &user2.account_id()), 799699997426210330025);
+    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1100*ONE_LPT - 502598511257512352631);
+    assert_eq!(mft_balance_of(&pool, ":0", &user2.account_id()), 699699997426210330025 + 100*ONE_LPT);
     assert_eq!(pool_share_price(&pool, 0), last_share_price);
     assert_eq!(mft_total_supply(&pool, ":0"), last_lpt_supply);
 
@@ -268,8 +273,8 @@ fn sim_stable_lp() {
     assert_eq!(mft_total_supply(&pool, ":0"), last_lpt_supply);
 
     // user2 remove by share
-    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1100*ONE_LPT-502598491280079770545);
-    assert_eq!(mft_balance_of(&pool, ":0", &user2.account_id()), 799699997426210330025);
+    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1100*ONE_LPT - 502598511257512352631);
+    assert_eq!(mft_balance_of(&pool, ":0", &user2.account_id()), 699699997426210330025 + 100*ONE_LPT);
     let out_come = call!(
         user2,
         pool.remove_liquidity(0, U128(300*ONE_LPT), vec![U128(1*ONE_DAI), U128(1*ONE_USDT), U128(1*ONE_USDC)]),
@@ -277,8 +282,8 @@ fn sim_stable_lp() {
     );
     out_come.assert_success();
     println!("{:#?}", get_logs(&out_come));
-    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1100*ONE_LPT-502598491280079770545);
-    assert_eq!(mft_balance_of(&pool, ":0", &user2.account_id()), 499699997426210330025);
+    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1100*ONE_LPT - 502598511257512352631);
+    assert_eq!(mft_balance_of(&pool, ":0", &user2.account_id()), 699699997426210330025 - 200*ONE_LPT);
     assert_eq!(pool_share_price(&pool, 0), last_share_price);
     assert_eq!(mft_total_supply(&pool, ":0"), last_lpt_supply-300*ONE_LPT);
     let last_lpt_supply = last_lpt_supply - 300*ONE_LPT;
@@ -291,11 +296,14 @@ fn sim_stable_lp() {
     );
     out_come.assert_success();
     println!("{:#?}", get_logs(&out_come));
-    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1100*ONE_LPT-502598491280079770545);
+    // "LP user2 removed 498596320225563082252 shares by given tokens, and fee is 597500435701476809 shares",
+    // "Exchange swap got 119500087140295361 shares, No referral fee, from remove_liquidity_by_tokens",
+
+    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 1100*ONE_LPT - 502598511257512352631);
     // previous lpt - removed lpt
-    assert_eq!(mft_balance_of(&pool, ":0", &user2.account_id()), 499699997426210330025-498596260777261245961);
+    assert_eq!(mft_balance_of(&pool, ":0", &user2.account_id()), 699699997426210330025 - 200*ONE_LPT - 498596320225563082252);
     // last_lpt_supply - removed lpt + admin_fee_to_lpt
-    let last_lpt_supply = last_lpt_supply - 498596260777261245961 + 95600058313712936;
+    let last_lpt_supply = last_lpt_supply - 498596320225563082252 + 119500087140295361;
     assert_eq!(mft_total_supply(&pool, ":0"), last_lpt_supply);
     assert!(pool_share_price(&pool, 0) > last_share_price);
     let last_share_price = pool_share_price(&pool, 0);
@@ -313,10 +321,13 @@ fn sim_stable_lp() {
     );
     out_come.assert_success();
     println!("{:#?}", get_logs(&out_come));
+    // "Mint 299997911758886758506069372942 shares for user3, fee is 895808190595468286848457 shares",
+    // "Exchange swap got 179161638119093657369691 shares, No referral fee, from add_liquidity",
+
     // minted_user_lpt
-    assert_eq!(mft_balance_of(&pool, ":0", &user3.account_id()), 299997852137498188726149828936);
+    assert_eq!(mft_balance_of(&pool, ":0", &user3.account_id()), 299997911758886758506069372942);
     // last_lpt_supply + minted_user_lpt + admin_fee_to_lpt
-    let last_lpt_supply = last_lpt_supply + 299997852137498188726149828936 + 143329282015797902428349;
+    let last_lpt_supply = last_lpt_supply + 299997911758886758506069372942 + 179161638119093657369691;
     assert_eq!(mft_total_supply(&pool, ":0"), last_lpt_supply);
     let last_share_price = pool_share_price(&pool, 0);
     println!("share_price: {}", last_share_price);

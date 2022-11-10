@@ -289,6 +289,22 @@ impl Contract {
             .into()
     }
 
+    /// List referrals
+    pub fn list_referrals(&self, from_index: Option<u64>, limit: Option<u64>) -> HashMap<AccountId, u32> {
+        let keys = self.referrals.keys_as_vector();
+        let from_index = from_index.unwrap_or(0);
+        let limit = limit.unwrap_or(keys.len());
+
+        (from_index..std::cmp::min(from_index + limit, keys.len()))
+            .map(|index| {
+                (
+                    keys.get(index).unwrap(),
+                    self.referrals.get(&keys.get(index).unwrap()).unwrap()
+                )
+            })
+            .collect()
+    }
+
     /// Get frozenlist tokens.
     pub fn get_frozenlist_tokens(&self) -> Vec<AccountId> {
         self.frozen_tokens.to_vec()

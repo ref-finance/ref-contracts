@@ -308,10 +308,7 @@ impl SimplePool {
             //   Note: only part of total_fee_shares are used to mint share, so we have:
             //   prev_shares / new_shares > prev_invariant / new_invariant
             //   which means per share value increases due to (total_fee - admin_fee) part.
-
             let denominator = prev_invariant * FEE_DIVISOR / admin_fee.admin_fee_bps;
-            // old version
-            // let denominator = new_invariant * FEE_DIVISOR / admin_fee.admin_fee_bps;
             let admin_shares = (numerator / denominator).as_u128();
 
             // Then, if there is valid referral and he has already registered as this pool LP, 

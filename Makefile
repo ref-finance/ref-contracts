@@ -21,7 +21,12 @@ else
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange --lib -- --nocapture
 endif
 
-test: test-exchange
+test: build-exchange mock-ft mock-rated
+ifdef TF
+	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange --test $(TF) -- --nocapture
+else
+	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange --tests
+endif
 
 test-exchange: build-exchange mock-ft mock-rated
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange 

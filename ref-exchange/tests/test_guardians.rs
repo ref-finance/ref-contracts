@@ -293,20 +293,20 @@ fn guardians_scenario_02() {
         ),
         deposit = 1
     ).assert_success();
-    assert_eq!(mft_balance_of(&pool, ":1", &pool.account_id()), 18182851357079036914);
+    assert_eq!(mft_balance_of(&pool, ":1", &pool.account_id()), 22731147428066673554);
     
     // guardians remove liquidity but owner account not ready
     println!("Guardians Case 0201: remove liquidity fail if owner account is not ready");
     let out_come = call!(
         guard1,
-        pool.remove_exchange_fee_liquidity(1, U128(18182851357079036914), vec![U128(1), U128(1)]),
+        pool.remove_exchange_fee_liquidity(1, U128(22731147428066673554), vec![U128(1), U128(1)]),
         deposit = 1
     );
     // println!("{:#?}", out_come.promise_results());
     assert!(!out_come.is_ok());
     assert_eq!(get_error_count(&out_come), 1);
     assert!(get_error_status(&out_come).contains("E10: account not registered"));
-    assert_eq!(mft_balance_of(&pool, ":1", &pool.account_id()), 18182851357079036914);
+    assert_eq!(mft_balance_of(&pool, ":1", &pool.account_id()), 22731147428066673554);
 
     // guardians remove liquidity
     println!("Guardians Case 0202: remove liquidity success");
@@ -318,27 +318,27 @@ fn guardians_scenario_02() {
     .assert_success();
     let out_come = call!(
         guard1,
-        pool.remove_exchange_fee_liquidity(1, U128(18182851357079036914), vec![U128(1), U128(1)]),
+        pool.remove_exchange_fee_liquidity(1, U128(22731147428066673554), vec![U128(1), U128(1)]),
         deposit = 1
     );
     out_come.assert_success();
     assert_eq!(mft_balance_of(&pool, ":1", &pool.account_id()), 0);
     let owner_deposits = get_deposits(&pool, owner.valid_account_id());
-    assert_eq!(owner_deposits.get(&token2.account_id()).unwrap().0, 330666437772348207866);
-    assert_eq!(owner_deposits.get(&token3.account_id()).unwrap().0, 200007728217076967880);
+    assert_eq!(owner_deposits.get(&token2.account_id()).unwrap().0, 413378144755595527105);
+    assert_eq!(owner_deposits.get(&token3.account_id()).unwrap().0, 250036938082231399513);
 
     // guardians withdraw owner token but owner not registered on token
     println!("Guardians Case 0203: withdraw owner token fail if owner not registered on token");
     let out_come = call!(
         guard1,
-        pool.withdraw_owner_token(token2.valid_account_id(), U128(330666437772348207866)),
+        pool.withdraw_owner_token(token2.valid_account_id(), U128(413378144755595527105)),
         deposit = 1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 1);
     assert!(get_error_status(&out_come).contains("The account owner2 is not registered"));
     let owner_deposits = get_deposits(&pool, owner.valid_account_id());
-    assert_eq!(owner_deposits.get(&token2.account_id()).unwrap().0, 330666437772348207866);
+    assert_eq!(owner_deposits.get(&token2.account_id()).unwrap().0, 413378144755595527105);
     assert_eq!(balance_of(&token2, &owner.account_id()), 0);
 
     // guardians withdraw owner token
@@ -351,12 +351,12 @@ fn guardians_scenario_02() {
     .assert_success();
     let out_come = call!(
         guard1,
-        pool.withdraw_owner_token(token2.valid_account_id(), U128(330666437772348207866)),
+        pool.withdraw_owner_token(token2.valid_account_id(), U128(413378144755595527105)),
         deposit = 1
     );
     out_come.assert_success();
     assert_eq!(get_error_count(&out_come), 0);
     let owner_deposits = get_deposits(&pool, owner.valid_account_id());
     assert_eq!(owner_deposits.get(&token2.account_id()).unwrap().0, 0);
-    assert_eq!(balance_of(&token2, &owner.account_id()), 330666437772348207866);
+    assert_eq!(balance_of(&token2, &owner.account_id()), 413378144755595527105);
 }
