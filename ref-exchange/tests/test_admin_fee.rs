@@ -88,7 +88,7 @@ fn modify_admin_fee() {
     // and 1 bps (referal fee) in total.
     let out_come = call!(
         owner,
-        pool.modify_admin_fee(1600, 400),
+        pool.modify_admin_fee(2000),
         deposit = 1
     );
     out_come.assert_success();
@@ -96,8 +96,8 @@ fn modify_admin_fee() {
 
     // make sure the modification succeed
     let metadata = get_metadata(&pool);
-    assert_eq!(metadata.exchange_fee, 1600);
-    assert_eq!(metadata.referral_fee, 400);
+    assert_eq!(metadata.exchange_fee, 2000);
+    assert_eq!(metadata.referral_fee, 0);
     let pool_fee = view!(pool.get_pool_fee(0)).unwrap_json::<u32>();
     assert_eq!(pool_fee, 25);
 
@@ -192,7 +192,7 @@ fn referral_fee() {
 
     call!(
         owner,
-        pool.modify_admin_fee(1600, 400),
+        pool.modify_admin_fee(2000),
         deposit=1
     ).assert_success();
 

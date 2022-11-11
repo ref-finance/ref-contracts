@@ -271,7 +271,8 @@ impl Contract {
                 assert!(amount >= &min_amount.0, "{}", ERR86_MIN_AMOUNT);
             }
         }
-        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
+        // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
+        let mut deposits = self.internal_unwrap_account(&sender_id);
         let tokens = pool.tokens();
         // Subtract updated amounts from deposits. This will fail if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
@@ -314,7 +315,8 @@ impl Contract {
             min_shares.into(),
             AdminFees::new(self.exchange_fee + self.referral_fee),
         );
-        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
+        // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
+        let mut deposits = self.internal_unwrap_account(&sender_id);
         let tokens = pool.tokens();
         // Subtract amounts from deposits. This will fail if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
@@ -357,7 +359,8 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
+        // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
+        let mut deposits = self.internal_unwrap_account(&sender_id);
         for i in 0..tokens.len() {
             deposits.deposit(&tokens[i], amounts[i]);
         }
@@ -403,7 +406,8 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
+        // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
+        let mut deposits = self.internal_unwrap_account(&sender_id);
         for i in 0..tokens.len() {
             deposits.deposit(&tokens[i], amounts[i].into());
         }
@@ -1681,9 +1685,9 @@ mod tests {
         assert_eq!(1600, contract.metadata().exchange_fee);
         assert_eq!(400, contract.metadata().referral_fee);
         testing_env!(context.predecessor_account_id(accounts(1)).attached_deposit(1).build());
-        contract.modify_admin_fee(20, 50);
-        assert_eq!(20, contract.metadata().exchange_fee);
-        assert_eq!(50, contract.metadata().referral_fee);
+        contract.modify_admin_fee(70);
+        assert_eq!(70, contract.metadata().exchange_fee);
+        assert_eq!(0, contract.metadata().referral_fee);
     }
 
     #[test]

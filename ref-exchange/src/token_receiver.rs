@@ -72,7 +72,7 @@ impl FungibleTokenReceiver for Contract {
     ) -> PromiseOrValue<U128> {
         self.assert_contract_running();
         let token_in = env::predecessor_account_id();
-        // feature frozenlist
+        // // [AUDITION_AMENDMENT] 2.3.8 Code Optimization (II)
         self.assert_no_frozen_tokens(&[token_in.clone()]);
         if msg.is_empty() {
             // Simple deposit.

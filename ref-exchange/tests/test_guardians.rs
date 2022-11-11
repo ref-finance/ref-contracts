@@ -26,6 +26,40 @@ fn guardians_scenario_01() {
 
     let out_come = call!(
         owner,
+        pool.remove_guardians(vec![guard2.valid_account_id()]),
+        deposit=1
+    );
+    assert!(!out_come.is_ok());
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E104: guardian not in list"));
+    let metadata = get_metadata(&pool);
+    assert_eq!(metadata.guardians.len(), 0);
+
+    let out_come = call!(
+        owner,
+        pool.extend_guardians(vec![guard1.valid_account_id(), guard2.valid_account_id()]),
+        deposit=1
+    );
+    out_come.assert_success();
+    assert_eq!(get_error_count(&out_come), 0);
+    let metadata = get_metadata(&pool);
+    assert_eq!(metadata.guardians.len(), 2);
+    assert_eq!(metadata.guardians.get(0).unwrap().clone(), guard1.account_id());
+    assert_eq!(metadata.guardians.get(1).unwrap().clone(), guard2.account_id());
+
+    let out_come = call!(
+        owner,
+        pool.remove_guardians(vec![guard2.valid_account_id()]),
+        deposit=1
+    );
+    out_come.assert_success();
+    assert_eq!(get_error_count(&out_come), 0);
+    let metadata = get_metadata(&pool);
+    assert_eq!(metadata.guardians.len(), 1);
+    assert_eq!(metadata.guardians.get(0).unwrap().clone(), guard1.account_id());
+
+    let out_come = call!(
+        owner,
         pool.extend_guardians(vec![guard1.valid_account_id(), guard2.valid_account_id()]),
         deposit=1
     );
@@ -276,7 +310,7 @@ fn guardians_scenario_02() {
     ).assert_success();
     call!(
         owner,
-        pool.modify_admin_fee(1600, 400),
+        pool.modify_admin_fee(2000),
         deposit=1
     ).assert_success();
     call!(

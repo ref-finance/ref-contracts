@@ -53,6 +53,7 @@ impl StorageManagement for Contract {
             .unwrap()
     }
 
+    /// param force is unused here, just reserve it to keep interface standard
     #[allow(unused_variables)]
     #[payable]
     fn storage_unregister(&mut self, force: Option<bool>) -> bool {
@@ -60,7 +61,7 @@ impl StorageManagement for Contract {
         self.assert_contract_running();
         let account_id = env::predecessor_account_id();
         if let Some(account_deposit) = self.internal_get_account(&account_id) {
-            // TODO: figure out force option logic.
+            // [AUDITION_AMENDMENT] 2.1.1 Improper Account Unregistration
             assert!(
                 account_deposit.tokens.is_empty() && account_deposit.legacy_tokens.is_empty(),
                 "{}", ERR18_TOKENS_NOT_EMPTY
