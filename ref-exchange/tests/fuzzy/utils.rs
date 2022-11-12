@@ -228,7 +228,7 @@ pub fn init_pool_env() -> (
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va("owner".to_string()), 4, 1)
+        init_method: new(to_va("owner".to_string()), 5, 0)
     );
 
     call!(

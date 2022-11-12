@@ -22,8 +22,7 @@ fn modify_admin_fee() {
 
     // make sure the exchange's initial admin fee is 4 & 1 bps
     let metadata = get_metadata(&pool);
-    assert_eq!(metadata.exchange_fee, 4);
-    assert_eq!(metadata.referral_fee, 1);
+    assert_eq!(metadata.admin_fee_bps, 5);
     let pool_fee = view!(pool.get_pool_fee(0)).unwrap_json::<u32>();
     assert_eq!(pool_fee, 25);
 
@@ -96,8 +95,7 @@ fn modify_admin_fee() {
 
     // make sure the modification succeed
     let metadata = get_metadata(&pool);
-    assert_eq!(metadata.exchange_fee, 2000);
-    assert_eq!(metadata.referral_fee, 0);
+    assert_eq!(metadata.admin_fee_bps, 2000);
     let pool_fee = view!(pool.get_pool_fee(0)).unwrap_json::<u32>();
     assert_eq!(pool_fee, 25);
 

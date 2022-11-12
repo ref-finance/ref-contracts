@@ -42,8 +42,6 @@ impl SimplePool {
         id: u32,
         token_account_ids: Vec<ValidAccountId>,
         total_fee: u32,
-        exchange_fee: u32,
-        referral_fee: u32,
     ) -> Self {
         assert!(
             total_fee < FEE_DIVISOR,
@@ -56,8 +54,8 @@ impl SimplePool {
             amounts: vec![0u128; NUM_TOKENS],
             volumes: vec![SwapVolume::default(); NUM_TOKENS],
             total_fee,
-            exchange_fee,
-            referral_fee,
+            exchange_fee: 0,
+            referral_fee: 0,
             // [AUDIT_11]
             shares: LookupMap::new(StorageKey::Shares {
                 pool_id: id,
@@ -372,7 +370,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
-        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 30, 0, 0);
+        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 30);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
@@ -421,7 +419,7 @@ mod tests {
         let mut context = VMContextBuilder::new();
         context.predecessor_account_id(accounts(0));
         testing_env!(context.build());
-        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 100, 100, 0);
+        let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 100);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
         let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
@@ -460,8 +458,8 @@ mod tests {
             amounts: vec![367701466208080431008668441, 2267116519548219219535],
             volumes: vec![SwapVolume::default(), SwapVolume::default()],
             total_fee: 30,
-            exchange_fee: 5,
-            referral_fee: 1,
+            exchange_fee: 0,
+            referral_fee: 0,
             shares_total_supply: 35967818779820559673547466,
             shares: LookupMap::new(StorageKey::Shares {
                 pool_id: 0,

@@ -85,10 +85,8 @@ pub trait SelfCallbacks {
 pub struct Contract {
     /// Account of the owner.
     owner_id: AccountId,
-    /// Exchange fee, that goes to exchange itself (managed by governance).
-    exchange_fee: u32,
-    /// Referral fee, that goes to referrer in the call.
-    referral_fee: u32,
+    /// Admin fee rate in total fee.
+    admin_fee_bps: u32,
     /// List of all the pools.
     pools: Vector<Pool>,
     /// Accounts registered, keeping track all the amounts deposited, storage and more.
@@ -111,8 +109,7 @@ impl Contract {
     pub fn new(owner_id: ValidAccountId, exchange_fee: u32, referral_fee: u32) -> Self {
         Self {
             owner_id: owner_id.as_ref().clone(),
-            exchange_fee,
-            referral_fee,
+            admin_fee_bps: exchange_fee + referral_fee,
             pools: Vector::new(StorageKey::Pools),
             accounts: LookupMap::new(StorageKey::Accounts),
             whitelisted_tokens: UnorderedSet::new(StorageKey::Whitelist),
@@ -133,8 +130,6 @@ impl Contract {
             self.pools.len() as u32,
             tokens,
             fee,
-            0,
-            0,
         )))
     }
 
@@ -313,7 +308,7 @@ impl Contract {
             &sender_id,
             &amounts,
             min_shares.into(),
-            AdminFees::new(self.exchange_fee + self.referral_fee),
+            AdminFees::new(self.admin_fee_bps),
         );
         // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
         let mut deposits = self.internal_unwrap_account(&sender_id);
@@ -402,7 +397,7 @@ impl Contract {
                 .map(|amount| amount.into())
                 .collect(),
             max_burn_shares.into(),
-            AdminFees::new(self.exchange_fee + self.referral_fee),
+            AdminFees::new(self.admin_fee_bps),
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
@@ -577,7 +572,7 @@ impl Contract {
             token_out,
             min_amount_out,
             AdminFees {
-                admin_fee_bps: self.exchange_fee + self.referral_fee,
+                admin_fee_bps: self.admin_fee_bps,
                 exchange_id: env::current_account_id(),
                 referral_info: referral_info.clone(),
             },
@@ -602,7 +597,7 @@ mod tests {
     fn setup_contract() -> (VMContextBuilder, Contract) {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let contract = Contract::new(accounts(0), 1600, 400);
+        let contract = Contract::new(accounts(0), 2000, 0);
         (context, contract)
     }
 
@@ -1682,12 +1677,10 @@ mod tests {
         testing_env!(context.predecessor_account_id(accounts(1)).attached_deposit(1).build());
         contract.change_state(RunningState::Paused);
         assert_eq!(RunningState::Paused, contract.metadata().state);
-        assert_eq!(1600, contract.metadata().exchange_fee);
-        assert_eq!(400, contract.metadata().referral_fee);
+        assert_eq!(2000, contract.metadata().admin_fee_bps);
         testing_env!(context.predecessor_account_id(accounts(1)).attached_deposit(1).build());
         contract.modify_admin_fee(70);
-        assert_eq!(70, contract.metadata().exchange_fee);
-        assert_eq!(0, contract.metadata().referral_fee);
+        assert_eq!(70, contract.metadata().admin_fee_bps);
     }
 
     #[test]

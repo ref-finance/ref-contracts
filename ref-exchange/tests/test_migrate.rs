@@ -48,8 +48,7 @@ fn test_upgrade() {
     let metadata = get_metadata(&pool);
     // println!("{:#?}", metadata);
     assert_eq!(metadata.version, "1.7.0".to_string());
-    assert_eq!(metadata.exchange_fee, 4);
-    assert_eq!(metadata.referral_fee, 1);
+    assert_eq!(metadata.admin_fee_bps, 5);
     assert_eq!(metadata.state, RunningState::Running);
 
     // Upgrade to the same code with insurfficient gas.

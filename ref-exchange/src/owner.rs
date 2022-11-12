@@ -196,8 +196,7 @@ impl Contract {
         assert_one_yocto();
         self.assert_owner();
         assert!(admin_fee_bps <= MAX_ADMIN_FEE_BPS, "{}", ERR101_ILLEGAL_FEE);
-        self.exchange_fee = admin_fee_bps;
-        self.referral_fee = 0;
+        self.admin_fee_bps = admin_fee_bps;
     }
 
     /// Remove exchange fee liquidity to owner's inner account.
@@ -336,8 +335,7 @@ impl Contract {
         let old: ContractV1 = env::state_read().expect(ERR103_NOT_INITIALIZED);
         Self { 
             owner_id: old.owner_id.clone(), 
-            exchange_fee: old.exchange_fee, 
-            referral_fee: old.referral_fee, 
+            admin_fee_bps: old.exchange_fee + old.referral_fee, 
             pools: old.pools, 
             accounts: old.accounts, 
             whitelisted_tokens: old.whitelisted_tokens, 
