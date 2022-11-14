@@ -303,7 +303,7 @@ fn storage_scenario_02() {
     );
     assert!(!out_come.is_ok());
     let ex_status = format!("{:?}", out_come.promise_errors()[0].as_ref().unwrap().status());
-    assert!(ex_status.contains("E11: insufficient $NEAR storage deposit"));
+    assert!(ex_status.contains("E10: account not registered"));
     assert!(get_storage_state(&pool, user3.valid_account_id()).is_none());
 
     call!(

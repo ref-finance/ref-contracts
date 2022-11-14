@@ -161,7 +161,7 @@ fn instant_swap_scenario_02() {
     assert!(get_error_status(&out_come)
         .contains("Smart contract panicked: The account new_user is not registered"));
     // println!("total logs: {:#?}", get_logs(&out_come));
-    assert!(get_logs(&out_come)[2].contains("Account new_user has not enough storage. Depositing to owner."));
+    assert!(get_logs(&out_come)[3].contains("Account new_user has not enough storage. Depositing to owner."));
     assert_eq!(
         get_storage_balance(&pool, new_user.valid_account_id())
             .unwrap()

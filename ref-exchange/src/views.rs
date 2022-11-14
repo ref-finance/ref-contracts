@@ -18,8 +18,7 @@ pub struct ContractMetadata {
     pub guardians: Vec<AccountId>,
     pub pool_count: u64,
     pub state: RunningState,
-    pub exchange_fee: u32,
-    pub referral_fee: u32,
+    pub admin_fee_bps: u32,
 }
 
 #[derive(Serialize, Deserialize, PartialEq)]
@@ -175,8 +174,7 @@ impl Contract {
             guardians: self.guardians.to_vec(),
             pool_count: self.pools.len(),
             state: self.state.clone(),
-            exchange_fee: self.exchange_fee,
-            referral_fee: self.referral_fee,
+            admin_fee_bps: self.admin_fee_bps,
         }
     }
 
@@ -285,8 +283,24 @@ impl Contract {
         token_out: ValidAccountId,
     ) -> U128 {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.get_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &AdminFees::new(self.exchange_fee))
+        pool.get_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &AdminFees::new(self.admin_fee_bps))
             .into()
+    }
+
+    /// List referrals
+    pub fn list_referrals(&self, from_index: Option<u64>, limit: Option<u64>) -> HashMap<AccountId, u32> {
+        let keys = self.referrals.keys_as_vector();
+        let from_index = from_index.unwrap_or(0);
+        let limit = limit.unwrap_or(keys.len());
+
+        (from_index..std::cmp::min(from_index + limit, keys.len()))
+            .map(|index| {
+                (
+                    keys.get(index).unwrap(),
+                    self.referrals.get(&keys.get(index).unwrap()).unwrap()
+                )
+            })
+            .collect()
     }
 
     /// Get frozenlist tokens.
@@ -328,7 +342,7 @@ impl Contract {
         amounts: &Vec<U128>,
     ) -> U128 {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.predict_add_stable_liquidity(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
+        pool.predict_add_stable_liquidity(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.admin_fee_bps))
             .into()
     }
 
@@ -347,7 +361,7 @@ impl Contract {
         amounts: &Vec<U128>,
     ) -> U128 {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.predict_remove_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.exchange_fee))
+        pool.predict_remove_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.admin_fee_bps))
             .into()
     }
 
@@ -387,7 +401,7 @@ impl Contract {
         pool.predict_add_rated_liquidity(
             &amounts.into_iter().map(|x| x.0).collect(),
             &rates,
-            &AdminFees::new(self.exchange_fee)
+            &AdminFees::new(self.admin_fee_bps)
         ).into()
     }
 
@@ -403,7 +417,7 @@ impl Contract {
             Some(rates) => Some(rates.into_iter().map(|x| x.0).collect()),
             _ => None
         };
-        pool.predict_remove_rated_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &rates, &AdminFees::new(self.exchange_fee))
+        pool.predict_remove_rated_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &rates, &AdminFees::new(self.admin_fee_bps))
             .into()
     }
 
@@ -421,7 +435,7 @@ impl Contract {
             Some(rates) => Some(rates.into_iter().map(|x| x.0).collect()),
             _ => None
         };
-        pool.get_rated_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &rates, &AdminFees::new(self.exchange_fee))
+        pool.get_rated_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &rates, &AdminFees::new(self.admin_fee_bps))
             .into()
     }
 }

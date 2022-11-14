@@ -26,7 +26,7 @@ fn assert_failure(outcome: ExecutionResult, error_message: &str) {
 #[test]
 fn sim_stable_e100 () {
     let root = init_simulator(None);
-    let (_, ex) = setup_exchange(&root, 1600, 400);
+    let (_, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![swap()]);
     let token2 = test_token(&root, usdt(), vec![swap()]);
     let outcome = call!(
@@ -45,7 +45,7 @@ fn sim_stable_e100 () {
 #[test]
 fn sim_stable_e61 () {
     let root = init_simulator(None);
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![swap()]);
     let token2 = test_token(&root, usdt(), vec![swap()]);
     call!(
@@ -85,7 +85,7 @@ fn sim_stable_e61 () {
 #[test]
 fn sim_stable_e62 () {
     let root = init_simulator(None);
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![swap()]);
     let token2 = test_token(&root, usdt(), vec![swap()]);
     call!(
@@ -112,7 +112,7 @@ fn sim_stable_e62 () {
 #[test]
 fn sim_stable_e63 () {
     let root = init_simulator(None);
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
@@ -160,7 +160,7 @@ fn sim_stable_e63 () {
 #[test]
 fn sim_stable_e64 () {
     let root = init_simulator(None);
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
@@ -228,7 +228,7 @@ fn sim_stable_e64 () {
 #[test]
 fn sim_stable_e65 () {
     let root = init_simulator(None);
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
@@ -265,7 +265,7 @@ fn sim_stable_e65 () {
 #[test]
 fn sim_stable_e13 () {
     let root = init_simulator(None);
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
@@ -309,7 +309,7 @@ fn sim_stable_e13 () {
 #[test]
 fn sim_stable_e34 () {
     let root = init_simulator(None);
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
@@ -377,7 +377,7 @@ fn sim_stable_e34 () {
 #[test]
 fn sim_stable_e68 () {
     let root = init_simulator(None);
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
@@ -434,7 +434,7 @@ fn sim_stable_e68 () {
 #[test]
 fn sim_stable_e69 () {
     let root = init_simulator(None);
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
@@ -513,7 +513,7 @@ fn sim_stable_e69 () {
 #[test]
 fn sim_stable_e71 () {
     let root = init_simulator(None);
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
@@ -556,7 +556,7 @@ fn sim_stable_e71 () {
 #[test]
 fn sim_stable_e14 () {
     let root = init_simulator(None);
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
@@ -586,7 +586,7 @@ fn sim_stable_e82 () {
     let mut gc = runtime::GenesisConfig::default();
     gc.genesis_time = 86400 * 1_000_000_000;
     let root = init_simulator(Some(gc));
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
@@ -616,7 +616,7 @@ fn sim_stable_e83 () {
     let mut gc = runtime::GenesisConfig::default();
     gc.genesis_time = 86400 * 1_000_000_000;
     let root = init_simulator(Some(gc));
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);
@@ -656,7 +656,7 @@ fn sim_stable_e84 () {
     let mut gc = runtime::GenesisConfig::default();
     gc.genesis_time = 86400 * 1_000_000_000;
     let root = init_simulator(Some(gc));
-    let (owner, ex) = setup_exchange(&root, 1600, 400);
+    let (owner, ex) = setup_exchange(&root, 2000);
     let token1 = test_token(&root, dai(), vec![ex.account_id()]);
     let token2 = test_token(&root, usdt(), vec![ex.account_id()]);
     whitelist_token(&owner, &ex, vec![token1.valid_account_id(), token2.valid_account_id()]);

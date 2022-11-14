@@ -83,6 +83,7 @@ pub const ERR100_NOT_ALLOWED: &str = "E100: no permission to invoke this";
 pub const ERR101_ILLEGAL_FEE: &str = "E101: illegal fee";
 pub const ERR102_INVALID_TOKEN_ID: &str = "E102: invalid token id";
 pub const ERR103_NOT_INITIALIZED: &str = "E103: contract is not initialized";
+pub const ERR104_GUARDIAN_NOT_IN_LIST: &str = "E104: guardian not in list";
 
 
 //mft
@@ -96,3 +97,8 @@ pub const ERR124_CROSS_CALL_FAILED: &str = "E124: Cross-contract call failed";
 // pub const ERR125_FAILED_TO_APPLY_RATES: &str = "E125: Failed to apply new rates";
 pub const ERR126_FAILED_TO_PARSE_RESULT: &str = "E126: Failed to parse cross-contract call result";
 pub const ERR127_INVALID_RATE_TYPE: &str = "E127: Invalid rate type";
+
+// referrals
+pub const ERR130_REFERRAL_EXIST: &str = "E130: Referral already exist";
+pub const ERR131_REFERRAL_NOT_EXIST: &str = "E131: Referral not exist";
+pub const ERR132_ILLEGAL_REFERRAL_FEE: &str = "E132: Illegal referral fee";

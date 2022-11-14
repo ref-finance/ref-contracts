@@ -24,6 +24,7 @@ pub const GAS_FOR_FT_TRANSFER: Gas = 20_000_000_000_000;
 
 /// Fee divisor, allowing to provide fee in bps.
 pub const FEE_DIVISOR: u32 = 10_000;
+pub const MAX_ADMIN_FEE_BPS: u32 = 8_000;
 
 /// Initial shares supply on deposit of liquidity.
 pub const INIT_SHARES_SUPPLY: u128 = 1_000_000_000_000_000_000_000_000;
@@ -86,6 +87,10 @@ pub fn integer_sqrt(value: U256) -> U256 {
         guess = (value / guess + guess) >> 1;
     }
     res
+}
+
+pub fn u128_ratio(a: u128, num: u128, denom: u128) -> u128 {
+    (U256::from(a) * U256::from(num) / U256::from(denom)).as_u128()
 }
 
 #[cfg(test)]

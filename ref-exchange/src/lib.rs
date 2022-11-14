@@ -6,7 +6,7 @@ use near_contract_standards::storage_management::{
 };
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{LookupMap, UnorderedSet, Vector};
+use near_sdk::collections::{LookupMap, UnorderedSet, Vector, UnorderedMap};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
@@ -56,6 +56,7 @@ pub(crate) enum StorageKey {
     Guardian,
     AccountTokens {account_id: AccountId},
     Frozenlist,
+    Referral,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]
@@ -84,10 +85,8 @@ pub trait SelfCallbacks {
 pub struct Contract {
     /// Account of the owner.
     owner_id: AccountId,
-    /// Exchange fee, that goes to exchange itself (managed by governance).
-    exchange_fee: u32,
-    /// Referral fee, that goes to referrer in the call.
-    referral_fee: u32,
+    /// Admin fee rate in total fee.
+    admin_fee_bps: u32,
     /// List of all the pools.
     pools: Vector<Pool>,
     /// Accounts registered, keeping track all the amounts deposited, storage and more.
@@ -100,6 +99,8 @@ pub struct Contract {
     state: RunningState,
     /// Set of frozenlist tokens
     frozen_tokens: UnorderedSet<AccountId>,
+    /// Map of referrals
+    referrals: UnorderedMap<AccountId, u32>,
 }
 
 #[near_bindgen]
@@ -108,14 +109,14 @@ impl Contract {
     pub fn new(owner_id: ValidAccountId, exchange_fee: u32, referral_fee: u32) -> Self {
         Self {
             owner_id: owner_id.as_ref().clone(),
-            exchange_fee,
-            referral_fee,
+            admin_fee_bps: exchange_fee + referral_fee,
             pools: Vector::new(StorageKey::Pools),
             accounts: LookupMap::new(StorageKey::Accounts),
             whitelisted_tokens: UnorderedSet::new(StorageKey::Whitelist),
             guardians: UnorderedSet::new(StorageKey::Guardian),
             state: RunningState::Running,
             frozen_tokens: UnorderedSet::new(StorageKey::Frozenlist),
+            referrals: UnorderedMap::new(StorageKey::Referral),
         }
     }
 
@@ -129,8 +130,6 @@ impl Contract {
             self.pools.len() as u32,
             tokens,
             fee,
-            0,
-            0,
         )))
     }
 
@@ -207,9 +206,13 @@ impl Contract {
                 }
             }
         }
-        let referral_id = referral_id.map(|r| r.into());
+
+        let referral_info :Option<(AccountId, u32)> = referral_id
+            .as_ref().and_then(|rid| self.referrals.get(rid.as_ref()))
+            .map(|fee| (referral_id.unwrap().into(), fee));
+        
         let result =
-            self.internal_execute_actions(&mut account, &referral_id, &actions, ActionResult::None);
+            self.internal_execute_actions(&mut account, &referral_info, &actions, ActionResult::None);
         self.internal_save_account(&sender_id, account);
         result
     }
@@ -263,7 +266,8 @@ impl Contract {
                 assert!(amount >= &min_amount.0, "{}", ERR86_MIN_AMOUNT);
             }
         }
-        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
+        // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
+        let mut deposits = self.internal_unwrap_account(&sender_id);
         let tokens = pool.tokens();
         // Subtract updated amounts from deposits. This will fail if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
@@ -304,9 +308,10 @@ impl Contract {
             &sender_id,
             &amounts,
             min_shares.into(),
-            AdminFees::new(self.exchange_fee),
+            AdminFees::new(self.admin_fee_bps),
         );
-        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
+        // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
+        let mut deposits = self.internal_unwrap_account(&sender_id);
         let tokens = pool.tokens();
         // Subtract amounts from deposits. This will fail if there is not enough funds for any of the tokens.
         for i in 0..tokens.len() {
@@ -349,7 +354,8 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
+        // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
+        let mut deposits = self.internal_unwrap_account(&sender_id);
         for i in 0..tokens.len() {
             deposits.deposit(&tokens[i], amounts[i]);
         }
@@ -391,11 +397,12 @@ impl Contract {
                 .map(|amount| amount.into())
                 .collect(),
             max_burn_shares.into(),
-            AdminFees::new(self.exchange_fee),
+            AdminFees::new(self.admin_fee_bps),
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        let mut deposits = self.internal_unwrap_or_default_account(&sender_id);
+        // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
+        let mut deposits = self.internal_unwrap_account(&sender_id);
         for i in 0..tokens.len() {
             deposits.deposit(&tokens[i], amounts[i].into());
         }
@@ -504,13 +511,13 @@ impl Contract {
     fn internal_execute_actions(
         &mut self,
         account: &mut Account,
-        referral_id: &Option<AccountId>,
+        referral_info: &Option<(AccountId, u32)>,
         actions: &[Action],
         prev_result: ActionResult,
     ) -> ActionResult {
         let mut result = prev_result;
         for action in actions {
-            result = self.internal_execute_action(account, referral_id, action, result);
+            result = self.internal_execute_action(account, referral_info, action, result);
         }
         result
     }
@@ -519,7 +526,7 @@ impl Contract {
     fn internal_execute_action(
         &mut self,
         account: &mut Account,
-        referral_id: &Option<AccountId>,
+        referral_info: &Option<(AccountId, u32)>,
         action: &Action,
         prev_result: ActionResult,
     ) -> ActionResult {
@@ -538,7 +545,7 @@ impl Contract {
                     amount_in,
                     &swap_action.token_out,
                     swap_action.min_amount_out.0,
-                    referral_id,
+                    referral_info,
                 );
                 account.deposit(&swap_action.token_out, amount_out);
                 // [AUDIT_02]
@@ -556,7 +563,7 @@ impl Contract {
         amount_in: u128,
         token_out: &AccountId,
         min_amount_out: u128,
-        referral_id: &Option<AccountId>,
+        referral_info: &Option<(AccountId, u32)>,
     ) -> u128 {
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         let amount_out = pool.swap(
@@ -565,10 +572,9 @@ impl Contract {
             token_out,
             min_amount_out,
             AdminFees {
-                exchange_fee: self.exchange_fee,
+                admin_fee_bps: self.admin_fee_bps,
                 exchange_id: env::current_account_id(),
-                referral_fee: self.referral_fee,
-                referral_id: referral_id.clone(),
+                referral_info: referral_info.clone(),
             },
         );
         self.pools.replace(pool_id, &pool);
@@ -591,7 +597,7 @@ mod tests {
     fn setup_contract() -> (VMContextBuilder, Contract) {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let contract = Contract::new(accounts(0), 1600, 400);
+        let contract = Contract::new(accounts(0), 2000, 0);
         (context, contract)
     }
 
@@ -760,9 +766,12 @@ mod tests {
             vec![1.into(), 2.into()],
         );
         // Exchange fees left in the pool as liquidity + 1m from transfer.
+        // 33336806279123620258 v1.6.2
+        // 41671007848904525323 refactor fee to support referral map
+        // 41679692022771629522 fix simple pool swap admin fee algorithm
         assert_eq!(
             contract.get_pool_total_shares(0).0,
-            33336806279123620258 + 1_000_000
+            41679692022771629522 + 1_000_000
         );
 
         contract.withdraw(
@@ -1668,12 +1677,10 @@ mod tests {
         testing_env!(context.predecessor_account_id(accounts(1)).attached_deposit(1).build());
         contract.change_state(RunningState::Paused);
         assert_eq!(RunningState::Paused, contract.metadata().state);
-        assert_eq!(1600, contract.metadata().exchange_fee);
-        assert_eq!(400, contract.metadata().referral_fee);
+        assert_eq!(2000, contract.metadata().admin_fee_bps);
         testing_env!(context.predecessor_account_id(accounts(1)).attached_deposit(1).build());
-        contract.modify_admin_fee(20, 50);
-        assert_eq!(20, contract.metadata().exchange_fee);
-        assert_eq!(50, contract.metadata().referral_fee);
+        contract.modify_admin_fee(70);
+        assert_eq!(70, contract.metadata().admin_fee_bps);
     }
 
     #[test]

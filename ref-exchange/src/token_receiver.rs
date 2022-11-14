@@ -34,10 +34,14 @@ impl Contract {
         // let @ be the virtual account
         let mut account: Account = Account::new(&String::from(VIRTUAL_ACC));
 
+        let referral_info :Option<(AccountId, u32)> = referral_id
+            .as_ref().and_then(|rid| self.referrals.get(&rid))
+            .map(|fee| (referral_id.unwrap().into(), fee));
+
         account.deposit(&token_in, amount_in);
         let _ = self.internal_execute_actions(
             &mut account,
-            &referral_id,
+            &referral_info,
             &actions,
             ActionResult::Amount(U128(amount_in)),
         );
@@ -68,7 +72,7 @@ impl FungibleTokenReceiver for Contract {
     ) -> PromiseOrValue<U128> {
         self.assert_contract_running();
         let token_in = env::predecessor_account_id();
-        // feature frozenlist
+        // [AUDITION_AMENDMENT] 2.3.8 Code Optimization (II)
         self.assert_no_frozen_tokens(&[token_in.clone()]);
         if msg.is_empty() {
             // Simple deposit.

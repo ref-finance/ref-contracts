@@ -50,4 +50,6 @@ pub struct ContractV1 {
     pub guardians: UnorderedSet<AccountId>,
     /// Running state
     pub state: RunningState,
+    /// Set of frozenlist tokens
+    pub frozen_tokens: UnorderedSet<AccountId>,
 }

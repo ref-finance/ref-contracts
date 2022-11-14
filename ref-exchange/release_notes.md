@@ -1,5 +1,10 @@
 # Release Notes
 
+### Version 1.7.0
+1. amendments according to audition recommendations;
+2. add mft_has_registered interface for user to query whether or not they need to register as LP for a given pool;
+3. Let referrals to be managed by DAO and Guardians with independent referral fee rate.
+
 ### Version 1.6.2
 1. add view interface get_pool_by_ids
 

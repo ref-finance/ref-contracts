@@ -5,7 +5,7 @@ use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 
 use crate::*;
 use crate::rated_swap::rate::{global_register_rate, global_unregister_rate};
-use crate::utils::{FEE_DIVISOR, GAS_FOR_BASIC_OP};
+use crate::utils::{FEE_DIVISOR, MAX_ADMIN_FEE_BPS, GAS_FOR_BASIC_OP};
 use crate::legacy::ContractV1;
 
 #[near_bindgen]
@@ -66,7 +66,9 @@ impl Contract {
         assert_one_yocto();
         self.assert_owner();
         for guardian in guardians {
-            self.guardians.remove(guardian.as_ref());
+            let exist = self.guardians.remove(guardian.as_ref());
+            // [AUDITION_AMENDMENT] 2.3.1 Lack of Check on Guardians’ Removal
+            assert!(exist, "{}", ERR104_GUARDIAN_NOT_IN_LIST);
         }
     }
 
@@ -134,13 +136,67 @@ impl Contract {
         }
     }
 
+    /// insert referral with given fee_bps
     #[payable]
-    pub fn modify_admin_fee(&mut self, exchange_fee: u32, referral_fee: u32) {
+    pub fn insert_referral(&mut self, referral_id: ValidAccountId, fee_bps: u32) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        let referral_id: AccountId = referral_id.into();
+        assert!(fee_bps > 0 && fee_bps < FEE_DIVISOR, "{}", ERR132_ILLEGAL_REFERRAL_FEE);
+        let old_fee_bps = self.referrals.insert(&referral_id, &fee_bps);
+        assert!(old_fee_bps.is_none(), "{}", ERR130_REFERRAL_EXIST);
+        env::log(
+            format!(
+                "Insert referral {} with fee_bps {}",
+                referral_id, fee_bps
+            )
+            .as_bytes(),
+        );     
+    }
+
+    /// update referral with given fee_bps
+    #[payable]
+    pub fn update_referral(&mut self, referral_id: ValidAccountId, fee_bps: u32) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        let referral_id: AccountId = referral_id.into();
+        assert!(fee_bps > 0 && fee_bps < FEE_DIVISOR, "{}", ERR132_ILLEGAL_REFERRAL_FEE);
+        let old_fee_bps = self.referrals.insert(&referral_id, &fee_bps);
+        assert!(old_fee_bps.is_some(), "{}", ERR131_REFERRAL_NOT_EXIST);
+        env::log(
+            format!(
+                "Update referral {} with new fee_bps {} where old fee_bps {}",
+                referral_id, fee_bps, old_fee_bps.unwrap()
+            )
+            .as_bytes(),
+        );     
+    }
+
+    /// remove referral
+    #[payable]
+    pub fn remove_referral(&mut self, referral_id: ValidAccountId) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        let referral_id: AccountId = referral_id.into();
+        let old_fee_bps = self.referrals.remove(&referral_id);
+        assert!(old_fee_bps.is_some(), "{}", ERR131_REFERRAL_NOT_EXIST);
+        env::log(
+            format!(
+                "Remove referral {} where fee_bps {}",
+                referral_id, old_fee_bps.unwrap()
+            )
+            .as_bytes(),
+        );     
+    }
+
+    /// [AUDITION_AMENDMENT] 2.3.4 Improper Check on the Admin Fees
+    /// As referral_fee has been set per referral, the global referral_fee is obsolete.
+    #[payable]
+    pub fn modify_admin_fee(&mut self, admin_fee_bps: u32) {
         assert_one_yocto();
         self.assert_owner();
-        assert!(exchange_fee + referral_fee <= FEE_DIVISOR, "{}", ERR101_ILLEGAL_FEE);
-        self.exchange_fee = exchange_fee;
-        self.referral_fee = referral_fee;
+        assert!(admin_fee_bps <= MAX_ADMIN_FEE_BPS, "{}", ERR101_ILLEGAL_FEE);
+        self.admin_fee_bps = admin_fee_bps;
     }
 
     /// Remove exchange fee liquidity to owner's inner account.
@@ -270,14 +326,24 @@ impl Contract {
             || self.guardians.contains(&env::predecessor_account_id())
     }
 
-    /// Migration function from v1.5.x to v1.6.0.
+    /// Migration function from v1.6.x to v1.7.0.
     /// For next version upgrades, change this function.
     #[init(ignore_state)]
     // [AUDIT_09]
     #[private]
     pub fn migrate() -> Self {
-        let contract: Contract = env::state_read().expect(ERR103_NOT_INITIALIZED);
-        contract
+        let old: ContractV1 = env::state_read().expect(ERR103_NOT_INITIALIZED);
+        Self { 
+            owner_id: old.owner_id.clone(), 
+            admin_fee_bps: old.exchange_fee + old.referral_fee, 
+            pools: old.pools, 
+            accounts: old.accounts, 
+            whitelisted_tokens: old.whitelisted_tokens, 
+            guardians: old.guardians, 
+            state: old.state, 
+            frozen_tokens: old.frozen_tokens,
+            referrals: UnorderedMap::new(StorageKey::Referral), 
+        }
     }
 }
 
@@ -292,7 +358,10 @@ mod upgrade {
     const BLOCKCHAIN_INTERFACE_NOT_SET_ERR: &str = "Blockchain interface not set.";
 
     /// Gas for calling migration call.
-    pub const GAS_FOR_MIGRATE_CALL: Gas = 5_000_000_000_000;
+    // [AUDITION_AMENDMENT] 2.3.6 Lack of Check on the Gas Used by migrate()
+    const GAS_TO_COMPLETE_UPGRADE_CALL: Gas = 10_000_000_000_000;
+    const GAS_FOR_GET_CONFIG_CALL: Gas = 5_000_000_000_000;
+    const MIN_GAS_FOR_MIGRATE_STATE_CALL: Gas = 50_000_000_000_000;
 
     /// Self upgrade and call migrate, optimizes gas by not loading into memory the code.
     /// Takes as input non serialized set of bytes of the code.
@@ -304,6 +373,7 @@ mod upgrade {
         contract.assert_owner();
         let current_id = env::current_account_id().into_bytes();
         let method_name = "migrate".as_bytes().to_vec();
+        let view_name = "metadata".as_bytes().to_vec();
         unsafe {
             BLOCKCHAIN_INTERFACE.with(|b| {
                 // Load input into register 0.
@@ -316,11 +386,19 @@ mod upgrade {
                     .as_ref()
                     .expect(BLOCKCHAIN_INTERFACE_NOT_SET_ERR)
                     .promise_batch_create(current_id.len() as _, current_id.as_ptr() as _);
+                // 1st action in the Tx: "deploy contract" (code is taken from register 0)
                 b.borrow()
                     .as_ref()
                     .expect(BLOCKCHAIN_INTERFACE_NOT_SET_ERR)
                     .promise_batch_action_deploy_contract(promise_id, u64::MAX as _, 0);
-                let attached_gas = env::prepaid_gas() - env::used_gas() - GAS_FOR_MIGRATE_CALL;
+
+                let required_gas = env::used_gas() + GAS_TO_COMPLETE_UPGRADE_CALL + GAS_FOR_GET_CONFIG_CALL;
+                assert!(
+                    env::prepaid_gas() >= required_gas + MIN_GAS_FOR_MIGRATE_STATE_CALL,
+                    "Not enough gas to complete state migration"
+                );
+                let migrate_state_attached_gas = env::prepaid_gas() - required_gas;
+                // 2nd action in the Tx: call this_contract.migrate() with remaining gas
                 b.borrow()
                     .as_ref()
                     .expect(BLOCKCHAIN_INTERFACE_NOT_SET_ERR)
@@ -331,7 +409,30 @@ mod upgrade {
                         0 as _,
                         0 as _,
                         0 as _,
-                        attached_gas,
+                        migrate_state_attached_gas,
+                    );
+                // 
+                // Scheduling to return metadata after the migration is completed.
+                //
+                // The upgrade method attaches it as an action, so the entire upgrade including deploy
+                // contract action and migration can be rolled back if the view call can't be
+                // returned successfully. The view call deserializes the root state which contains the owner_id. 
+                // If the contract can deserialize the current root state,
+                // then it can validate the owner and execute the upgrade again (in case the previous
+                // upgrade/migration went badly).
+                //
+                // It's an extra safety guard for the remote contract upgrades.
+                b.borrow()
+                    .as_ref()
+                    .expect(BLOCKCHAIN_INTERFACE_NOT_SET_ERR)
+                    .promise_batch_action_function_call(
+                        promise_id,
+                        view_name.len() as _,
+                        view_name.as_ptr() as _,
+                        0 as _,
+                        0 as _,
+                        0 as _,
+                        GAS_FOR_GET_CONFIG_CALL,
                     );
             });
         }

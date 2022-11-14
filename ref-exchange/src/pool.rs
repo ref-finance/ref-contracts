@@ -197,6 +197,15 @@ impl Pool {
         }
     }
 
+    /// See if the given account has been registered as a LP
+    pub fn share_has_registered(&self, account_id: &AccountId) -> bool {
+        match self {
+            Pool::SimplePool(pool) => pool.share_has_registered(account_id),
+            Pool::StableSwapPool(pool) => pool.share_has_registered(account_id),
+            Pool::RatedSwapPool(pool) => pool.share_has_registered(account_id),
+        }
+    }
+
     pub fn share_register(&mut self, account_id: &AccountId) {
         match self {
             Pool::SimplePool(pool) => pool.share_register(account_id),
