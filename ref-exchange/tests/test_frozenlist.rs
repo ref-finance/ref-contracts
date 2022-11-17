@@ -93,9 +93,10 @@ fn frozenlist_scenario_02() {
 
     println!("Frozenlist Case 0102: token in frozenlist");
 
+    // add token1 & token3 into frozen, leave toekn2 (eth) still valid, 
     let out_come = call!(
         guard1,
-        pool.extend_frozenlist_tokens(vec![to_va(eth()), to_va(dai()), to_va(usdt())]),
+        pool.extend_frozenlist_tokens(vec![to_va(dai()), to_va(usdt())]),
         deposit=1
     );
     out_come.assert_success();
@@ -192,7 +193,7 @@ fn frozenlist_scenario_02() {
     // withdraw token would fail
     let out_come = call!(
         root,
-        pool.withdraw(to_va(eth()), U128(to_yocto("1")), None),
+        pool.withdraw(to_va(dai()), U128(to_yocto("1")), None),
         deposit = 1
     );
     assert!(!out_come.is_ok());
@@ -201,20 +202,13 @@ fn frozenlist_scenario_02() {
 
     // swap would fail, even only token_out is frozen
     let out_come = call!(
-        owner,
-        pool.remove_frozenlist_tokens(vec![to_va(dai())]),
-        deposit=1
-    );
-    out_come.assert_success();
-    
-    let out_come = call!(
         root,
         pool.swap(
             vec![SwapAction {
                 pool_id: 0,
-                token_in: dai(),
+                token_in: eth(),
                 amount_in: Some(U128(to_yocto("1"))),
-                token_out: eth(),
+                token_out: dai(),
                 min_amount_out: U128(1)
             }],
             None

@@ -37,6 +37,15 @@ impl Action {
             }
         }
     }
+
+    /// Returns out token in this action.
+    pub fn out_token(&self) -> AccountId {
+        match self {
+            Action::Swap(swap_action) => {
+                swap_action.token_out.clone()
+            }
+        }
+    }
 }
 
 /// Result from action execution.
