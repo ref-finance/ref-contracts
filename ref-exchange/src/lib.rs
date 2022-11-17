@@ -15,9 +15,7 @@ use near_sdk::{
 use utils::{NO_DEPOSIT, GAS_FOR_BASIC_OP};
 
 use crate::account_deposit::{VAccount, Account};
-pub use crate::action::SwapAction;
-pub use crate::action::Action;
-use crate::action::ActionResult;
+pub use crate::action::{SwapAction, Action, ActionResult, get_tokens_in_actions};
 use crate::errors::*;
 use crate::admin_fee::AdminFees;
 use crate::pool::Pool;
@@ -515,6 +513,15 @@ impl Contract {
         actions: &[Action],
         prev_result: ActionResult,
     ) -> ActionResult {
+        // fronzen token feature
+        // [AUDITION_AMENDMENT] 2.3.8 Code Optimization (II)
+        self.assert_no_frozen_tokens(
+            &get_tokens_in_actions(actions)
+            .into_iter()
+            .map(|token| token)
+            .collect::<Vec<AccountId>>()
+        );
+
         let mut result = prev_result;
         for action in actions {
             result = self.internal_execute_action(account, referral_info, action, result);
@@ -532,8 +539,6 @@ impl Contract {
     ) -> ActionResult {
         match action {
             Action::Swap(swap_action) => {
-                // feature frozenlist
-                self.assert_no_frozen_tokens(&[swap_action.token_in.clone(), swap_action.token_out.clone()]);
                 let amount_in = swap_action
                     .amount_in
                     .map(|value| value.0)

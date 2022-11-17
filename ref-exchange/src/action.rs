@@ -1,6 +1,7 @@
 use crate::errors::ERR41_WRONG_ACTION_RESULT;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{env, json_types::U128, AccountId, Balance};
+use std::collections::HashSet;
 
 /// Single swap action.
 #[derive(Serialize, Deserialize)]
@@ -58,4 +59,18 @@ impl ActionResult {
             _ => env::panic(ERR41_WRONG_ACTION_RESULT.as_bytes()),
         }
     }
+}
+
+/// return involved tokens in an action array
+pub fn get_tokens_in_actions(actions: &[Action]) -> HashSet<AccountId> {
+    let mut tokens: HashSet<AccountId> = HashSet::new();
+    for action in actions {
+        match action {
+            Action::Swap(swap_action) => {
+                tokens.insert(swap_action.token_in.clone());
+                tokens.insert(swap_action.token_out.clone());
+            }
+        }
+    }
+    tokens
 }
