@@ -72,9 +72,9 @@ impl FungibleTokenReceiver for Contract {
     ) -> PromiseOrValue<U128> {
         self.assert_contract_running();
         let token_in = env::predecessor_account_id();
-        self.assert_no_frozen_tokens(&[token_in.clone()]);
         if msg.is_empty() {
             // Simple deposit.
+            self.assert_no_frozen_tokens(&[token_in.clone()]);
             self.internal_deposit(sender_id.as_ref(), &token_in, amount.into());
             PromiseOrValue::Value(U128(0))
         } else {
@@ -86,13 +86,6 @@ impl FungibleTokenReceiver for Contract {
                     referral_id,
                     actions,
                 } => {
-                    // [AUDITION_AMENDMENT] 2.3.8 Code Optimization (II)
-                    let out_tokens: Vec<AccountId> = actions
-                        .iter()
-                        .map(|action| action.out_token())
-                        .collect();
-                    self.assert_no_frozen_tokens(&out_tokens);
-
                     let referral_id = referral_id.map(|x| x.to_string());
                     let out_amounts = self.internal_direct_actions(
                         token_in,
