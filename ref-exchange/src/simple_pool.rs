@@ -108,15 +108,9 @@ impl SimplePool {
         &self.token_account_ids
     }
 
-    /// Adds the amounts of tokens to liquidity pool and returns number of shares that this user receives.
-    /// Updates amount to amount kept in the pool.
-    pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>) -> Balance {
-        assert_eq!(
-            amounts.len(),
-            NUM_TOKENS,
-            "{}", ERR89_WRONG_AMOUNT_COUNT
-        );
-        let shares = if self.shares_total_supply > 0 {
+    pub fn predict_add_simple_liquidity(&self, amounts: &Vec<Balance>) -> (Balance, Vec<Balance>) {
+        let mut real_cost = vec![];
+        if self.shares_total_supply > 0 {
             let mut fair_supply = U256::max_value();
             for i in 0..self.token_account_ids.len() {
                 assert!(amounts[i] > 0, "{}", ERR31_ZERO_AMOUNT);
@@ -130,18 +124,33 @@ impl SimplePool {
                     / U256::from(self.shares_total_supply))
                 .as_u128() + 1;
                 assert!(amount > 0, "{}", ERR31_ZERO_AMOUNT);
-                self.amounts[i] += amount;
-                amounts[i] = amount;
+                real_cost.push(amount);
             }
-            fair_supply.as_u128()
+            (fair_supply.as_u128(), real_cost)
         } else {
             for i in 0..self.token_account_ids.len() {
                 assert!(amounts[i] > 0, "{}", ERR31_ZERO_AMOUNT);
-                self.amounts[i] += amounts[i];
+                real_cost.push(amounts[i]);
             }
-            INIT_SHARES_SUPPLY
-        };
-        self.mint_shares(&sender_id, shares);
+            (INIT_SHARES_SUPPLY, real_cost)
+        }
+    }
+
+    /// Adds the amounts of tokens to liquidity pool and returns number of shares that this user receives.
+    /// Updates amount to amount kept in the pool.
+    pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>, is_view: bool) -> Balance {
+        assert_eq!(
+            amounts.len(),
+            NUM_TOKENS,
+            "{}", ERR89_WRONG_AMOUNT_COUNT
+        );
+        let (shares, real_cost) = self.predict_add_simple_liquidity(amounts);
+        for i in 0..self.token_account_ids.len() {
+            self.amounts[i] += real_cost[i];
+            amounts[i] = real_cost[i];
+        }
+
+        self.mint_shares(&sender_id, shares, is_view);
         assert!(shares > 0, "{}", ERR32_ZERO_SHARES);
         env::log(
             format!(
@@ -159,12 +168,14 @@ impl SimplePool {
     }
 
     /// Mint new shares for given user.
-    fn mint_shares(&mut self, account_id: &AccountId, shares: Balance) {
+    fn mint_shares(&mut self, account_id: &AccountId, shares: Balance, is_view: bool) {
         if shares == 0 {
             return;
         }
         self.shares_total_supply = self.shares_total_supply.checked_add(shares).expect(ERR36_SHARES_TOTAL_SUPPLY_OVERFLOW);
-        add_to_collection(&mut self.shares, &account_id, shares);
+        if !is_view {
+            add_to_collection(&mut self.shares, &account_id, shares);
+        }
     }
 
     /// Removes given number of shares from the pool and returns amounts to the parent.
@@ -173,6 +184,7 @@ impl SimplePool {
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
+        is_view: bool
     ) -> Vec<Balance> {
         assert_eq!(
             min_amounts.len(),
@@ -190,12 +202,14 @@ impl SimplePool {
             self.amounts[i] -= amount;
             result.push(amount);
         }
-        if prev_shares_amount == shares {
-            // [AUDIT_13] Never unregister a LP when he removed all his liquidity.
-            self.shares.insert(&sender_id, &0);
-        } else {
-            self.shares
-                .insert(&sender_id, &(prev_shares_amount - shares));
+        if !is_view {
+            if prev_shares_amount == shares {
+                // [AUDIT_13] Never unregister a LP when he removed all his liquidity.
+                self.shares.insert(&sender_id, &0);
+            } else {
+                self.shares
+                    .insert(&sender_id, &(prev_shares_amount - shares));
+            }
         }
         env::log(
             format!(
@@ -276,6 +290,7 @@ impl SimplePool {
         token_out: &AccountId,
         min_amount_out: Balance,
         admin_fee: &AdminFees,
+        is_view: bool
     ) -> Balance {
         assert_ne!(token_in, token_out, "{}", ERR73_SAME_TOKEN);
         let in_idx = self.token_index(token_in);
@@ -326,7 +341,7 @@ impl SimplePool {
                 0
             };
             if referral_share > 0 {
-                self.mint_shares(&admin_fee.referral_info.as_ref().unwrap().0, referral_share);
+                self.mint_shares(&admin_fee.referral_info.as_ref().unwrap().0, referral_share, is_view);
                 env::log(
                     format!(
                         "Exchange {} got {} shares, Referral {} got {} shares",
@@ -344,7 +359,7 @@ impl SimplePool {
                 );
             }
             // Finally, remaining admin shares belong to the exchange
-            self.mint_shares(&admin_fee.exchange_id, admin_shares - referral_share);
+            self.mint_shares(&admin_fee.exchange_id, admin_shares - referral_share, is_view);
         }
 
         // Keeping track of volume per each input traded separately.
@@ -372,7 +387,7 @@ mod tests {
         testing_env!(context.build());
         let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 30);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, false);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
         assert_eq!(
             pool.share_balance_of(accounts(0).as_ref()),
@@ -388,6 +403,7 @@ mod tests {
                 exchange_id: accounts(3).as_ref().clone(),
                 referral_info: None,
             },
+            false
         );
         assert_eq!(
             pool.share_balance_of(accounts(0).as_ref()),
@@ -408,7 +424,7 @@ mod tests {
             INIT_SHARES_SUPPLY / 2
         );
         assert_eq!(
-            pool.remove_liquidity(accounts(0).as_ref(), num_shares / 2, vec![1, 1]),
+            pool.remove_liquidity(accounts(0).as_ref(), num_shares / 2, vec![1, 1], false),
             [3 * one_near, 5 * one_near - out / 2]
         );
     }
@@ -421,7 +437,7 @@ mod tests {
         testing_env!(context.build());
         let mut pool = SimplePool::new(0, vec![accounts(1), accounts(2)], 100);
         let mut amounts = vec![to_yocto("5"), to_yocto("10")];
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, false);
         assert_eq!(amounts, vec![to_yocto("5"), to_yocto("10")]);
         assert_eq!(
             pool.share_balance_of(accounts(0).as_ref()),
@@ -437,14 +453,15 @@ mod tests {
                 exchange_id: accounts(3).as_ref().clone(),
                 referral_info: None,
             },
+            false
         );
         assert_eq!(
             pool.share_balance_of(accounts(0).as_ref()),
             INIT_SHARES_SUPPLY
         );
-        let liq1 = pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1]);
+        let liq1 = pool.remove_liquidity(accounts(0).as_ref(), num_shares, vec![1, 1], false);
         let num_shares2 = pool.share_balance_of(accounts(3).as_ref());
-        let liq2 = pool.remove_liquidity(accounts(3).as_ref(), num_shares2, vec![1, 1]);
+        let liq2 = pool.remove_liquidity(accounts(3).as_ref(), num_shares2, vec![1, 1], false);
         assert_eq!(liq1[0] + liq2[0], to_yocto("6"));
         assert_eq!(liq1[1] + liq2[1], to_yocto("10") - out);
     }
@@ -466,6 +483,6 @@ mod tests {
             }),
         };
         let mut amounts = vec![145782, 1];
-        let _ = pool.add_liquidity(&accounts(2).to_string(), &mut amounts);
+        let _ = pool.add_liquidity(&accounts(2).to_string(), &mut amounts, false);
     }
 }

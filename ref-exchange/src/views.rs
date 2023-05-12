@@ -336,6 +336,16 @@ impl Contract {
     }
 
     ///
+    pub fn predict_add_simple_liquidity(
+        &self,
+        pool_id: u64,
+        amounts: &Vec<U128>,
+    ) -> (U128, Vec<U128>) {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let (shares, real_cost) = pool.predict_add_simple_liquidity(&amounts.into_iter().map(|x| x.0).collect());
+        (U128(shares), real_cost.into_iter().map(|v| U128(v)).collect())
+    }
+
     pub fn predict_add_stable_liquidity(
         &self,
         pool_id: u64,
@@ -437,5 +447,88 @@ impl Contract {
         };
         pool.get_rated_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &rates, &AdminFees::new(self.admin_fee_bps))
             .into()
+    }
+
+    pub fn predict_hot_zap(
+        &self, 
+        referral_id: Option<ValidAccountId>,
+        token_in: ValidAccountId,
+        amount_in: U128,
+        hot_zap_actions: Vec<Action>,
+
+        pool_id: u64,
+        min_amounts: Option<Vec<U128>>,
+        min_shares: Option<U128>,
+    ) -> (U128, HashMap<AccountId, U128>) {
+        // let mut view_account: Account = Account::new(&String::from("@view"));
+        let mut account_assets = HashMap::from([(token_in.to_string(), amount_in)]);
+        let mut pool_cache = HashMap::new();
+        let view_account_id: AccountId = "@view".to_string();
+
+        let referral_id = referral_id.map(|x| x.to_string());
+        let referral_info :Option<(AccountId, u32)> = referral_id
+            .as_ref().and_then(|rid| self.referrals.get(&rid))
+            .map(|fee| (referral_id.unwrap().into(), fee));
+
+        self.internal_execute_actions_in_cache(
+            &mut pool_cache,
+            &mut account_assets,
+            &referral_info,
+            &hot_zap_actions,
+            ActionResult::Amount(amount_in),
+        );
+
+        let mut pool = pool_cache.remove(&pool_id).unwrap_or(self.pools.get(pool_id).expect(ERR85_NO_POOL));
+        
+        let tokens_in_pool = match &pool {
+            Pool::SimplePool(p) => p.token_account_ids.clone(),
+            Pool::RatedSwapPool(p) => p.token_account_ids.clone(),
+            Pool::StableSwapPool(p) => p.token_account_ids.clone(),
+        };
+
+        let mut add_liquidity_amounts = vec![];
+        for token_id in tokens_in_pool.iter() {
+            add_liquidity_amounts.push(
+                account_assets.get(token_id).expect(&format!("actions result missing token : {:?}", token_id)).0
+            )
+        }
+
+        let shares = match pool {
+            Pool::SimplePool(_) => {
+                let shares = pool.add_liquidity(
+                    &view_account_id,
+                    &mut add_liquidity_amounts,
+                    true
+                );
+                if let Some(min_amounts) = min_amounts {
+                    // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
+                    for (amount, min_amount) in add_liquidity_amounts.iter().zip(min_amounts.iter()) {
+                        assert!(amount >= &min_amount.0, "{}", ERR86_MIN_AMOUNT);
+                    }
+                }
+                shares
+            },
+            Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) => {
+                let min_shares = min_shares.expect("Need input min_shares");
+                let shares = pool.add_stable_liquidity(
+                    &view_account_id,
+                    &add_liquidity_amounts,
+                    min_shares.into(),
+                    AdminFees::new(self.admin_fee_bps),
+                    true
+                );
+                shares
+            }
+        };
+
+        for i in 0..tokens_in_pool.len() {
+            let amount_before_add_liquidity = account_assets.remove(&tokens_in_pool[i]).unwrap();
+            let diff = amount_before_add_liquidity.0 - add_liquidity_amounts[i];
+            if diff > 0 {
+                account_assets.insert(tokens_in_pool[i].clone(), U128(diff));
+            }
+        }
+
+        (U128(shares), account_assets)
     }
 }

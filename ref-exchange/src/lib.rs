@@ -257,6 +257,7 @@ impl Contract {
         let shares = pool.add_liquidity(
             &sender_id,
             &mut amounts,
+            false
         );
         if let Some(min_amounts) = min_amounts {
             // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
@@ -307,6 +308,7 @@ impl Contract {
             &amounts,
             min_shares.into(),
             AdminFees::new(self.admin_fee_bps),
+            false
         );
         // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
         let mut deposits = self.internal_unwrap_account(&sender_id);
@@ -349,6 +351,7 @@ impl Contract {
                 .into_iter()
                 .map(|amount| amount.into())
                 .collect(),
+            false
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
@@ -396,6 +399,7 @@ impl Contract {
                 .collect(),
             max_burn_shares.into(),
             AdminFees::new(self.admin_fee_bps),
+            false
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
@@ -581,8 +585,95 @@ impl Contract {
                 exchange_id: env::current_account_id(),
                 referral_info: referral_info.clone(),
             },
+            false
         );
         self.pools.replace(pool_id, &pool);
+        amount_out
+    }
+}
+
+use std::collections::HashMap;
+
+impl Contract {
+    fn internal_execute_actions_in_cache(
+        &self,
+        pool_cache: &mut HashMap<u64, Pool>,
+        account_assets: &mut HashMap<AccountId, U128>,
+        referral_info: &Option<(AccountId, u32)>,
+        actions: &[Action],
+        prev_result: ActionResult,
+    ) {
+        self.assert_no_frozen_tokens(
+            &get_tokens_in_actions(actions)
+            .into_iter()
+            .map(|token| token)
+            .collect::<Vec<AccountId>>()
+        );
+
+        let mut result = prev_result;
+        for action in actions {
+            result = self.internal_execute_action_in_cache(pool_cache, account_assets, referral_info, action, result);
+        }
+    }
+
+    fn internal_execute_action_in_cache(
+        &self,
+        pool_cache: &mut HashMap<u64, Pool>,
+        account_assets: &mut HashMap<AccountId, U128>,
+        referral_info: &Option<(AccountId, u32)>,
+        action: &Action,
+        prev_result: ActionResult,
+    ) -> ActionResult {
+        match action {
+            Action::Swap(swap_action) => {
+                let amount_in = swap_action
+                    .amount_in
+                    .map(|value| value.0)
+                    .unwrap_or_else(|| prev_result.to_amount());
+                let exist_token_in_amount = account_assets.remove(&swap_action.token_in).unwrap();
+                let remain = exist_token_in_amount.0 - amount_in;
+                if remain > 0 {
+                    account_assets.insert(swap_action.token_in.clone(), U128(exist_token_in_amount.0 - amount_in));
+                }
+                let amount_out = self.internal_pool_swap_in_cache(
+                    pool_cache,
+                    swap_action.pool_id,
+                    &swap_action.token_in,
+                    amount_in,
+                    &swap_action.token_out,
+                    swap_action.min_amount_out.0,
+                    referral_info,
+                );
+                account_assets.entry(swap_action.token_out.clone()).and_modify(|v| *v = U128(v.0 + amount_out)).or_insert(U128(amount_out));
+                ActionResult::Amount(U128(amount_out))
+            }
+        }
+    }
+
+    fn internal_pool_swap_in_cache(
+        &self,
+        pool_cache: &mut HashMap<u64, Pool>,
+        pool_id: u64,
+        token_in: &AccountId,
+        amount_in: u128,
+        token_out: &AccountId,
+        min_amount_out: u128,
+        referral_info: &Option<(AccountId, u32)>,
+    ) -> u128 {
+        let mut pool = pool_cache.remove(&pool_id).unwrap_or(self.pools.get(pool_id).expect(ERR85_NO_POOL));
+        let amount_out = pool.swap(
+            token_in,
+            amount_in,
+            token_out,
+            min_amount_out,
+            AdminFees {
+                admin_fee_bps: self.admin_fee_bps,
+                exchange_id: env::current_account_id(),
+                referral_info: referral_info.clone(),
+            },
+            true
+        );
+        pool_cache.insert(pool_id, pool);
         amount_out
     }
 }

@@ -269,6 +269,7 @@ impl RatedSwapPool {
         amounts: &Vec<Balance>,
         min_shares: Balance,
         fees: &AdminFees,
+        is_view: bool
     ) -> Balance {
 
         let n_coins = self.token_account_ids.len();
@@ -283,7 +284,7 @@ impl RatedSwapPool {
             self.c_amounts[i] = self.c_amounts[i].checked_add(self.amount_to_c_amount(amounts[i], i)).unwrap();
         }
 
-        self.mint_shares(sender_id, new_shares);
+        self.mint_shares(sender_id, new_shares, is_view);
         env::log(
             format!(
                 "Mint {} shares for {}, fee is {} shares",
@@ -299,8 +300,8 @@ impl RatedSwapPool {
             if referral_share > 0 && self.shares.get(&referral).is_none() {
                 referral_share = 0;
             }
-            self.mint_shares(&referral, referral_share);
-            self.mint_shares(&fees.exchange_id, admin_share - referral_share);
+            self.mint_shares(&referral, referral_share, is_view);
+            self.mint_shares(&fees.exchange_id, admin_share - referral_share, is_view);
 
             if referral_share > 0 {
                 env::log(
@@ -346,6 +347,7 @@ impl RatedSwapPool {
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
+        is_view: bool
     ) -> Vec<Balance> {
         let n_coins = self.token_account_ids.len();
         assert_eq!(min_amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
@@ -370,7 +372,7 @@ impl RatedSwapPool {
             assert!(result[i] >= min_amounts[i], "{}", ERR68_SLIPPAGE);
         }
 
-        self.burn_shares(&sender_id, prev_shares_amount, shares);
+        self.burn_shares(&sender_id, prev_shares_amount, shares, is_view);
         
         env::log(
             format!(
@@ -447,6 +449,7 @@ impl RatedSwapPool {
         amounts: Vec<Balance>,
         max_burn_shares: Balance,
         fees: &AdminFees,
+        is_view: bool
     ) -> Balance {
 
         let n_coins = self.token_account_ids.len();
@@ -484,7 +487,7 @@ impl RatedSwapPool {
             self.c_amounts[i] = self.c_amounts[i].checked_sub(c_amounts[i]).unwrap();
             self.assert_min_reserve(self.c_amounts[i]);
         }
-        self.burn_shares(&sender_id, prev_shares_amount, burn_shares);
+        self.burn_shares(&sender_id, prev_shares_amount, burn_shares, is_view);
         env::log(
             format!(
                 "LP {} removed {} shares by given tokens, and fee is {} shares",
@@ -500,8 +503,8 @@ impl RatedSwapPool {
             if referral_share > 0 && self.shares.get(&referral).is_none() {
                 referral_share = 0;
             }
-            self.mint_shares(&referral, referral_share);
-            self.mint_shares(&fees.exchange_id, admin_share - referral_share);
+            self.mint_shares(&referral, referral_share, is_view);
+            self.mint_shares(&fees.exchange_id, admin_share - referral_share, is_view);
 
             if referral_share > 0 {
                 env::log(
@@ -602,6 +605,7 @@ impl RatedSwapPool {
         token_out: &AccountId,
         min_amount_out: Balance,
         fees: &AdminFees,
+        is_view: bool
     ) -> Balance {
 
         assert_ne!(token_in, token_out, "{}", ERR71_SWAP_DUP_TOKENS);
@@ -637,12 +641,12 @@ impl RatedSwapPool {
             let (exchange_share, referral_share) = if let Some((referral_id, referral_fee)) = &fees.referral_info {
                 if self.shares.contains_key(referral_id)
                 {
-                    self.distribute_admin_fee(&fees.exchange_id, referral_id, *referral_fee, out_idx, result.admin_fee)
+                    self.distribute_admin_fee(&fees.exchange_id, referral_id, *referral_fee, out_idx, result.admin_fee, is_view)
                 } else {
-                    self.distribute_admin_fee(&fees.exchange_id, referral_id, 0, out_idx, result.admin_fee)
+                    self.distribute_admin_fee(&fees.exchange_id, referral_id, 0, out_idx, result.admin_fee, is_view)
                 }
             } else {
-                self.distribute_admin_fee(&fees.exchange_id, &fees.exchange_id, 0, out_idx, result.admin_fee)
+                self.distribute_admin_fee(&fees.exchange_id, &fees.exchange_id, 0, out_idx, result.admin_fee, is_view)
             };
             if referral_share > 0 {
                 env::log(
@@ -675,6 +679,7 @@ impl RatedSwapPool {
         referral_fee_bps: u32,
         token_id: usize,
         c_amount: Balance,
+        is_view: bool
     ) -> (Balance, Balance) {
         let invariant = self.get_invariant_with_rates(&self.get_rates());
 
@@ -697,19 +702,21 @@ impl RatedSwapPool {
             0
         };
 
-        self.mint_shares(referral_id, referral_share);
-        self.mint_shares(exchange_id, new_shares - referral_share);
+        self.mint_shares(referral_id, referral_share, is_view);
+        self.mint_shares(exchange_id, new_shares - referral_share, is_view);
 
         (new_shares - referral_share, referral_share)
     }
 
     /// Mint new shares for given user.
-    fn mint_shares(&mut self, account_id: &AccountId, shares: Balance) {
+    fn mint_shares(&mut self, account_id: &AccountId, shares: Balance, is_view: bool) {
         if shares == 0 {
             return;
         }
         self.shares_total_supply += shares;
-        add_to_collection(&mut self.shares, &account_id, shares);
+        if !is_view {
+            add_to_collection(&mut self.shares, &account_id, shares);
+        }
     }
 
     /// Burn shares from given user's balance.
@@ -718,14 +725,16 @@ impl RatedSwapPool {
         account_id: &AccountId,
         prev_shares_amount: Balance,
         shares: Balance,
+        is_view: bool
     ) {
         if shares == 0 {
             return;
         }
         // Never remove shares from storage to allow to bring it back without extra storage deposit.
         self.shares_total_supply -= shares;
-        self.shares
-            .insert(&account_id, &(prev_shares_amount - shares));
+        if !is_view {
+            self.shares.insert(&account_id, &(prev_shares_amount - shares));
+        }
     }
 
     /// See if the given account has been registered as a LP
@@ -839,6 +848,7 @@ mod tests {
             accounts(token_out).as_ref(),
             0,
             &AdminFees::zero(),
+            false
         )
     }
 
@@ -873,7 +883,7 @@ mod tests {
         println!("rates: {:?}", pool.get_rates());
 
         let mut amounts = vec![100000 * PRECISION, 200000 * PRECISION];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let out = swap(&mut pool, 1, 1 * PRECISION, 2);
         assert_eq!(out, 1_999999990004997550200911);

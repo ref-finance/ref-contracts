@@ -41,9 +41,21 @@ impl Pool {
         &mut self,
         sender_id: &AccountId,
         amounts: &mut Vec<Balance>,
+        is_view: bool
     ) -> Balance {
         match self {
-            Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts),
+            Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts, is_view),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(_) => unimplemented!(),
+        }
+    }
+
+    pub fn predict_add_simple_liquidity(
+        &self,
+        amounts: &Vec<Balance>,
+    ) -> (Balance, Vec<u128>) {
+        match self {
+            Pool::SimplePool(pool) => pool.predict_add_simple_liquidity(amounts),
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(_) => unimplemented!(),
         }
@@ -55,11 +67,12 @@ impl Pool {
         amounts: &Vec<Balance>,
         min_shares: Balance,
         admin_fee: AdminFees,
+        is_view: bool
     ) -> Balance {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee),
-            Pool::RatedSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee),
+            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee, is_view),
+            Pool::RatedSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee, is_view),
         }
     }
 
@@ -69,14 +82,15 @@ impl Pool {
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
+        is_view: bool
     ) -> Vec<Balance> {
         match self {
-            Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts),
+            Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts, is_view),
             Pool::StableSwapPool(pool) => {
-                pool.remove_liquidity_by_shares(sender_id, shares, min_amounts)
+                pool.remove_liquidity_by_shares(sender_id, shares, min_amounts, is_view)
             },
             Pool::RatedSwapPool(pool) => {
-                pool.remove_liquidity_by_shares(sender_id, shares, min_amounts)
+                pool.remove_liquidity_by_shares(sender_id, shares, min_amounts, is_view)
             }
         }
     }
@@ -88,14 +102,15 @@ impl Pool {
         amounts: Vec<Balance>,
         max_burn_shares: Balance,
         admin_fee: AdminFees,
+        is_view: bool
     ) -> Balance {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => {
-                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee)
+                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee, is_view)
             },
             Pool::RatedSwapPool(pool) => {
-                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee)
+                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee, is_view)
             }
         }
     }
@@ -159,16 +174,17 @@ impl Pool {
         token_out: &AccountId,
         min_amount_out: Balance,
         admin_fee: AdminFees,
+        is_view: bool
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => {
-                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee, is_view)
             }
             Pool::StableSwapPool(pool) => {
-                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee, is_view)
             }
             Pool::RatedSwapPool(pool) => {
-                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee, is_view)
             }
         }
     }

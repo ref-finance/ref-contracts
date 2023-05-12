@@ -216,6 +216,7 @@ impl Contract {
                 .into_iter()
                 .map(|amount| amount.into())
                 .collect(),
+            false
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
