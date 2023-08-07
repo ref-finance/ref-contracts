@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use near_sdk::json_types::{ValidAccountId, U128, U64};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
-use crate::utils::SwapVolume;
+use crate::utils::{SwapVolume, TokenCache};
 use crate::rated_swap::rate::Rate;
 use crate::*;
 
@@ -54,6 +54,14 @@ pub struct PoolInfo {
     /// Total number of shares.
     pub shares_total_supply: U128,
     pub amp: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub struct AddLiquidityPrediction {
+    pub need_amounts: Vec<U128>,
+    pub mint_shares: U128,
 }
 
 impl From<Pool> for PoolInfo {
@@ -340,10 +348,13 @@ impl Contract {
         &self,
         pool_id: u64,
         amounts: &Vec<U128>,
-    ) -> (U128, Vec<U128>) {
+    ) -> AddLiquidityPrediction {
         let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         let (shares, real_cost) = pool.predict_add_simple_liquidity(&amounts.into_iter().map(|x| x.0).collect());
-        (U128(shares), real_cost.into_iter().map(|v| U128(v)).collect())
+        AddLiquidityPrediction {
+            need_amounts: real_cost.iter().map(|v| U128(*v)).collect(),
+            mint_shares: U128(shares)
+        }
     }
 
     pub fn predict_add_stable_liquidity(
@@ -455,14 +466,12 @@ impl Contract {
         token_in: ValidAccountId,
         amount_in: U128,
         hot_zap_actions: Vec<Action>,
-
-        pool_id: u64,
-        min_amounts: Option<Vec<U128>>,
-        min_shares: Option<U128>,
-    ) -> (U128, HashMap<AccountId, U128>) {
-        // let mut view_account: Account = Account::new(&String::from("@view"));
-        let mut account_assets = HashMap::from([(token_in.to_string(), amount_in)]);
+        add_liquidity_infos: Vec<token_receiver::AddLiquidityInfo>
+    ) -> (Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>) {
         let mut pool_cache = HashMap::new();
+        let mut add_liquidity_predictions = vec![];
+        let mut token_cache = TokenCache::new();
+        token_cache.add(&token_in.into(), amount_in.0);
         let view_account_id: AccountId = "@view".to_string();
 
         let referral_id = referral_id.map(|x| x.to_string());
@@ -470,65 +479,67 @@ impl Contract {
             .as_ref().and_then(|rid| self.referrals.get(&rid))
             .map(|fee| (referral_id.unwrap().into(), fee));
 
-        self.internal_execute_actions_in_cache(
+        self.internal_execute_actions_by_cache(
             &mut pool_cache,
-            &mut account_assets,
+            &mut token_cache,
             &referral_info,
             &hot_zap_actions,
             ActionResult::Amount(amount_in),
         );
 
-        let mut pool = pool_cache.remove(&pool_id).unwrap_or(self.pools.get(pool_id).expect(ERR85_NO_POOL));
-        
-        let tokens_in_pool = match &pool {
-            Pool::SimplePool(p) => p.token_account_ids.clone(),
-            Pool::RatedSwapPool(p) => p.token_account_ids.clone(),
-            Pool::StableSwapPool(p) => p.token_account_ids.clone(),
-        };
-
-        let mut add_liquidity_amounts = vec![];
-        for token_id in tokens_in_pool.iter() {
-            add_liquidity_amounts.push(
-                account_assets.get(token_id).expect(&format!("actions result missing token : {:?}", token_id)).0
-            )
-        }
-
-        let shares = match pool {
-            Pool::SimplePool(_) => {
-                let shares = pool.add_liquidity(
-                    &view_account_id,
-                    &mut add_liquidity_amounts,
-                    true
-                );
-                if let Some(min_amounts) = min_amounts {
-                    // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
-                    for (amount, min_amount) in add_liquidity_amounts.iter().zip(min_amounts.iter()) {
-                        assert!(amount >= &min_amount.0, "{}", ERR86_MIN_AMOUNT);
+        for add_liquidity_info in add_liquidity_infos {
+            let mut pool = pool_cache.remove(&add_liquidity_info.pool_id).unwrap_or(self.pools.get(add_liquidity_info.pool_id).expect(ERR85_NO_POOL));
+            
+            let tokens_in_pool = match &pool {
+                Pool::SimplePool(p) => p.token_account_ids.clone(),
+                Pool::RatedSwapPool(p) => p.token_account_ids.clone(),
+                Pool::StableSwapPool(p) => p.token_account_ids.clone(),
+            };
+            
+            let mut add_liquidity_amounts = add_liquidity_info.amounts.iter().map(|v| v.0).collect();
+            
+            let shares = match pool {
+                Pool::SimplePool(_) => {
+                    let shares = pool.add_liquidity(
+                        &view_account_id,
+                        &mut add_liquidity_amounts,
+                        true
+                    );
+                    if let Some(min_amounts) = add_liquidity_info.min_amounts {
+                        // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
+                        for (amount, min_amount) in add_liquidity_amounts.iter().zip(min_amounts.iter()) {
+                            assert!(amount >= &min_amount.0, "{}", ERR86_MIN_AMOUNT);
+                        }
                     }
+                    shares
+                },
+                Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) => {
+                    let min_shares = add_liquidity_info.min_shares.expect("Need input min_shares");
+                    let shares = pool.add_stable_liquidity(
+                        &view_account_id,
+                        &add_liquidity_amounts,
+                        min_shares.into(),
+                        AdminFees::new(self.admin_fee_bps),
+                        true
+                    );
+                    shares
                 }
-                shares
-            },
-            Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) => {
-                let min_shares = min_shares.expect("Need input min_shares");
-                let shares = pool.add_stable_liquidity(
-                    &view_account_id,
-                    &add_liquidity_amounts,
-                    min_shares.into(),
-                    AdminFees::new(self.admin_fee_bps),
-                    true
-                );
-                shares
-            }
-        };
+            };
+            
+            add_liquidity_predictions.push(
+                AddLiquidityPrediction {
+                    need_amounts: add_liquidity_amounts.iter().map(|v| U128(*v)).collect(),
+                    mint_shares: U128(shares)
+                }
+            );
 
-        for i in 0..tokens_in_pool.len() {
-            let amount_before_add_liquidity = account_assets.remove(&tokens_in_pool[i]).unwrap();
-            let diff = amount_before_add_liquidity.0 - add_liquidity_amounts[i];
-            if diff > 0 {
-                account_assets.insert(tokens_in_pool[i].clone(), U128(diff));
+            for (cost_token_id, cost_amount) in tokens_in_pool.iter().zip(add_liquidity_amounts.into_iter()) {
+                token_cache.sub(cost_token_id, cost_amount);
             }
+
+            pool_cache.insert(add_liquidity_info.pool_id, pool);
         }
-
-        (U128(shares), account_assets)
+        
+        (add_liquidity_predictions, token_cache.into())
     }
 }

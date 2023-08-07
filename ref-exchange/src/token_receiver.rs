@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{serde_json, PromiseOrValue};
@@ -7,6 +5,15 @@ use near_sdk::{serde_json, PromiseOrValue};
 use crate::*;
 
 pub const VIRTUAL_ACC: &str = "@";
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct AddLiquidityInfo {
+    pub pool_id: u64,
+    pub amounts: Vec<U128>,
+    pub min_amounts: Option<Vec<U128>>,
+    pub min_shares: Option<U128>,
+}
 
 /// Message parameters to receive via token function call.
 #[derive(Serialize, Deserialize)]
@@ -22,10 +29,7 @@ enum TokenReceiverMessage {
     HotZap {
         referral_id: Option<ValidAccountId>,
         hot_zap_actions: Vec<Action>,
-
-        pool_id: u64,
-        min_amounts: Option<Vec<U128>>,
-        min_shares: Option<U128>,
+        add_liquidity_infos: Vec<AddLiquidityInfo>
     },
 }
 
@@ -111,14 +115,10 @@ impl FungibleTokenReceiver for Contract {
                 TokenReceiverMessage::HotZap { 
                     referral_id, 
                     hot_zap_actions, 
-
-                    pool_id, 
-                    min_amounts,
-                    min_shares,
+                    add_liquidity_infos
                 } => {
                     let sender_id: AccountId = sender_id.into();
-                    let mut account = self.internal_unwrap_account(&sender_id);
-
+                    let mut account = self.internal_unwrap_account(&sender_id);                    
                     let referral_id = referral_id.map(|x| x.to_string());
                     let out_amounts = self.internal_direct_actions(
                         token_in,
@@ -127,68 +127,64 @@ impl FungibleTokenReceiver for Contract {
                         &hot_zap_actions,
                     );
 
-                    let mut remain_assets = HashMap::new(); 
+                    let mut token_cache = TokenCache::new();
                     for (out_token_id, out_amount) in out_amounts {
-                        account.deposit(&out_token_id, out_amount);
-                        remain_assets.insert(out_token_id, U128(out_amount));
+                        token_cache.add(&out_token_id, out_amount);
                     }
                     
-                    let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-                    let tokens_in_pool = match &pool {
-                        Pool::SimplePool(p) => p.token_account_ids.clone(),
-                        Pool::RatedSwapPool(p) => p.token_account_ids.clone(),
-                        Pool::StableSwapPool(p) => p.token_account_ids.clone(),
-                    };
+                    for add_liquidity_info in add_liquidity_infos {
+                        let mut pool = self.pools.get(add_liquidity_info.pool_id).expect(ERR85_NO_POOL);
+                        let tokens_in_pool = match &pool {
+                            Pool::SimplePool(p) => p.token_account_ids.clone(),
+                            Pool::RatedSwapPool(p) => p.token_account_ids.clone(),
+                            Pool::StableSwapPool(p) => p.token_account_ids.clone(),
+                        };
+                        
+                        let mut add_liquidity_amounts = add_liquidity_info.amounts.iter().map(|v| v.0).collect();
 
-                    let mut add_liquidity_amounts = vec![];
-                    for token_id in tokens_in_pool.iter() {
-                        add_liquidity_amounts.push(
-                            remain_assets.get(token_id).expect(&format!("actions result missing token : {:?}", token_id)).0
-                        )
-                    }
-
-                    match pool {
-                        Pool::SimplePool(_) => {
-                            pool.add_liquidity(
-                                &sender_id,
-                                &mut add_liquidity_amounts,
-                                false
-                            );
-                            if let Some(min_amounts) = min_amounts {
-                                // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
-                                for (amount, min_amount) in add_liquidity_amounts.iter().zip(min_amounts.iter()) {
-                                    assert!(amount >= &min_amount.0, "{}", ERR86_MIN_AMOUNT);
+                        match pool {
+                            Pool::SimplePool(_) => {
+                                pool.add_liquidity(
+                                    &sender_id,
+                                    &mut add_liquidity_amounts,
+                                    false
+                                );
+                                if let Some(min_amounts) = add_liquidity_info.min_amounts {
+                                    // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
+                                    for (amount, min_amount) in add_liquidity_amounts.iter().zip(min_amounts.iter()) {
+                                        assert!(amount >= &min_amount.0, "{}", ERR86_MIN_AMOUNT);
+                                    }
                                 }
+                            },
+                            Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) => {
+                                let min_shares = add_liquidity_info.min_shares.expect("Need input min_shares");
+                                pool.add_stable_liquidity(
+                                    &sender_id,
+                                    &add_liquidity_amounts,
+                                    min_shares.into(),
+                                    AdminFees::new(self.admin_fee_bps),
+                                    false
+                                );
                             }
-                        },
-                        Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) => {
-                            let min_shares = min_shares.expect("Need input min_shares");
-                            pool.add_stable_liquidity(
-                                &sender_id,
-                                &add_liquidity_amounts,
-                                min_shares.into(),
-                                AdminFees::new(self.admin_fee_bps),
-                                false
-                            );
-                        }
-                    };
+                        };
 
-                    for i in 0..tokens_in_pool.len() {
-                        account.withdraw(&tokens_in_pool[i], add_liquidity_amounts[i]);
-                        let amount = remain_assets.remove(&tokens_in_pool[i]).unwrap().0;
-                        let remain = amount - add_liquidity_amounts[i];
-                        if remain > 0 {
-                            remain_assets.insert(tokens_in_pool[i].clone(), U128(remain));
+                        for (cost_token_id, cost_amount) in tokens_in_pool.iter().zip(add_liquidity_amounts.into_iter()) {
+                            token_cache.sub(cost_token_id, cost_amount);
                         }
+
+                        self.pools.replace(add_liquidity_info.pool_id, &pool);
                     }
-                    
+
+                    for (remain_token_id, remain_amount) in token_cache.0.iter() {
+                        account.deposit(remain_token_id, *remain_amount);
+                    }
+
                     self.internal_save_account(&sender_id, account);
-                    self.pools.replace(pool_id, &pool);
 
                     env::log(
                         format!(
                             "HotZap remain internal account assets: {:?}",
-                            remain_assets
+                            token_cache.0
                         )
                         .as_bytes(),
                     );
