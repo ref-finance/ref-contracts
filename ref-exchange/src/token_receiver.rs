@@ -117,6 +117,7 @@ impl FungibleTokenReceiver for Contract {
                     hot_zap_actions, 
                     add_liquidity_infos
                 } => {
+                    assert!(hot_zap_actions.len() > 0 && add_liquidity_infos.len() > 0);
                     let sender_id: AccountId = sender_id.into();
                     let mut account = self.internal_unwrap_account(&sender_id);                    
                     let referral_id = referral_id.map(|x| x.to_string());

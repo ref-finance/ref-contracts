@@ -467,7 +467,10 @@ impl Contract {
         amount_in: U128,
         hot_zap_actions: Vec<Action>,
         add_liquidity_infos: Vec<token_receiver::AddLiquidityInfo>
-    ) -> (Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>) {
+    ) -> Option<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)> {
+        if hot_zap_actions.is_empty() || add_liquidity_infos.is_empty() {
+            return None
+        }
         let mut pool_cache = HashMap::new();
         let mut add_liquidity_predictions = vec![];
         let mut token_cache = TokenCache::new();
@@ -540,6 +543,6 @@ impl Contract {
             pool_cache.insert(add_liquidity_info.pool_id, pool);
         }
         
-        (add_liquidity_predictions, token_cache.into())
+        Some((add_liquidity_predictions, token_cache.into()))
     }
 }

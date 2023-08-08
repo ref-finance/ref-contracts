@@ -78,7 +78,7 @@ fn test_hotzap_simple_pool() {
                 min_shares: None
             }
         ]
-    )).unwrap_json::<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)>());
+    )).unwrap_json::<Option<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)>>());
 
     let mock_boost_farming = deploy!(
         contract: MockBoostFarming,
@@ -229,7 +229,7 @@ fn test_hotzap_simple_pool_add_two() {
                 min_shares: None
             }
         ]
-    )).unwrap_json::<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)>());
+    )).unwrap_json::<Option<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)>>());
 
     let mock_boost_farming = deploy!(
         contract: MockBoostFarming,
@@ -425,7 +425,7 @@ fn test_hotzap_stable_pool() {
                 min_shares: Some(U128(0))
             }
         ]
-    )).unwrap_json::<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)>());
+    )).unwrap_json::<Option<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)>>());
 
     let mock_boost_farming = deploy!(
         contract: MockBoostFarming,
@@ -641,7 +641,7 @@ fn test_hotzap_stable_pool_add_two() {
                 min_shares: Some(U128(0))
             }
         ]
-    )).unwrap_json::<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)>());
+    )).unwrap_json::<Option<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)>>());
 
     let mock_boost_farming = deploy!(
         contract: MockBoostFarming,
@@ -830,7 +830,7 @@ fn test_hotzap_rate_pool() {
                 min_shares: Some(U128(0))
             }
         ]
-    )).unwrap_json::<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)>());
+    )).unwrap_json::<Option<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)>>());
 
     let mock_boost_farming = deploy!(
         contract: MockBoostFarming,
@@ -1030,7 +1030,7 @@ fn test_hotzap_rate_pool_add_two() {
                 min_shares: Some(U128(0))
             }
         ]
-    )).unwrap_json::<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)>());
+    )).unwrap_json::<Option<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)>>());
 
     let mock_boost_farming = deploy!(
         contract: MockBoostFarming,
