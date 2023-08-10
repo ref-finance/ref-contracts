@@ -294,6 +294,7 @@ fn test_hotzap_simple_pool_add_two() {
     println!("{:#?}", get_logs(&outcome));
     // println!("{:?}", outcome.promise_errors()[0].as_ref().unwrap().status());
     assert!(outcome.promise_errors().is_empty());
+    println!("gas burn: {:?}", outcome.gas_burnt());
     
     println!("before mft_transfer_all_call: {:?}", view!(mock_boost_farming.get_seed(seed_id.clone())).unwrap_json::<Value>());
 

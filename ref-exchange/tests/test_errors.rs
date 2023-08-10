@@ -293,13 +293,6 @@ fn sim_stable_e13 () {
 
     let outcome = call!(
         user,
-        ex.remove_liquidity_by_tokens(0, vec![U128(1), U128(1)], U128(1)),
-        deposit = 1
-    );
-    assert_failure(outcome, "E13: LP not registered");
-
-    let outcome = call!(
-        user,
         ex.mft_transfer(":0".to_string(), root.valid_account_id(), U128(1), None),
         deposit = 1
     );

@@ -638,7 +638,7 @@ impl Contract {
                     &swap_action.token_in,
                     amount_in,
                     &swap_action.token_out,
-                    swap_action.min_amount_out.0,
+                    0,
                     referral_info,
                 );
                 token_cache.add(&swap_action.token_out, amount_out);

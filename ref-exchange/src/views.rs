@@ -290,9 +290,8 @@ impl Contract {
         amount_in: U128,
         token_out: ValidAccountId,
     ) -> U128 {
-        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.get_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &AdminFees::new(self.admin_fee_bps))
-            .into()
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        pool.swap(token_in.as_ref(), amount_in.into(), token_out.as_ref(), 0, AdminFees::new(self.admin_fee_bps), true).into()
     }
 
     /// List referrals
@@ -349,11 +348,12 @@ impl Contract {
         pool_id: u64,
         amounts: &Vec<U128>,
     ) -> AddLiquidityPrediction {
-        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        let (shares, real_cost) = pool.predict_add_simple_liquidity(&amounts.into_iter().map(|x| x.0).collect());
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let mut amounts = amounts.iter().map(|v| v.0).collect();
+        let mint_shares = pool.add_liquidity(&String::from("@view"), &mut amounts, true);
         AddLiquidityPrediction {
-            need_amounts: real_cost.iter().map(|v| U128(*v)).collect(),
-            mint_shares: U128(shares)
+            need_amounts: amounts.iter().map(|v| U128(*v)).collect(),
+            mint_shares: U128(mint_shares)
         }
     }
 
@@ -362,9 +362,9 @@ impl Contract {
         pool_id: u64,
         amounts: &Vec<U128>,
     ) -> U128 {
-        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.predict_add_stable_liquidity(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.admin_fee_bps))
-            .into()
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let amounts = amounts.iter().map(|v| v.0).collect();
+        pool.add_stable_liquidity(&String::from("@view"), &amounts, 0, AdminFees::new(self.admin_fee_bps), true).into()
     }
 
     pub fn predict_remove_liquidity(
@@ -372,8 +372,8 @@ impl Contract {
         pool_id: u64,
         shares: U128,
     ) -> Vec<U128> {
-        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.predict_remove_liquidity(shares.into()).into_iter().map(|x| U128(x)).collect()
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        pool.remove_liquidity(&String::from("@view"), shares.into(), vec![0; pool.tokens().len()], true).into_iter().map(|x| U128(x)).collect()
     }
 
     pub fn predict_remove_liquidity_by_tokens(
@@ -381,9 +381,9 @@ impl Contract {
         pool_id: u64,
         amounts: &Vec<U128>,
     ) -> U128 {
-        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.predict_remove_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.admin_fee_bps))
-            .into()
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let amounts = amounts.iter().map(|v| v.0).collect();
+        pool.remove_liquidity_by_tokens(&String::from("@view"), amounts, u128::MAX, AdminFees::new(self.admin_fee_bps), true).into()
     }
 
     pub fn list_rated_tokens(&self) -> HashMap<String, RatedTokenInfo> {
@@ -508,20 +508,13 @@ impl Contract {
                         &mut add_liquidity_amounts,
                         true
                     );
-                    if let Some(min_amounts) = add_liquidity_info.min_amounts {
-                        // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
-                        for (amount, min_amount) in add_liquidity_amounts.iter().zip(min_amounts.iter()) {
-                            assert!(amount >= &min_amount.0, "{}", ERR86_MIN_AMOUNT);
-                        }
-                    }
                     shares
                 },
                 Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) => {
-                    let min_shares = add_liquidity_info.min_shares.expect("Need input min_shares");
                     let shares = pool.add_stable_liquidity(
                         &view_account_id,
                         &add_liquidity_amounts,
-                        min_shares.into(),
+                        0,
                         AdminFees::new(self.admin_fee_bps),
                         true
                     );

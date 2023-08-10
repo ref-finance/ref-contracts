@@ -238,20 +238,6 @@ impl StableSwapPool {
         }
     }
 
-    pub fn predict_add_stable_liquidity(
-        &self,
-        amounts: &Vec<Balance>,
-        fees: &AdminFees,
-    ) -> Balance {
-
-        let n_coins = self.token_account_ids.len();
-        assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
-
-        let (new_shares, _) = self.calc_add_liquidity(amounts, fees);
-
-        new_shares
-    }
-
     /// Add liquidity into the pool.
     /// Allows to add liquidity of a subset of tokens,
     /// by set other tokens balance into 0.
@@ -312,24 +298,6 @@ impl StableSwapPool {
         new_shares
     }
 
-    pub fn predict_remove_liquidity(
-        &self,
-        shares: Balance,
-    ) -> Vec<Balance> {
-        let n_coins = self.token_account_ids.len();
-        let mut result = vec![0u128; n_coins];
-        for i in 0..n_coins {
-            result[i] = U256::from(self.c_amounts[i])
-                .checked_mul(shares.into())
-                .unwrap()
-                .checked_div(self.shares_total_supply.into())
-                .unwrap()
-                .as_u128();
-            result[i] = self.c_amount_to_amount(result[i], i);
-        }
-        result
-    }
-
     /// balanced removal of liquidity would be free of charge.
     pub fn remove_liquidity_by_shares(
         &mut self,
@@ -340,12 +308,15 @@ impl StableSwapPool {
     ) -> Vec<Balance> {
         let n_coins = self.token_account_ids.len();
         assert_eq!(min_amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
-        let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
-        assert!(
-            prev_shares_amount >= shares,
-            "{}",
-            ERR34_INSUFFICIENT_LP_SHARES
-        );
+        if !is_view {
+            let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
+            assert!(
+                prev_shares_amount >= shares,
+                "{}",
+                ERR34_INSUFFICIENT_LP_SHARES
+            );
+            self.burn_shares(&sender_id, prev_shares_amount, shares);
+        }
         let mut result = vec![0u128; n_coins];
 
         for i in 0..n_coins {
@@ -361,8 +332,8 @@ impl StableSwapPool {
             assert!(result[i] >= min_amounts[i], "{}", ERR68_SLIPPAGE);
         }
 
-        self.burn_shares(&sender_id, prev_shares_amount, shares, is_view);
-        
+        self.shares_total_supply -= shares;
+
         env::log(
             format!(
                 "LP {} remove {} shares to gain tokens {:?}",
@@ -372,32 +343,6 @@ impl StableSwapPool {
         );
 
         result
-    }
-
-    pub fn predict_remove_liquidity_by_tokens(
-        &self,
-        amounts: &Vec<Balance>,
-        fees: &AdminFees,
-    ) -> Balance {
-        let n_coins = self.token_account_ids.len();
-        let c_amounts = self.amounts_to_c_amounts(amounts);
-        for i in 0..n_coins {
-            self.assert_min_reserve(self.c_amounts[i].checked_sub(c_amounts[i]).unwrap_or(0));
-        }
-
-        let invariant = self.get_invariant();
-        let trade_fee = Fees::new(self.total_fee, &fees);
-
-        let (burn_shares, _) = invariant
-            .compute_lp_amount_for_withdraw(
-                &c_amounts,
-                &self.c_amounts,
-                self.shares_total_supply,
-                &trade_fee,
-            )
-            .expect(ERR67_LPSHARE_CALC_ERR);
-
-        burn_shares
     }
 
     /// Remove liquidity from the pool by fixed tokens-out,
@@ -413,7 +358,6 @@ impl StableSwapPool {
     ) -> Balance {
         let n_coins = self.token_account_ids.len();
         assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
-        let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
 
         // make amounts into comparable-amounts
         let c_amounts = self.amounts_to_c_amounts(&amounts);
@@ -433,18 +377,23 @@ impl StableSwapPool {
             )
             .expect(ERR67_LPSHARE_CALC_ERR);
 
-        assert!(
-            burn_shares <= prev_shares_amount,
-            "{}",
-            ERR34_INSUFFICIENT_LP_SHARES
-        );
-        assert!(burn_shares <= max_burn_shares, "{}", ERR68_SLIPPAGE);
+        if !is_view {
+            let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
+            assert!(
+                burn_shares <= prev_shares_amount,
+                "{}",
+                ERR34_INSUFFICIENT_LP_SHARES
+            );
+            assert!(burn_shares <= max_burn_shares, "{}", ERR68_SLIPPAGE);
+            self.burn_shares(&sender_id, prev_shares_amount, burn_shares);
+        }
 
         for i in 0..n_coins {
             self.c_amounts[i] = self.c_amounts[i].checked_sub(c_amounts[i]).unwrap();
             self.assert_min_reserve(self.c_amounts[i]);
         }
-        self.burn_shares(&sender_id, prev_shares_amount, burn_shares, is_view);
+        self.shares_total_supply -= burn_shares;
+
         env::log(
             format!(
                 "LP {} removed {} shares by given tokens, and fee is {} shares",
@@ -506,25 +455,6 @@ impl StableSwapPool {
             )
             .expect(ERR70_SWAP_OUT_CALC_ERR)
 
-    }
-
-    /// Returns how much token you will receive if swap `token_amount_in` of `token_in` for `token_out`.
-    pub fn get_return(
-        &self,
-        token_in: &AccountId,
-        amount_in: Balance,
-        token_out: &AccountId,
-        fees: &AdminFees,
-    ) -> Balance {
-        assert_ne!(token_in, token_out, "{}", ERR71_SWAP_DUP_TOKENS);
-        let c_amount_out = self.internal_get_return(
-            self.token_index(token_in),
-            amount_in,
-            self.token_index(token_out),
-            &fees,
-        )
-        .amount_swapped;
-        self.c_amount_to_amount(c_amount_out, self.token_index(token_out))
     }
 
     /// Swap `token_amount_in` of `token_in` token into `token_out` and return how much was received.
@@ -655,16 +585,12 @@ impl StableSwapPool {
         account_id: &AccountId,
         prev_shares_amount: Balance,
         shares: Balance,
-        is_view: bool
     ) {
         if shares == 0 {
             return;
         }
         // Never remove shares from storage to allow to bring it back without extra storage deposit.
-        self.shares_total_supply -= shares;
-        if !is_view {
-            self.shares.insert(&account_id, &(prev_shares_amount - shares));
-        }
+        self.shares.insert(&account_id, &(prev_shares_amount - shares));
     }
 
     /// See if the given account has been registered as a LP

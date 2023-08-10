@@ -108,34 +108,6 @@ impl SimplePool {
         &self.token_account_ids
     }
 
-    pub fn predict_add_simple_liquidity(&self, amounts: &Vec<Balance>) -> (Balance, Vec<Balance>) {
-        let mut real_cost = vec![];
-        if self.shares_total_supply > 0 {
-            let mut fair_supply = U256::max_value();
-            for i in 0..self.token_account_ids.len() {
-                assert!(amounts[i] > 0, "{}", ERR31_ZERO_AMOUNT);
-                fair_supply = min(
-                    fair_supply,
-                    U256::from(amounts[i] - 1) * U256::from(self.shares_total_supply) / self.amounts[i],
-                );
-            }
-            for i in 0..self.token_account_ids.len() {
-                let amount = (U256::from(self.amounts[i]) * fair_supply
-                    / U256::from(self.shares_total_supply))
-                .as_u128() + 1;
-                assert!(amount > 0, "{}", ERR31_ZERO_AMOUNT);
-                real_cost.push(amount);
-            }
-            (fair_supply.as_u128(), real_cost)
-        } else {
-            for i in 0..self.token_account_ids.len() {
-                assert!(amounts[i] > 0, "{}", ERR31_ZERO_AMOUNT);
-                real_cost.push(amounts[i]);
-            }
-            (INIT_SHARES_SUPPLY, real_cost)
-        }
-    }
-
     /// Adds the amounts of tokens to liquidity pool and returns number of shares that this user receives.
     /// Updates amount to amount kept in the pool.
     pub fn add_liquidity(&mut self, sender_id: &AccountId, amounts: &mut Vec<Balance>, is_view: bool) -> Balance {
@@ -210,8 +182,17 @@ impl SimplePool {
             NUM_TOKENS,
             "{}", ERR89_WRONG_AMOUNT_COUNT
         );
-        let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
-        assert!(prev_shares_amount >= shares, "{}", ERR91_NOT_ENOUGH_SHARES);
+        if !is_view {
+            let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
+            assert!(prev_shares_amount >= shares, "{}", ERR91_NOT_ENOUGH_SHARES);
+            if prev_shares_amount == shares {
+                // [AUDIT_13] Never unregister a LP when he removed all his liquidity.
+                self.shares.insert(&sender_id, &0);
+            } else {
+                self.shares
+                    .insert(&sender_id, &(prev_shares_amount - shares));
+            }
+        }
         let mut result = vec![];
         for i in 0..self.token_account_ids.len() {
             let amount = (U256::from(self.amounts[i]) * U256::from(shares)
@@ -220,15 +201,6 @@ impl SimplePool {
             assert!(amount >= min_amounts[i], "{}", ERR68_SLIPPAGE);
             self.amounts[i] -= amount;
             result.push(amount);
-        }
-        if !is_view {
-            if prev_shares_amount == shares {
-                // [AUDIT_13] Never unregister a LP when he removed all his liquidity.
-                self.shares.insert(&sender_id, &0);
-            } else {
-                self.shares
-                    .insert(&sender_id, &(prev_shares_amount - shares));
-            }
         }
         env::log(
             format!(
@@ -274,20 +246,6 @@ impl SimplePool {
         let amount_with_fee = U256::from(amount_in) * U256::from(FEE_DIVISOR - self.total_fee);
         (amount_with_fee * out_balance / (U256::from(FEE_DIVISOR) * in_balance + amount_with_fee))
             .as_u128()
-    }
-
-    /// Returns how much token you will receive if swap `token_amount_in` of `token_in` for `token_out`.
-    pub fn get_return(
-        &self,
-        token_in: &AccountId,
-        amount_in: Balance,
-        token_out: &AccountId,
-    ) -> Balance {
-        self.internal_get_return(
-            self.token_index(token_in),
-            amount_in,
-            self.token_index(token_out),
-        )
     }
 
     /// Returns given pool's total fee.
