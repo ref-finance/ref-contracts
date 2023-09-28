@@ -143,18 +143,20 @@ impl SimplePool {
         };
         self.mint_shares(&sender_id, shares, is_view);
         assert!(shares > 0, "{}", ERR32_ZERO_SHARES);
-        env::log(
-            format!(
-                "Liquidity added {:?}, minted {} shares",
-                amounts
-                    .iter()
-                    .zip(self.token_account_ids.iter())
-                    .map(|(amount, token_id)| format!("{} {}", amount, token_id))
-                    .collect::<Vec<String>>(),
-                shares
-            )
-            .as_bytes(),
-        );
+        if !is_view {
+            env::log(
+                format!(
+                    "Liquidity added {:?}, minted {} shares",
+                    amounts
+                        .iter()
+                        .zip(self.token_account_ids.iter())
+                        .map(|(amount, token_id)| format!("{} {}", amount, token_id))
+                        .collect::<Vec<String>>(),
+                    shares
+                )
+                .as_bytes(),
+            );
+        }
         shares
     }
 
@@ -202,19 +204,21 @@ impl SimplePool {
             self.amounts[i] -= amount;
             result.push(amount);
         }
-        env::log(
-            format!(
-                "{} shares of liquidity removed: receive back {:?}",
-                shares,
-                result
-                    .iter()
-                    .zip(self.token_account_ids.iter())
-                    .map(|(amount, token_id)| format!("{} {}", amount, token_id))
-                    .collect::<Vec<String>>(),
-            )
-            .as_bytes(),
-        );
         self.shares_total_supply -= shares;
+        if !is_view {
+            env::log(
+                format!(
+                    "{} shares of liquidity removed: receive back {:?}",
+                    shares,
+                    result
+                        .iter()
+                        .zip(self.token_account_ids.iter())
+                        .map(|(amount, token_id)| format!("{} {}", amount, token_id))
+                        .collect::<Vec<String>>(),
+                )
+                .as_bytes(),
+            );
+        }
         result
     }
 
@@ -274,13 +278,15 @@ impl SimplePool {
         let out_idx = self.token_index(token_out);
         let amount_out = self.internal_get_return(in_idx, amount_in, out_idx);
         assert!(amount_out >= min_amount_out, "{}", ERR68_SLIPPAGE);
-        env::log(
-            format!(
-                "Swapped {} {} for {} {}",
-                amount_in, token_in, amount_out, token_out
-            )
-            .as_bytes(),
-        );
+        if !is_view {
+            env::log(
+                format!(
+                    "Swapped {} {} for {} {}",
+                    amount_in, token_in, amount_out, token_out
+                )
+                .as_bytes(),
+            );
+        }
 
         let prev_invariant =
             integer_sqrt(U256::from(self.amounts[in_idx]) * U256::from(self.amounts[out_idx]));
@@ -319,21 +325,25 @@ impl SimplePool {
             };
             if referral_share > 0 {
                 self.mint_shares(&admin_fee.referral_info.as_ref().unwrap().0, referral_share, is_view);
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, Referral {} got {} shares",
-                        &admin_fee.exchange_id, admin_shares - referral_share, &admin_fee.referral_info.as_ref().unwrap().0, referral_share,
-                    )
-                    .as_bytes(),
-                );
+                if !is_view {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, Referral {} got {} shares",
+                            &admin_fee.exchange_id, admin_shares - referral_share, &admin_fee.referral_info.as_ref().unwrap().0, referral_share,
+                        )
+                        .as_bytes(),
+                    );
+                }
             } else {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, No referral fee",
-                        &admin_fee.exchange_id, admin_shares,
-                    )
-                    .as_bytes(),
-                );
+                if !is_view {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, No referral fee",
+                            &admin_fee.exchange_id, admin_shares,
+                        )
+                        .as_bytes(),
+                    );
+                }
             }
             // Finally, remaining admin shares belong to the exchange
             self.mint_shares(&admin_fee.exchange_id, admin_shares - referral_share, is_view);

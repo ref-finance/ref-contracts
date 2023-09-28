@@ -133,7 +133,8 @@ impl FungibleTokenReceiver for Contract {
                     for (out_token_id, out_amount) in out_amounts {
                         token_cache.add(&out_token_id, out_amount);
                     }
-                    
+
+                    let prev_storage = env::storage_usage();
                     for add_liquidity_info in add_liquidity_infos {
                         let mut pool = self.pools.get(add_liquidity_info.pool_id).expect(ERR85_NO_POOL);
                         let tokens_in_pool = match &pool {
@@ -151,11 +152,10 @@ impl FungibleTokenReceiver for Contract {
                                     &mut add_liquidity_amounts,
                                     false
                                 );
-                                if let Some(min_amounts) = add_liquidity_info.min_amounts {
-                                    // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
-                                    for (amount, min_amount) in add_liquidity_amounts.iter().zip(min_amounts.iter()) {
-                                        assert!(amount >= &min_amount.0, "{}", ERR86_MIN_AMOUNT);
-                                    }
+                                let min_amounts = add_liquidity_info.min_amounts.expect("Need input min_amounts");
+                                // Check that all amounts are above request min amounts in case of front running that changes the exchange rate.
+                                for (amount, min_amount) in add_liquidity_amounts.iter().zip(min_amounts.iter()) {
+                                    assert!(amount >= &min_amount.0, "{}", ERR86_MIN_AMOUNT);
                                 }
                             },
                             Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) => {
@@ -175,6 +175,11 @@ impl FungibleTokenReceiver for Contract {
                         }
 
                         self.pools.replace(add_liquidity_info.pool_id, &pool);
+                    }
+
+                    if env::storage_usage() > prev_storage {
+                        let storage_cost = (env::storage_usage() - prev_storage) as Balance * env::storage_byte_cost();
+                        account.near_amount = account.near_amount.checked_sub(storage_cost).expect(ERR11_INSUFFICIENT_STORAGE);
                     }
 
                     for (remain_token_id, remain_amount) in token_cache.0.iter() {

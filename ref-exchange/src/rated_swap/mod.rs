@@ -285,13 +285,15 @@ impl RatedSwapPool {
         }
 
         self.mint_shares(sender_id, new_shares, is_view);
-        env::log(
-            format!(
-                "Mint {} shares for {}, fee is {} shares",
-                new_shares, sender_id, fee_part,
-            )
-            .as_bytes(),
-        );
+        if !is_view {
+            env::log(
+                format!(
+                    "Mint {} shares for {}, fee is {} shares",
+                    new_shares, sender_id, fee_part,
+                )
+                .as_bytes(),
+            );
+        }
 
         if fee_part > 0 {
             let admin_share = u128_ratio(fee_part, fees.admin_fee_bps as u128, FEE_DIVISOR as u128);
@@ -303,20 +305,22 @@ impl RatedSwapPool {
             self.mint_shares(&referral, referral_share, is_view);
             self.mint_shares(&fees.exchange_id, admin_share - referral_share, is_view);
 
-            if referral_share > 0 {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, Referral {} got {} shares, from add_liquidity", 
-                        &fees.exchange_id, admin_share - referral_share, referral, referral_share
-                    ).as_bytes(),
-                );
-            } else {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, No referral fee, from add_liquidity", 
-                        &fees.exchange_id, admin_share
-                    ).as_bytes(),
-                );
+            if !is_view {
+                if referral_share > 0 {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, Referral {} got {} shares, from add_liquidity", 
+                            &fees.exchange_id, admin_share - referral_share, referral, referral_share
+                        ).as_bytes(),
+                    );
+                } else {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, No referral fee, from add_liquidity", 
+                            &fees.exchange_id, admin_share
+                        ).as_bytes(),
+                    );
+                }
             }
         }
 
@@ -359,13 +363,15 @@ impl RatedSwapPool {
 
         self.shares_total_supply -= shares;
         
-        env::log(
-            format!(
-                "LP {} remove {} shares to gain tokens {:?}",
-                sender_id, shares, result
-            )
-            .as_bytes(),
-        );
+        if !is_view {
+            env::log(
+                format!(
+                    "LP {} remove {} shares to gain tokens {:?}",
+                    sender_id, shares, result
+                )
+                .as_bytes(),
+            );
+        }
 
         result
     }
@@ -449,13 +455,15 @@ impl RatedSwapPool {
         }
         self.shares_total_supply -= burn_shares;
 
-        env::log(
-            format!(
-                "LP {} removed {} shares by given tokens, and fee is {} shares",
-                sender_id, burn_shares, fee_part
-            )
-            .as_bytes(),
-        );
+        if !is_view {
+            env::log(
+                format!(
+                    "LP {} removed {} shares by given tokens, and fee is {} shares",
+                    sender_id, burn_shares, fee_part
+                )
+                .as_bytes(),
+            );
+        }
 
         if fee_part > 0 {
             let admin_share = u128_ratio(fee_part, fees.admin_fee_bps as u128, FEE_DIVISOR as u128);
@@ -467,20 +475,22 @@ impl RatedSwapPool {
             self.mint_shares(&referral, referral_share, is_view);
             self.mint_shares(&fees.exchange_id, admin_share - referral_share, is_view);
 
-            if referral_share > 0 {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, Referral {} got {} shares, from remove_liquidity_by_tokens", 
-                        &fees.exchange_id, admin_share - referral_share, referral, referral_share
-                    ).as_bytes(),
-                );
-            } else {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, No referral fee, from remove_liquidity_by_tokens", 
-                        &fees.exchange_id, admin_share
-                    ).as_bytes(),
-                );
+            if !is_view {
+                if referral_share > 0 {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, Referral {} got {} shares, from remove_liquidity_by_tokens", 
+                            &fees.exchange_id, admin_share - referral_share, referral, referral_share
+                        ).as_bytes(),
+                    );
+                } else {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, No referral fee, from remove_liquidity_by_tokens", 
+                            &fees.exchange_id, admin_share
+                        ).as_bytes(),
+                    );
+                }
             }
         }
 
@@ -567,15 +577,17 @@ impl RatedSwapPool {
             "{}",
             ERR68_SLIPPAGE
         );
-        env::log(
-            format!(
-                "Swapped {} {} for {} {}, total fee {}, admin fee {}",
-                amount_in, token_in, amount_swapped, token_out, 
-                self.c_amount_to_amount(result.fee, out_idx), 
-                self.c_amount_to_amount(result.admin_fee, out_idx)
-            )
-            .as_bytes(),
-        );
+        if !is_view {
+            env::log(
+                format!(
+                    "Swapped {} {} for {} {}, total fee {}, admin fee {}",
+                    amount_in, token_in, amount_swapped, token_out, 
+                    self.c_amount_to_amount(result.fee, out_idx), 
+                    self.c_amount_to_amount(result.admin_fee, out_idx)
+                )
+                .as_bytes(),
+            );
+        }
 
         self.c_amounts[in_idx] = result.new_source_amount;
         self.c_amounts[out_idx] = result.new_destination_amount;
@@ -597,22 +609,24 @@ impl RatedSwapPool {
             } else {
                 self.distribute_admin_fee(&fees.exchange_id, &fees.exchange_id, 0, out_idx, result.admin_fee, is_view)
             };
-            if referral_share > 0 {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, Referral {} got {} shares",
-                        &fees.exchange_id, exchange_share, &fees.referral_info.as_ref().unwrap().0, referral_share,
-                    )
-                    .as_bytes(),
-                );
-            } else {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, No referral fee",
-                        &fees.exchange_id, exchange_share,
-                    )
-                    .as_bytes(),
-                );
+            if !is_view {
+                if referral_share > 0 {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, Referral {} got {} shares",
+                            &fees.exchange_id, exchange_share, &fees.referral_info.as_ref().unwrap().0, referral_share,
+                        )
+                        .as_bytes(),
+                    );
+                } else {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, No referral fee",
+                            &fees.exchange_id, exchange_share,
+                        )
+                        .as_bytes(),
+                    );
+                }
             }
         }
 
