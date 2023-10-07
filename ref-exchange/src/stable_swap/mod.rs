@@ -238,20 +238,6 @@ impl StableSwapPool {
         }
     }
 
-    pub fn predict_add_stable_liquidity(
-        &self,
-        amounts: &Vec<Balance>,
-        fees: &AdminFees,
-    ) -> Balance {
-
-        let n_coins = self.token_account_ids.len();
-        assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
-
-        let (new_shares, _) = self.calc_add_liquidity(amounts, fees);
-
-        new_shares
-    }
-
     /// Add liquidity into the pool.
     /// Allows to add liquidity of a subset of tokens,
     /// by set other tokens balance into 0.
@@ -261,6 +247,7 @@ impl StableSwapPool {
         amounts: &Vec<Balance>,
         min_shares: Balance,
         fees: &AdminFees,
+        is_view: bool
     ) -> Balance {
         let n_coins = self.token_account_ids.len();
         assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
@@ -272,14 +259,16 @@ impl StableSwapPool {
         for i in 0..n_coins {
             self.c_amounts[i] = self.c_amounts[i].checked_add(self.amount_to_c_amount(amounts[i], i)).unwrap();
         }
-        self.mint_shares(sender_id, new_shares);
-        env::log(
-            format!(
-                "Mint {} shares for {}, fee is {} shares",
-                new_shares, sender_id, fee_part,
-            )
-            .as_bytes(),
-        );
+        self.mint_shares(sender_id, new_shares, is_view);
+        if !is_view {
+            env::log(
+                format!(
+                    "Mint {} shares for {}, fee is {} shares",
+                    new_shares, sender_id, fee_part,
+                )
+                .as_bytes(),
+            );
+        }
 
         if fee_part > 0 {
             let admin_share = u128_ratio(fee_part, fees.admin_fee_bps as u128, FEE_DIVISOR as u128);
@@ -288,45 +277,29 @@ impl StableSwapPool {
             if referral_share > 0 && self.shares.get(&referral).is_none() {
                 referral_share = 0;
             }
-            self.mint_shares(&referral, referral_share);
-            self.mint_shares(&fees.exchange_id, admin_share - referral_share);
+            self.mint_shares(&referral, referral_share, is_view);
+            self.mint_shares(&fees.exchange_id, admin_share - referral_share, is_view);
 
-            if referral_share > 0 {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, Referral {} got {} shares, from add_liquidity", 
-                        &fees.exchange_id, admin_share - referral_share, referral, referral_share
-                    ).as_bytes(),
-                );
-            } else {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, No referral fee, from add_liquidity", 
-                        &fees.exchange_id, admin_share
-                    ).as_bytes(),
-                );
+            if !is_view {
+                if referral_share > 0 {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, Referral {} got {} shares, from add_liquidity", 
+                            &fees.exchange_id, admin_share - referral_share, referral, referral_share
+                        ).as_bytes(),
+                    );
+                } else {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, No referral fee, from add_liquidity", 
+                            &fees.exchange_id, admin_share
+                        ).as_bytes(),
+                    );
+                }
             }
         }
 
         new_shares
-    }
-
-    pub fn predict_remove_liquidity(
-        &self,
-        shares: Balance,
-    ) -> Vec<Balance> {
-        let n_coins = self.token_account_ids.len();
-        let mut result = vec![0u128; n_coins];
-        for i in 0..n_coins {
-            result[i] = U256::from(self.c_amounts[i])
-                .checked_mul(shares.into())
-                .unwrap()
-                .checked_div(self.shares_total_supply.into())
-                .unwrap()
-                .as_u128();
-            result[i] = self.c_amount_to_amount(result[i], i);
-        }
-        result
     }
 
     /// balanced removal of liquidity would be free of charge.
@@ -335,15 +308,19 @@ impl StableSwapPool {
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
+        is_view: bool
     ) -> Vec<Balance> {
         let n_coins = self.token_account_ids.len();
         assert_eq!(min_amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
-        let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
-        assert!(
-            prev_shares_amount >= shares,
-            "{}",
-            ERR34_INSUFFICIENT_LP_SHARES
-        );
+        if !is_view {
+            let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
+            assert!(
+                prev_shares_amount >= shares,
+                "{}",
+                ERR34_INSUFFICIENT_LP_SHARES
+            );
+            self.burn_shares(&sender_id, prev_shares_amount, shares);
+        }
         let mut result = vec![0u128; n_coins];
 
         for i in 0..n_coins {
@@ -359,43 +336,19 @@ impl StableSwapPool {
             assert!(result[i] >= min_amounts[i], "{}", ERR68_SLIPPAGE);
         }
 
-        self.burn_shares(&sender_id, prev_shares_amount, shares);
-        
-        env::log(
-            format!(
-                "LP {} remove {} shares to gain tokens {:?}",
-                sender_id, shares, result
-            )
-            .as_bytes(),
-        );
+        self.shares_total_supply -= shares;
 
-        result
-    }
-
-    pub fn predict_remove_liquidity_by_tokens(
-        &self,
-        amounts: &Vec<Balance>,
-        fees: &AdminFees,
-    ) -> Balance {
-        let n_coins = self.token_account_ids.len();
-        let c_amounts = self.amounts_to_c_amounts(amounts);
-        for i in 0..n_coins {
-            self.assert_min_reserve(self.c_amounts[i].checked_sub(c_amounts[i]).unwrap_or(0));
+        if !is_view {
+            env::log(
+                format!(
+                    "LP {} remove {} shares to gain tokens {:?}",
+                    sender_id, shares, result
+                )
+                .as_bytes(),
+            );
         }
 
-        let invariant = self.get_invariant();
-        let trade_fee = Fees::new(self.total_fee, &fees);
-
-        let (burn_shares, _) = invariant
-            .compute_lp_amount_for_withdraw(
-                &c_amounts,
-                &self.c_amounts,
-                self.shares_total_supply,
-                &trade_fee,
-            )
-            .expect(ERR67_LPSHARE_CALC_ERR);
-
-        burn_shares
+        result
     }
 
     /// Remove liquidity from the pool by fixed tokens-out,
@@ -407,10 +360,10 @@ impl StableSwapPool {
         amounts: Vec<Balance>,
         max_burn_shares: Balance,
         fees: &AdminFees,
+        is_view: bool
     ) -> Balance {
         let n_coins = self.token_account_ids.len();
         assert_eq!(amounts.len(), n_coins, "{}", ERR64_TOKENS_COUNT_ILLEGAL);
-        let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
 
         // make amounts into comparable-amounts
         let c_amounts = self.amounts_to_c_amounts(&amounts);
@@ -430,25 +383,32 @@ impl StableSwapPool {
             )
             .expect(ERR67_LPSHARE_CALC_ERR);
 
-        assert!(
-            burn_shares <= prev_shares_amount,
-            "{}",
-            ERR34_INSUFFICIENT_LP_SHARES
-        );
-        assert!(burn_shares <= max_burn_shares, "{}", ERR68_SLIPPAGE);
+        if !is_view {
+            let prev_shares_amount = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
+            assert!(
+                burn_shares <= prev_shares_amount,
+                "{}",
+                ERR34_INSUFFICIENT_LP_SHARES
+            );
+            assert!(burn_shares <= max_burn_shares, "{}", ERR68_SLIPPAGE);
+            self.burn_shares(&sender_id, prev_shares_amount, burn_shares);
+        }
 
         for i in 0..n_coins {
             self.c_amounts[i] = self.c_amounts[i].checked_sub(c_amounts[i]).unwrap();
             self.assert_min_reserve(self.c_amounts[i]);
         }
-        self.burn_shares(&sender_id, prev_shares_amount, burn_shares);
-        env::log(
-            format!(
-                "LP {} removed {} shares by given tokens, and fee is {} shares",
-                sender_id, burn_shares, fee_part
-            )
-            .as_bytes(),
-        );
+        self.shares_total_supply -= burn_shares;
+
+        if !is_view {
+            env::log(
+                format!(
+                    "LP {} removed {} shares by given tokens, and fee is {} shares",
+                    sender_id, burn_shares, fee_part
+                )
+                .as_bytes(),
+            );
+        }
 
         if fee_part > 0 {
             let admin_share = u128_ratio(fee_part, fees.admin_fee_bps as u128, FEE_DIVISOR as u128);
@@ -457,23 +417,25 @@ impl StableSwapPool {
             if referral_share > 0 && self.shares.get(&referral).is_none() {
                 referral_share = 0;
             }
-            self.mint_shares(&referral, referral_share);
-            self.mint_shares(&fees.exchange_id, admin_share - referral_share);
+            self.mint_shares(&referral, referral_share, is_view);
+            self.mint_shares(&fees.exchange_id, admin_share - referral_share, is_view);
 
-            if referral_share > 0 {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, Referral {} got {} shares, from remove_liquidity_by_tokens", 
-                        &fees.exchange_id, admin_share - referral_share, referral, referral_share
-                    ).as_bytes(),
-                );
-            } else {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, No referral fee, from remove_liquidity_by_tokens", 
-                        &fees.exchange_id, admin_share
-                    ).as_bytes(),
-                );
+            if !is_view {
+                if referral_share > 0 {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, Referral {} got {} shares, from remove_liquidity_by_tokens", 
+                            &fees.exchange_id, admin_share - referral_share, referral, referral_share
+                        ).as_bytes(),
+                    );
+                } else {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, No referral fee, from remove_liquidity_by_tokens", 
+                            &fees.exchange_id, admin_share
+                        ).as_bytes(),
+                    );
+                }
             }
         }
 
@@ -505,25 +467,6 @@ impl StableSwapPool {
 
     }
 
-    /// Returns how much token you will receive if swap `token_amount_in` of `token_in` for `token_out`.
-    pub fn get_return(
-        &self,
-        token_in: &AccountId,
-        amount_in: Balance,
-        token_out: &AccountId,
-        fees: &AdminFees,
-    ) -> Balance {
-        assert_ne!(token_in, token_out, "{}", ERR71_SWAP_DUP_TOKENS);
-        let c_amount_out = self.internal_get_return(
-            self.token_index(token_in),
-            amount_in,
-            self.token_index(token_out),
-            &fees,
-        )
-        .amount_swapped;
-        self.c_amount_to_amount(c_amount_out, self.token_index(token_out))
-    }
-
     /// Swap `token_amount_in` of `token_in` token into `token_out` and return how much was received.
     /// Assuming that `token_amount_in` was already received from `sender_id`.
     pub fn swap(
@@ -533,6 +476,7 @@ impl StableSwapPool {
         token_out: &AccountId,
         min_amount_out: Balance,
         fees: &AdminFees,
+        is_view: bool
     ) -> Balance {
         assert_ne!(token_in, token_out, "{}", ERR71_SWAP_DUP_TOKENS);
         let in_idx = self.token_index(token_in);
@@ -544,15 +488,17 @@ impl StableSwapPool {
             "{}",
             ERR68_SLIPPAGE
         );
-        env::log(
-            format!(
-                "Swapped {} {} for {} {}, total fee {}, admin fee {}",
-                amount_in, token_in, amount_swapped, token_out, 
-                self.c_amount_to_amount(result.fee, out_idx), 
-                self.c_amount_to_amount(result.admin_fee, out_idx)
-            )
-            .as_bytes(),
-        );
+        if !is_view {
+            env::log(
+                format!(
+                    "Swapped {} {} for {} {}, total fee {}, admin fee {}",
+                    amount_in, token_in, amount_swapped, token_out, 
+                    self.c_amount_to_amount(result.fee, out_idx), 
+                    self.c_amount_to_amount(result.admin_fee, out_idx)
+                )
+                .as_bytes(),
+            );
+        }
 
         self.c_amounts[in_idx] = result.new_source_amount;
         self.c_amounts[out_idx] = result.new_destination_amount;
@@ -567,29 +513,31 @@ impl StableSwapPool {
             let (exchange_share, referral_share) = if let Some((referral_id, referral_fee)) = &fees.referral_info {
                 if self.shares.contains_key(referral_id)
                 {
-                    self.distribute_admin_fee(&fees.exchange_id, referral_id, *referral_fee, out_idx, result.admin_fee)
+                    self.distribute_admin_fee(&fees.exchange_id, referral_id, *referral_fee, out_idx, result.admin_fee, is_view)
                 } else {
-                    self.distribute_admin_fee(&fees.exchange_id, referral_id, 0, out_idx, result.admin_fee)
+                    self.distribute_admin_fee(&fees.exchange_id, referral_id, 0, out_idx, result.admin_fee, is_view)
                 }
             } else {
-                self.distribute_admin_fee(&fees.exchange_id, &fees.exchange_id, 0, out_idx, result.admin_fee)
+                self.distribute_admin_fee(&fees.exchange_id, &fees.exchange_id, 0, out_idx, result.admin_fee, is_view)
             };
-            if referral_share > 0 {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, Referral {} got {} shares",
-                        &fees.exchange_id, exchange_share, &fees.referral_info.as_ref().unwrap().0, referral_share,
-                    )
-                    .as_bytes(),
-                );
-            } else {
-                env::log(
-                    format!(
-                        "Exchange {} got {} shares, No referral fee",
-                        &fees.exchange_id, exchange_share,
-                    )
-                    .as_bytes(),
-                );
+            if !is_view {
+                if referral_share > 0 {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, Referral {} got {} shares",
+                            &fees.exchange_id, exchange_share, &fees.referral_info.as_ref().unwrap().0, referral_share,
+                        )
+                        .as_bytes(),
+                    );
+                } else {
+                    env::log(
+                        format!(
+                            "Exchange {} got {} shares, No referral fee",
+                            &fees.exchange_id, exchange_share,
+                        )
+                        .as_bytes(),
+                    );
+                }
             }
         }
 
@@ -605,6 +553,7 @@ impl StableSwapPool {
         referral_fee_bps: u32,
         token_id: usize,
         c_amount: Balance,
+        is_view: bool
     ) -> (Balance, Balance) {
         let invariant = self.get_invariant();
 
@@ -627,19 +576,21 @@ impl StableSwapPool {
             0
         };
 
-        self.mint_shares(referral_id, referral_share);
-        self.mint_shares(exchange_id, new_shares - referral_share);
+        self.mint_shares(referral_id, referral_share, is_view);
+        self.mint_shares(exchange_id, new_shares - referral_share, is_view);
 
         (new_shares - referral_share, referral_share)
     }
 
     /// Mint new shares for given user.
-    fn mint_shares(&mut self, account_id: &AccountId, shares: Balance) {
+    fn mint_shares(&mut self, account_id: &AccountId, shares: Balance, is_view: bool) {
         if shares == 0 {
             return;
         }
         self.shares_total_supply += shares;
-        add_to_collection(&mut self.shares, &account_id, shares);
+        if !is_view {
+            add_to_collection(&mut self.shares, &account_id, shares);
+        }
     }
 
     /// Burn shares from given user's balance.
@@ -653,9 +604,7 @@ impl StableSwapPool {
             return;
         }
         // Never remove shares from storage to allow to bring it back without extra storage deposit.
-        self.shares_total_supply -= shares;
-        self.shares
-            .insert(&account_id, &(prev_shares_amount - shares));
+        self.shares.insert(&account_id, &(prev_shares_amount - shares));
     }
 
     /// See if the given account has been registered as a LP
@@ -783,6 +732,7 @@ mod tests {
             accounts(token_out).as_ref(),
             0,
             &AdminFees::zero(),
+            false
         )
     }
 
@@ -798,7 +748,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000, 100000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let out = swap(&mut pool, 1, 10000000000, 2);
         assert_eq!(out, 9999495232);
@@ -817,7 +767,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000000000000000, 100000000000000000000000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let out = swap(&mut pool, 1, 10000000000000000000000, 2);
         assert_eq!(out, 9999495232752197989995000000);
@@ -836,7 +786,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000, 100000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let out = swap(&mut pool, 1, 0, 2);
         assert_eq!(out, 0);
@@ -855,7 +805,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000000000000000, 100000000000000000000000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let out = swap(&mut pool, 1, 0, 2);
         assert_eq!(out, 0);
@@ -874,7 +824,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000, 100000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let out = swap(&mut pool, 1, 1, 2);
         assert_eq!(out, 0);
@@ -893,7 +843,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000000000000000, 100000000000000000000000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let out = swap(&mut pool, 1, 1, 2);
         assert_eq!(out, 0);
@@ -912,7 +862,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000, 100000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let out = swap(&mut pool, 1, 100000000000, 2);
         assert_eq!(out, 98443663539);
@@ -931,7 +881,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000000000000000, 100000000000000000000000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let out = swap(&mut pool, 1, 100000000000000000000000, 2);
         assert_eq!(out, 98443663539913153080656000000);
@@ -950,7 +900,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000, 100000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let out = swap(&mut pool, 1, 99999000000, 2);
         assert_eq!(out, 98443167413);
@@ -969,7 +919,7 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000000000000000, 100000000000000000000000000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let out = swap(&mut pool, 1, 99999000000000000000000, 2);
         assert_eq!(out, 98443167413204135506296000000);
@@ -988,8 +938,8 @@ mod tests {
         );
 
         let mut amounts = vec![1000000000000000000, 1000000000000000000];
-        let shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-        pool.remove_liquidity_by_shares(accounts(0).as_ref(), shares - 2 * MIN_RESERVE, vec![0, 0]);
+        let shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
+        pool.remove_liquidity_by_shares(accounts(0).as_ref(), shares - 2 * MIN_RESERVE, vec![0, 0], false);
         assert_eq!(vec![MIN_RESERVE, MIN_RESERVE], pool.c_amounts);
     }
 
@@ -1005,8 +955,8 @@ mod tests {
         );
 
         let mut amounts = vec![100000000000000000000000, 100000000000000000000000000000];
-        let shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
-        pool.remove_liquidity_by_tokens(accounts(0).as_ref(), vec![amounts[0] - MIN_RESERVE, amounts[1] - MIN_RESERVE], shares, &AdminFees::zero());
+        let shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
+        pool.remove_liquidity_by_tokens(accounts(0).as_ref(), vec![amounts[0] - MIN_RESERVE, amounts[1] - MIN_RESERVE], shares, &AdminFees::zero(), false);
         assert_eq!(vec![MIN_RESERVE, MIN_RESERVE], pool.c_amounts);
     }
 
@@ -1068,7 +1018,7 @@ mod tests {
             100000000000_000000, 
             100000000000_000000,
         ];
-        let share = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let share = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
         assert_eq!(share, 900000000000_000000000000000000);
         let out = pool.swap(
             &String::from("aone.near"),
@@ -1076,6 +1026,7 @@ mod tests {
             &String::from("atwo.near"),
             0,
             &AdminFees::zero(),
+            false
         );
         assert_eq!(out, 99998999999);
     }
@@ -1092,7 +1043,7 @@ mod tests {
         );
 
         let mut amounts = vec![5000000, 10000000];
-        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let _ = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let out = swap(&mut pool, 1, 1000000, 2);
         assert_eq!(out, 1000031);
@@ -1103,7 +1054,7 @@ mod tests {
 
         // Add only one side of the capital.
         let mut amounts2 = vec![5000000, 0];
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, 1, &fees);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, 1, &fees, false);
 
         // Withdraw on same side of the capital.
         let shares_burned = pool.remove_liquidity_by_tokens(
@@ -1111,25 +1062,27 @@ mod tests {
             vec![5000000, 0],
             num_shares,
             &fees,
+            false
         );
         assert_eq!(shares_burned, num_shares);
 
         // Add only one side of the capital, and withdraw by share
         let mut amounts2 = vec![5000000, 0];
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, 1, &fees);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, 1, &fees, false);
 
-        let tokens = pool.remove_liquidity_by_shares(accounts(0).as_ref(), num_shares, vec![1, 1]);
+        let tokens = pool.remove_liquidity_by_shares(accounts(0).as_ref(), num_shares, vec![1, 1], false);
         assert_eq!(tokens[0], 2500023);
         assert_eq!(tokens[1], 2500023);
 
         // Add only one side of the capital, and withdraw from another side
         let mut amounts2 = vec![5000000, 0];
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, 1, &fees);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts2, 1, &fees, false);
         let shares_burned = pool.remove_liquidity_by_tokens(
             accounts(0).as_ref(),
             vec![0, 5000000 - 1200],
             num_shares,
             &fees,
+            false
         );
         // as imbalance withdraw, will lose a little amount token
         assert!(shares_burned < num_shares);
@@ -1145,7 +1098,7 @@ mod tests {
         let mut amounts = vec![5000000, 10000000];
         let fees = AdminFees::new(1000); // 10% exchange fee
 
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
 
         let amount_out = pool.swap(
             accounts(1).as_ref(),
@@ -1153,9 +1106,10 @@ mod tests {
             accounts(2).as_ref(),
             1,
             &fees,
+            false
         );
         println!("swap out: {}", amount_out);
-        let tokens = pool.remove_liquidity_by_shares(accounts(0).as_ref(), num_shares/2, vec![1, 1]);
+        let tokens = pool.remove_liquidity_by_shares(accounts(0).as_ref(), num_shares/2, vec![1, 1], false);
         assert_eq!(tokens[0], 2996052);
         assert_eq!(tokens[1], 4593934);
     }
@@ -1169,7 +1123,7 @@ mod tests {
         let mut pool = StableSwapPool::new(0, vec![accounts(1), accounts(2)], vec![6, 6], 10000, 0);
         let mut amounts = vec![5000000, 10000000];
         let fees = AdminFees::zero();
-        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees);
+        let num_shares = pool.add_liquidity(accounts(0).as_ref(), &mut amounts, 1, &fees, false);
         assert_eq!(amounts, vec![5000000, 10000000]);
         assert!(num_shares > 1);
         assert_eq!(num_shares, pool.share_balance_of(accounts(0).as_ref()));
@@ -1184,7 +1138,7 @@ mod tests {
 
         // Remove all liquidity.
         testing_env!(context.predecessor_account_id(accounts(3)).build());
-        pool.remove_liquidity_by_shares(accounts(3).as_ref(), num_shares, vec![1, 1]);
+        pool.remove_liquidity_by_shares(accounts(3).as_ref(), num_shares, vec![1, 1], false);
     }
 
     /// Test ramping up amplification factor, ramping it even more and then stopping.

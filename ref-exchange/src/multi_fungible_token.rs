@@ -56,21 +56,25 @@ fn parse_token_id(token_id: String) -> TokenOrPool {
     }
 }
 
-#[near_bindgen]
 impl Contract {
-    fn internal_mft_transfer(
+    pub fn internal_mft_transfer(
         &mut self,
         token_id: String,
         sender_id: &AccountId,
         receiver_id: &AccountId,
-        amount: u128,
+        amount: Option<u128>,
         memo: Option<String>,
-    ) {
+    ) -> Balance {
         // [AUDIT_07]
         assert_ne!(sender_id, receiver_id, "{}", ERR33_TRANSFER_TO_SELF);
-        match parse_token_id(token_id) {
+        let transfer_amount = match parse_token_id(token_id) {
             TokenOrPool::Pool(pool_id) => {
                 let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+
+                let total_shares = pool.share_balances(sender_id);
+                let amount = amount.unwrap_or(total_shares);
+                assert!(amount > 0, "transfer_amount must be greater than zero");
+
                 pool.share_transfer(sender_id, receiver_id, amount);
                 self.pools.replace(pool_id, &pool);
                 log!(
@@ -80,11 +84,15 @@ impl Contract {
                     sender_id,
                     receiver_id
                 );
+                amount
             }
             TokenOrPool::Token(token_id) => {
+                // TokenOrPool::Token unsupport transfer all
+                let amount = amount.unwrap_or_else(||{unimplemented!()});
+
                 let mut sender_account: Account = self.internal_unwrap_account(&sender_id);
                 let mut receiver_account: Account = self.internal_unwrap_account(&receiver_id);
-                
+
                 sender_account.withdraw(&token_id, amount);
                 receiver_account.deposit(&token_id, amount);
                 self.internal_save_account(&sender_id, sender_account);
@@ -96,11 +104,13 @@ impl Contract {
                     sender_id,
                     receiver_id
                 );
+                amount
             }
-        }
+        };
         if let Some(memo) = memo {
             log!("Memo: {}", memo);
         }
+        transfer_amount
     }
 
     fn internal_mft_balance(&self, token_id: String, account_id: &AccountId) -> Balance {
@@ -112,6 +122,10 @@ impl Contract {
             TokenOrPool::Token(token_id) => self.internal_get_deposit(account_id, &token_id),
         }
     }
+}
+
+#[near_bindgen]
+impl Contract {
 
     /// Returns the balance of the given account. If the account doesn't exist will return `"0"`.
     pub fn mft_balance_of(&self, token_id: String, account_id: ValidAccountId) -> U128 {
@@ -177,7 +191,7 @@ impl Contract {
             token_id,
             &env::predecessor_account_id(),
             receiver_id.as_ref(),
-            amount.0,
+            Some(amount.0),
             memo,
         );
     }
@@ -198,7 +212,7 @@ impl Contract {
             token_id.clone(),
             &sender_id,
             receiver_id.as_ref(),
-            amount.0,
+            Some(amount.0),
             memo,
         );
         ext_share_token_receiver::mft_on_transfer(
@@ -215,6 +229,45 @@ impl Contract {
             sender_id,
             receiver_id.into(),
             amount,
+            &env::current_account_id(),
+            NO_DEPOSIT,
+            GAS_FOR_RESOLVE_TRANSFER,
+        ))
+        .into()
+    }
+
+    #[payable]
+    pub fn mft_transfer_all_call(
+        &mut self,
+        token_id: String,
+        receiver_id: ValidAccountId,
+        memo: Option<String>,
+        msg: String,
+    ) -> PromiseOrValue<U128> {
+        assert_one_yocto();
+        self.assert_contract_running();
+        let sender_id = env::predecessor_account_id();
+        let transfer_amount = self.internal_mft_transfer(
+            token_id.clone(),
+            &sender_id,
+            receiver_id.as_ref(),
+            None,
+            memo,
+        );
+        ext_share_token_receiver::mft_on_transfer(
+            token_id.clone(),
+            sender_id.clone(),
+            U128(transfer_amount),
+            msg,
+            receiver_id.as_ref(),
+            NO_DEPOSIT,
+            env::prepaid_gas() - GAS_FOR_FT_TRANSFER_CALL,
+        )
+        .then(ext_self::mft_resolve_transfer(
+            token_id,
+            sender_id,
+            receiver_id.into(),
+            U128(transfer_amount),
             &env::current_account_id(),
             NO_DEPOSIT,
             GAS_FOR_RESOLVE_TRANSFER,
@@ -256,7 +309,7 @@ impl Contract {
                     // Funds are sent to the contract account.
                     env::current_account_id()
                 };
-                self.internal_mft_transfer(token_id, &receiver_id, &refund_to, refund_amount, None);
+                self.internal_mft_transfer(token_id, &receiver_id, &refund_to, Some(refund_amount), None);
             }
         }
         U128(unused_amount)

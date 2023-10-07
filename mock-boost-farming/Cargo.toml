@@ -1,0 +1,19 @@
+[package]
+name = "mock-boost-farming"
+version = "0.2.4"
+authors = ["Marco Sun <sun.dsk1@gmail.com>", "MagicGordon"]
+edition = "2018"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+uint = { version = "0.9.3", default-features = false } 
+near-sdk = "3.1.0"
+near-contract-standards = "3.1.0"
+near-sys = "=0.1"
+once_cell = "=1.8.0"
+
+[dev-dependencies]
+rand = "0.8.5"

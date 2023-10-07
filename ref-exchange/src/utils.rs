@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
@@ -91,6 +91,38 @@ pub fn integer_sqrt(value: U256) -> U256 {
 
 pub fn u128_ratio(a: u128, num: u128, denom: u128) -> u128 {
     (U256::from(a) * U256::from(num) / U256::from(denom)).as_u128()
+}
+
+pub struct TokenCache(pub HashMap<AccountId, u128>);
+
+impl TokenCache {
+    pub fn new() -> Self {
+        TokenCache(HashMap::new())
+    }
+
+    pub fn add(&mut self, token_id: &AccountId, amount: u128) {
+        self.0.entry(token_id.clone()).and_modify(|v| *v += amount).or_insert(amount);
+    }
+
+    pub fn sub(&mut self, token_id: &AccountId, amount: u128) {
+        if amount != 0 {
+            if let Some(prev) = self.0.remove(token_id) {
+                assert!(amount <= prev, "{}", ERR22_NOT_ENOUGH_TOKENS);
+                let remain = prev - amount;
+                if remain > 0 {
+                    self.0.insert(token_id.clone(), remain);
+                }
+            } else {
+                panic!("{}", ERR22_NOT_ENOUGH_TOKENS);
+            }
+        }
+    }
+}
+
+impl From<TokenCache> for HashMap<AccountId, U128> {
+    fn from(v: TokenCache) -> Self {
+        v.0.into_iter().map(|(k, v)| (k, U128(v))).collect()
+    }
 }
 
 #[cfg(test)]

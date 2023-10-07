@@ -41,9 +41,10 @@ impl Pool {
         &mut self,
         sender_id: &AccountId,
         amounts: &mut Vec<Balance>,
+        is_view: bool
     ) -> Balance {
         match self {
-            Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts),
+            Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts, is_view),
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(_) => unimplemented!(),
         }
@@ -55,11 +56,12 @@ impl Pool {
         amounts: &Vec<Balance>,
         min_shares: Balance,
         admin_fee: AdminFees,
+        is_view: bool
     ) -> Balance {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee),
-            Pool::RatedSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee),
+            Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee, is_view),
+            Pool::RatedSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee, is_view),
         }
     }
 
@@ -69,14 +71,15 @@ impl Pool {
         sender_id: &AccountId,
         shares: Balance,
         min_amounts: Vec<Balance>,
+        is_view: bool
     ) -> Vec<Balance> {
         match self {
-            Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts),
+            Pool::SimplePool(pool) => pool.remove_liquidity(sender_id, shares, min_amounts, is_view),
             Pool::StableSwapPool(pool) => {
-                pool.remove_liquidity_by_shares(sender_id, shares, min_amounts)
+                pool.remove_liquidity_by_shares(sender_id, shares, min_amounts, is_view)
             },
             Pool::RatedSwapPool(pool) => {
-                pool.remove_liquidity_by_shares(sender_id, shares, min_amounts)
+                pool.remove_liquidity_by_shares(sender_id, shares, min_amounts, is_view)
             }
         }
     }
@@ -88,30 +91,16 @@ impl Pool {
         amounts: Vec<Balance>,
         max_burn_shares: Balance,
         admin_fee: AdminFees,
+        is_view: bool
     ) -> Balance {
         match self {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => {
-                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee)
+                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee, is_view)
             },
             Pool::RatedSwapPool(pool) => {
-                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee)
+                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee, is_view)
             }
-        }
-    }
-
-    /// Returns how many tokens will one receive swapping given amount of token_in for token_out.
-    pub fn get_return(
-        &self,
-        token_in: &AccountId,
-        amount_in: Balance,
-        token_out: &AccountId,
-        fees: &AdminFees,
-    ) -> Balance {
-        match self {
-            Pool::SimplePool(pool) => pool.get_return(token_in, amount_in, token_out),
-            Pool::StableSwapPool(pool) => pool.get_return(token_in, amount_in, token_out, fees),
-            Pool::RatedSwapPool(pool) => pool.get_return(token_in, amount_in, token_out, fees),
         }
     }
 
@@ -159,16 +148,17 @@ impl Pool {
         token_out: &AccountId,
         min_amount_out: Balance,
         admin_fee: AdminFees,
+        is_view: bool
     ) -> Balance {
         match self {
             Pool::SimplePool(pool) => {
-                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee, is_view)
             }
             Pool::StableSwapPool(pool) => {
-                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee, is_view)
             }
             Pool::RatedSwapPool(pool) => {
-                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee)
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee, is_view)
             }
         }
     }
@@ -211,41 +201,6 @@ impl Pool {
             Pool::SimplePool(pool) => pool.share_register(account_id),
             Pool::StableSwapPool(pool) => pool.share_register(account_id),
             Pool::RatedSwapPool(pool) => pool.share_register(account_id),
-        }
-    }
-
-    pub fn predict_add_stable_liquidity(
-        &self,
-        amounts: &Vec<Balance>,
-        fees: &AdminFees,
-    ) -> Balance {
-        match self {
-            Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(pool) => pool.predict_add_stable_liquidity(amounts, fees),
-            Pool::RatedSwapPool(pool) => pool.predict_add_rated_liquidity(amounts, &None, fees),
-        }
-    }
-
-    pub fn predict_remove_liquidity(
-        &self,
-        shares: Balance,
-    ) -> Vec<Balance> {
-        match self {
-            Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(pool) => pool.predict_remove_liquidity(shares),
-            Pool::RatedSwapPool(pool) => pool.predict_remove_liquidity(shares),
-        }
-    }
-
-    pub fn predict_remove_liquidity_by_tokens(
-        &self,
-        amounts: &Vec<Balance>,
-        fees: &AdminFees,
-    ) -> Balance {
-        match self {
-            Pool::SimplePool(_) => unimplemented!(),
-            Pool::StableSwapPool(pool) => pool.predict_remove_liquidity_by_tokens(amounts, fees),
-            Pool::RatedSwapPool(pool) => pool.predict_remove_liquidity_by_tokens(amounts, fees),
         }
     }
 

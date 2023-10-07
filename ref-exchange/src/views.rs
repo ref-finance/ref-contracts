@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use near_sdk::json_types::{ValidAccountId, U128, U64};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
-use crate::utils::SwapVolume;
+use crate::utils::{SwapVolume, TokenCache};
 use crate::rated_swap::rate::Rate;
 use crate::*;
 
@@ -54,6 +54,14 @@ pub struct PoolInfo {
     /// Total number of shares.
     pub shares_total_supply: U128,
     pub amp: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub struct AddLiquidityPrediction {
+    pub need_amounts: Vec<U128>,
+    pub mint_shares: U128,
 }
 
 impl From<Pool> for PoolInfo {
@@ -282,9 +290,8 @@ impl Contract {
         amount_in: U128,
         token_out: ValidAccountId,
     ) -> U128 {
-        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.get_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &AdminFees::new(self.admin_fee_bps))
-            .into()
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        pool.swap(token_in.as_ref(), amount_in.into(), token_out.as_ref(), 0, AdminFees::new(self.admin_fee_bps), true).into()
     }
 
     /// List referrals
@@ -336,14 +343,28 @@ impl Contract {
     }
 
     ///
+    pub fn predict_add_simple_liquidity(
+        &self,
+        pool_id: u64,
+        amounts: &Vec<U128>,
+    ) -> AddLiquidityPrediction {
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let mut amounts = amounts.iter().map(|v| v.0).collect();
+        let mint_shares = pool.add_liquidity(&String::from("@view"), &mut amounts, true);
+        AddLiquidityPrediction {
+            need_amounts: amounts.iter().map(|v| U128(*v)).collect(),
+            mint_shares: U128(mint_shares)
+        }
+    }
+
     pub fn predict_add_stable_liquidity(
         &self,
         pool_id: u64,
         amounts: &Vec<U128>,
     ) -> U128 {
-        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.predict_add_stable_liquidity(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.admin_fee_bps))
-            .into()
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let amounts = amounts.iter().map(|v| v.0).collect();
+        pool.add_stable_liquidity(&String::from("@view"), &amounts, 0, AdminFees::new(self.admin_fee_bps), true).into()
     }
 
     pub fn predict_remove_liquidity(
@@ -351,8 +372,8 @@ impl Contract {
         pool_id: u64,
         shares: U128,
     ) -> Vec<U128> {
-        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.predict_remove_liquidity(shares.into()).into_iter().map(|x| U128(x)).collect()
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        pool.remove_liquidity(&String::from("@view"), shares.into(), vec![0; pool.tokens().len()], true).into_iter().map(|x| U128(x)).collect()
     }
 
     pub fn predict_remove_liquidity_by_tokens(
@@ -360,9 +381,9 @@ impl Contract {
         pool_id: u64,
         amounts: &Vec<U128>,
     ) -> U128 {
-        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-        pool.predict_remove_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &AdminFees::new(self.admin_fee_bps))
-            .into()
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let amounts = amounts.iter().map(|v| v.0).collect();
+        pool.remove_liquidity_by_tokens(&String::from("@view"), amounts, u128::MAX, AdminFees::new(self.admin_fee_bps), true).into()
     }
 
     pub fn list_rated_tokens(&self) -> HashMap<String, RatedTokenInfo> {
@@ -437,5 +458,84 @@ impl Contract {
         };
         pool.get_rated_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &rates, &AdminFees::new(self.admin_fee_bps))
             .into()
+    }
+
+    pub fn predict_hot_zap(
+        &self, 
+        referral_id: Option<ValidAccountId>,
+        token_in: ValidAccountId,
+        amount_in: U128,
+        hot_zap_actions: Vec<Action>,
+        add_liquidity_infos: Vec<token_receiver::AddLiquidityInfo>
+    ) -> Option<(Vec<AddLiquidityPrediction>, HashMap<AccountId, U128>)> {
+        if hot_zap_actions.is_empty() || add_liquidity_infos.is_empty() {
+            return None
+        }
+        let mut pool_cache = HashMap::new();
+        let mut add_liquidity_predictions = vec![];
+        let mut token_cache = TokenCache::new();
+        token_cache.add(&token_in.into(), amount_in.0);
+        let view_account_id: AccountId = "@view".to_string();
+
+        let referral_id = referral_id.map(|x| x.to_string());
+        let referral_info :Option<(AccountId, u32)> = referral_id
+            .as_ref().and_then(|rid| self.referrals.get(&rid))
+            .map(|fee| (referral_id.unwrap().into(), fee));
+
+        self.internal_execute_actions_by_cache(
+            &mut pool_cache,
+            &mut token_cache,
+            &referral_info,
+            &hot_zap_actions,
+            ActionResult::Amount(amount_in),
+        );
+
+        for add_liquidity_info in add_liquidity_infos {
+            let mut pool = pool_cache.remove(&add_liquidity_info.pool_id).unwrap_or(self.pools.get(add_liquidity_info.pool_id).expect(ERR85_NO_POOL));
+            
+            let tokens_in_pool = match &pool {
+                Pool::SimplePool(p) => p.token_account_ids.clone(),
+                Pool::RatedSwapPool(p) => p.token_account_ids.clone(),
+                Pool::StableSwapPool(p) => p.token_account_ids.clone(),
+            };
+            
+            let mut add_liquidity_amounts = add_liquidity_info.amounts.iter().map(|v| v.0).collect();
+            
+            let shares = match pool {
+                Pool::SimplePool(_) => {
+                    let shares = pool.add_liquidity(
+                        &view_account_id,
+                        &mut add_liquidity_amounts,
+                        true
+                    );
+                    shares
+                },
+                Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) => {
+                    let shares = pool.add_stable_liquidity(
+                        &view_account_id,
+                        &add_liquidity_amounts,
+                        0,
+                        AdminFees::new(self.admin_fee_bps),
+                        true
+                    );
+                    shares
+                }
+            };
+            
+            add_liquidity_predictions.push(
+                AddLiquidityPrediction {
+                    need_amounts: add_liquidity_amounts.iter().map(|v| U128(*v)).collect(),
+                    mint_shares: U128(shares)
+                }
+            );
+
+            for (cost_token_id, cost_amount) in tokens_in_pool.iter().zip(add_liquidity_amounts.into_iter()) {
+                token_cache.sub(cost_token_id, cost_amount);
+            }
+
+            pool_cache.insert(add_liquidity_info.pool_id, pool);
+        }
+        
+        Some((add_liquidity_predictions, token_cache.into()))
     }
 }
