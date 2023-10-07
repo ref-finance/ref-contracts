@@ -2,7 +2,7 @@
 
 ### Version 1.7.1
 ```
-DoZzCXpLVetkNgNWtavriquzb7mkMmm83rbNdoLsgh5P
+6ZU3rmDwEs988pvYWyDxg6DJm7fP1F3FnAwHGo698ATw
 ```
 1. import hotzap;
 
