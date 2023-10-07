@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.7.1
+```
+DoZzCXpLVetkNgNWtavriquzb7mkMmm83rbNdoLsgh5P
+```
+1. import hotzap;
+
 ### Version 1.7.0
 1. amendments according to audition recommendations;
 2. add mft_has_registered interface for user to query whether or not they need to register as LP for a given pool;

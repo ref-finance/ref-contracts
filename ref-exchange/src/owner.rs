@@ -333,18 +333,8 @@ impl Contract {
     // [AUDIT_09]
     #[private]
     pub fn migrate() -> Self {
-        let old: ContractV1 = env::state_read().expect(ERR103_NOT_INITIALIZED);
-        Self { 
-            owner_id: old.owner_id.clone(), 
-            admin_fee_bps: old.exchange_fee + old.referral_fee, 
-            pools: old.pools, 
-            accounts: old.accounts, 
-            whitelisted_tokens: old.whitelisted_tokens, 
-            guardians: old.guardians, 
-            state: old.state, 
-            frozen_tokens: old.frozen_tokens,
-            referrals: UnorderedMap::new(StorageKey::Referral), 
-        }
+        let contract = env::state_read().expect(ERR103_NOT_INITIALIZED);
+        contract
     }
 }
 
