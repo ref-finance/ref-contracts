@@ -86,6 +86,10 @@ impl RatedSwapPool {
         }
     }
 
+    pub fn modify_total_fee(&mut self, total_fee: u32) {
+        self.total_fee = total_fee;
+    }
+
     pub fn get_rates(&self) -> Vec<u128> {
         self.token_account_ids
         .iter()

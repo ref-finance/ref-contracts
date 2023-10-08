@@ -35,6 +35,14 @@ impl Pool {
         }
     }
 
+    pub fn modify_total_fee(&mut self, total_fee: u32) {
+        match self {
+            Pool::SimplePool(pool) => pool.modify_total_fee(total_fee),
+            Pool::StableSwapPool(pool) => pool.modify_total_fee(total_fee),
+            Pool::RatedSwapPool(pool) => pool.modify_total_fee(total_fee),
+        }
+    }
+
     /// Adds liquidity into underlying pool.
     /// Updates amounts to amount kept in the pool.
     pub fn add_liquidity(
