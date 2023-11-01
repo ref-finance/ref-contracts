@@ -198,6 +198,7 @@ impl Contract {
         self.admin_fee_bps = admin_fee_bps;
     }
 
+    #[payable]
     pub fn modify_total_fee(&mut self, pool_id: u64, total_fee: u32) {
         assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);

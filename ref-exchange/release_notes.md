@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.7.2
+```
+9KuaBbp9FT1g17YCaCsaezGxWDuZkKrjPsXu1RCN8Ux7
+```
+1. add modify_total_fee;
+
 ### Version 1.7.1
 ```
 6ZU3rmDwEs988pvYWyDxg6DJm7fP1F3FnAwHGo698ATw
