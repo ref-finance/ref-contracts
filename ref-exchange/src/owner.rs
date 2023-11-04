@@ -6,7 +6,6 @@ use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 use crate::*;
 use crate::rated_swap::rate::{global_register_rate, global_unregister_rate};
 use crate::utils::{FEE_DIVISOR, MAX_ADMIN_FEE_BPS, GAS_FOR_BASIC_OP};
-use crate::legacy::ContractV1;
 
 #[near_bindgen]
 impl Contract {
@@ -197,6 +196,19 @@ impl Contract {
         self.assert_owner();
         assert!(admin_fee_bps <= MAX_ADMIN_FEE_BPS, "{}", ERR101_ILLEGAL_FEE);
         self.admin_fee_bps = admin_fee_bps;
+    }
+
+    #[payable]
+    pub fn modify_total_fee(&mut self, pool_id: u64, total_fee: u32) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        assert!(total_fee < FEE_DIVISOR, "{}", ERR62_FEE_ILLEGAL);
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        env::log(
+            format!("Modify total_fee pool_id {} from {} to {}", pool_id, pool.get_fee(), total_fee).as_bytes()
+        );
+        pool.modify_total_fee(total_fee);
+        self.pools.replace(pool_id, &pool);
     }
 
     /// Remove exchange fee liquidity to owner's inner account.

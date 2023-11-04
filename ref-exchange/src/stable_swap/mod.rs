@@ -77,6 +77,10 @@ impl StableSwapPool {
         }
     }
 
+    pub fn modify_total_fee(&mut self, total_fee: u32) {
+        self.total_fee = total_fee;
+    }
+
     pub fn get_amounts(&self) ->Vec<u128> {
         let mut amounts = self.c_amounts.clone();
         for (index, value) in self.token_decimals.iter().enumerate() {

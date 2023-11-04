@@ -9,7 +9,7 @@ use crate::common::utils::*;
 pub mod common;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    PREV_EXCHANGE_WASM_BYTES => "../releases/ref_exchange_release_v170.wasm",
+    PREV_EXCHANGE_WASM_BYTES => "../releases/ref_exchange_release_v171.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
 }
 
@@ -47,7 +47,7 @@ fn test_upgrade() {
     .assert_success();
     let metadata = get_metadata(&pool);
     // println!("{:#?}", metadata);
-    assert_eq!(metadata.version, "1.7.1".to_string());
+    assert_eq!(metadata.version, "1.7.2".to_string());
     assert_eq!(metadata.admin_fee_bps, 5);
     assert_eq!(metadata.state, RunningState::Running);
 

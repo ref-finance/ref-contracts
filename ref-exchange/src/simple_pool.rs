@@ -64,6 +64,10 @@ impl SimplePool {
         }
     }
 
+    pub fn modify_total_fee(&mut self, total_fee: u32) {
+        self.total_fee = total_fee;
+    }
+
     /// See if the given account has been registered as a LP
     pub fn share_has_registered(&self, account_id: &AccountId) -> bool {
         self.shares.contains_key(account_id)
