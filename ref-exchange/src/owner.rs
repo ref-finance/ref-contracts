@@ -4,6 +4,7 @@ use near_sdk::json_types::WrappedTimestamp;
 use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 
 use crate::*;
+use crate::legacy::ContractV2;
 use crate::rated_swap::rate::{global_register_rate, global_unregister_rate};
 use crate::utils::{FEE_DIVISOR, MAX_ADMIN_FEE_BPS, GAS_FOR_BASIC_OP};
 
@@ -69,6 +70,22 @@ impl Contract {
             // [AUDITION_AMENDMENT] 2.3.1 Lack of Check on Guardians’ Removal
             assert!(exist, "{}", ERR104_GUARDIAN_NOT_IN_LIST);
         }
+    }
+
+    #[payable]
+    pub fn modify_boost_farm_id(&mut self, boost_farm_id: AccountId) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        log!("Modify boost_farm_id from {} to {}", self.boost_farm_id, boost_farm_id);  
+        self.boost_farm_id = boost_farm_id;
+    }
+
+    #[payable]
+    pub fn modify_burrowland_id(&mut self, burrowland_id: AccountId) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        log!("Modify burrowland_id from {} to {}", self.burrowland_id, burrowland_id);  
+        self.burrowland_id = burrowland_id;
     }
 
     /// Change state of contract, Only can be called by owner or guardians.
@@ -345,8 +362,31 @@ impl Contract {
     // [AUDIT_09]
     #[private]
     pub fn migrate() -> Self {
-        let contract = env::state_read().expect(ERR103_NOT_INITIALIZED);
-        contract
+        let ContractV2{
+            owner_id,
+            admin_fee_bps,
+            pools,
+            accounts,
+            whitelisted_tokens,
+            guardians,
+            state,
+            frozen_tokens,
+            referrals
+        } = env::state_read().expect(ERR103_NOT_INITIALIZED);
+        
+        Self {
+            owner_id,
+            boost_farm_id: "boostfarm.ref-labs.near".to_string(),
+            burrowland_id: "contract.main.burrow.near".to_string(),
+            admin_fee_bps,
+            pools,
+            accounts,
+            whitelisted_tokens,
+            guardians,
+            state,
+            frozen_tokens,
+            referrals
+        }
     }
 }
 

@@ -284,6 +284,13 @@ fn sim_stable_e13 () {
 
     let user = root.create_user("user".to_string(), to_yocto("100"));
 
+    call!(
+        user,
+        ex.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
     let outcome = call!(
         user,
         ex.remove_liquidity(0, U128(1), vec![U128(1), U128(1)]),

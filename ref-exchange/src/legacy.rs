@@ -28,6 +28,40 @@ impl AccountV1 {
                 account_id: account_id.clone(),
             }),
             storage_used: self.storage_used,
+            shadow_records: UnorderedMap::new(StorageKey::ShadowRecord {
+                account_id: account_id.clone(),
+            })
+        }
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct AccountV2 {
+    /// Native NEAR amount sent to the exchange.
+    /// Used for storage right now, but in future can be used for trading as well.
+    pub near_amount: Balance,
+    /// Amounts of various tokens deposited to this account.
+    pub legacy_tokens: HashMap<AccountId, Balance>,
+    pub tokens: UnorderedMap<AccountId, Balance>,
+    pub storage_used: StorageUsage,
+}
+
+impl AccountV2 {
+    pub fn into_current(self, account_id: &AccountId) -> Account {
+        let AccountV2 {
+            near_amount,
+            legacy_tokens,
+            tokens,
+            storage_used
+        } = self;
+        Account {
+            near_amount,
+            legacy_tokens,
+            tokens,
+            storage_used,
+            shadow_records: UnorderedMap::new(StorageKey::ShadowRecord {
+                account_id: account_id.clone(),
+            })
         }
     }
 }
@@ -52,4 +86,26 @@ pub struct ContractV1 {
     pub state: RunningState,
     /// Set of frozenlist tokens
     pub frozen_tokens: UnorderedSet<AccountId>,
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct ContractV2 {
+    /// Account of the owner.
+    pub owner_id: AccountId,
+    /// Admin fee rate in total fee.
+    pub admin_fee_bps: u32,
+    /// List of all the pools.
+    pub pools: Vector<Pool>,
+    /// Accounts registered, keeping track all the amounts deposited, storage and more.
+    pub accounts: LookupMap<AccountId, VAccount>,
+    /// Set of whitelisted tokens by "owner".
+    pub whitelisted_tokens: UnorderedSet<AccountId>,
+    /// Set of guardians.
+    pub guardians: UnorderedSet<AccountId>,
+    /// Running state
+    pub state: RunningState,
+    /// Set of frozenlist tokens
+    pub frozen_tokens: UnorderedSet<AccountId>,
+    /// Map of referrals
+    pub referrals: UnorderedMap<AccountId, u32>,
 }

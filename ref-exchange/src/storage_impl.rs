@@ -63,7 +63,7 @@ impl StorageManagement for Contract {
         if let Some(account_deposit) = self.internal_get_account(&account_id) {
             // [AUDITION_AMENDMENT] 2.1.1 Improper Account Unregistration
             assert!(
-                account_deposit.tokens.is_empty() && account_deposit.legacy_tokens.is_empty(),
+                account_deposit.tokens.is_empty() && account_deposit.legacy_tokens.is_empty() && account_deposit.shadow_records.is_empty(),
                 "{}", ERR18_TOKENS_NOT_EMPTY
             );
             self.accounts.remove(&account_id);

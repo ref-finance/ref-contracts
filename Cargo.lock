@@ -2322,7 +2322,7 @@ dependencies = [
 
 [[package]]
 name = "ref-exchange"
-version = "1.7.2"
+version = "1.8.0"
 dependencies = [
  "mock-boost-farming",
  "near-contract-standards",

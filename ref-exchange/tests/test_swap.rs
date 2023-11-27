@@ -105,7 +105,7 @@ fn setup_pool_with_liquidity() -> (
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va("owner".to_string()), 5, 0)
+        init_method: new(to_va("owner".to_string()), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 5, 0)
     );
     let token1 = test_token(&root, dai(), vec![swap()]);
     let token2 = test_token(&root, eth(), vec![swap()]);
@@ -242,7 +242,7 @@ fn test_withdraw_failure() {
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va("owner".to_string()), 5, 0)
+        init_method: new(to_va("owner".to_string()), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 5, 0)
     );
     // Deploy DAI and wETH fungible tokens
     let dai_contract = test_token(&root, dai(), vec![swap()]);

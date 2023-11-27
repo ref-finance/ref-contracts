@@ -322,7 +322,7 @@ pub fn setup_pool_with_liquidity() -> (
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va("owner".to_string()), 5, 0)
+        init_method: new(to_va("owner".to_string()), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 5, 0)
     );
     let token1 = test_token(&root, dai(), vec![swap()]);
     let token2 = test_token(&root, eth(), vec![swap()]);
@@ -423,7 +423,7 @@ pub fn setup_stable_pool_with_liquidity(
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(owner.valid_account_id(), 2000, 0)
+        init_method: new(owner.valid_account_id(), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 2000, 0)
     );
 
     let mut token_contracts: Vec<ContractAccount<TestToken>> = vec![];
@@ -514,7 +514,7 @@ pub fn setup_rated_pool_with_liquidity(
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(owner.valid_account_id(), 2000, 0)
+        init_method: new(owner.valid_account_id(), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 2000, 0)
     );
 
     let mut pool_tokens = vec![];
@@ -638,7 +638,7 @@ pub fn setup_rated_pool(
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(owner.valid_account_id(), 2000, 0)
+        init_method: new(owner.valid_account_id(), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 2000, 0)
     );
 
     let mut pool_tokens = vec![];
@@ -773,7 +773,7 @@ pub fn setup_exchange(root: &UserAccount, admin_fee_bps: u32) -> (
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va("owner".to_string()), admin_fee_bps, 0)
+        init_method: new(to_va("owner".to_string()), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), admin_fee_bps, 0)
     );
     (owner, pool)
 }

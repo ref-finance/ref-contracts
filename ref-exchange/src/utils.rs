@@ -64,6 +64,34 @@ pub trait RefExchange {
         sender_id: AccountId,
         amount: U128,
     );
+    fn callback_deposit_free_shadow_seed(
+        &mut self,
+        sender_id: AccountId,
+        pool_id: u64,
+        amount: U128,
+        storage_cost: U128
+    ) -> bool;
+    fn callback_withdraw_free_shadow_seed(
+        &mut self,
+        sender_id: AccountId,
+        pool_id: u64,
+        amount: U128,
+        storage_refund: U128
+    ) -> bool;
+    fn callback_deposit_shadow_asset(
+        &mut self,
+        sender_id: AccountId,
+        pool_id: u64,
+        amount: U128,
+        storage_cost: U128
+    ) -> bool;
+    fn callback_withdraw_shadow_asset(
+        &mut self,
+        sender_id: AccountId,
+        pool_id: u64,
+        amount: U128,
+        storage_refund: U128
+    ) -> bool;
 }
 
 /// Adds given value to item stored in the given key in the LookupMap collection.

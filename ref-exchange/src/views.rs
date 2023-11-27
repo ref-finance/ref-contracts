@@ -15,6 +15,8 @@ use crate::*;
 pub struct ContractMetadata {
     pub version: String,
     pub owner: AccountId,
+    pub boost_farm_id: AccountId,
+    pub burrowland_id: AccountId,
     pub guardians: Vec<AccountId>,
     pub pool_count: u64,
     pub state: RunningState,
@@ -171,6 +173,31 @@ impl From<Pool> for RatedPoolInfo {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub struct ShadowRecordInfo {
+    pub to_farming_amount: U128,
+    pub to_burrowland_amount: U128
+}
+
+impl From<ShadowRecord> for ShadowRecordInfo {
+    fn from(v: ShadowRecord) -> Self {
+        Self { 
+            to_farming_amount: U128(v.to_farming_amount), 
+            to_burrowland_amount: U128(v.to_burrowland_amount) 
+        }
+    }
+}
+
+impl From<VShadowRecord> for ShadowRecordInfo {
+    fn from(v_shadow_record: VShadowRecord) -> Self {
+        match v_shadow_record {
+            VShadowRecord::Current(v) => v.into(),
+        }
+    }
+}
+
 #[near_bindgen]
 impl Contract {
 
@@ -179,6 +206,8 @@ impl Contract {
         ContractMetadata {
             version: env!("CARGO_PKG_VERSION").to_string(),
             owner: self.owner_id.clone(),
+            boost_farm_id: self.boost_farm_id.clone(),
+            burrowland_id: self.burrowland_id.clone(),
             guardians: self.guardians.to_vec(),
             pool_count: self.pools.len(),
             state: self.state.clone(),
@@ -270,6 +299,18 @@ impl Contract {
             account.get_tokens()
                 .iter()
                 .map(|token| (token.clone(), U128(account.get_balance(token).unwrap())))
+                .collect()
+        } else {
+            HashMap::new()
+        }
+    }
+
+    pub fn get_shadow_records(&self, account_id: ValidAccountId) -> HashMap<u64, ShadowRecordInfo> {
+        let wrapped_account = self.internal_get_account(account_id.as_ref());
+        if let Some(account) = wrapped_account {
+            account.shadow_records
+                .iter()
+                .map(|(pool_id, vshadow_record)| (pool_id, vshadow_record.into()))
                 .collect()
         } else {
             HashMap::new()
