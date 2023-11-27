@@ -21,7 +21,7 @@ pub trait BoostFarmActions {
     fn withdraw_free_shadow_seed(&mut self, farmer_id: AccountId, seed_id: String, amount: U128);
 }
 
-#[ext_contract(ext_burrowlnad_receiver)]
+#[ext_contract(ext_burrowland_receiver)]
 pub trait BurrowlandActions {
     fn deposit_shadow_asset(&mut self, sender_id: AccountId, token_id: AccountId, amount: U128, after_deposit_actions_msg: Option<String>);
     fn withdraw_shadow_asset(&mut self, sender_id: AccountId, token_id: AccountId, amount: U128, before_withdraw_actions_msg: Option<String>);
@@ -185,7 +185,7 @@ impl Contract {
         let storage_cost = self.internal_check_storage(prev_storage);
         let token_id = pool_id_to_burrowland_token_id(pool_id);
 
-        ext_burrowlnad_receiver::deposit_shadow_asset(
+        ext_burrowland_receiver::deposit_shadow_asset(
             sender_id.clone(),
             token_id,
             U128(amount),
@@ -232,7 +232,7 @@ impl Contract {
 
         let token_id = pool_id_to_burrowland_token_id(pool_id);
 
-        ext_burrowlnad_receiver::withdraw_shadow_asset(
+        ext_burrowland_receiver::withdraw_shadow_asset(
             sender_id.clone(),
             token_id,
             U128(amount),
@@ -252,7 +252,7 @@ impl Contract {
         )).into()
     }
 
-    pub fn process_burrowlnad_liquidate_result(&mut self, sender_id: AccountId, liquidation_account_id: AccountId, pool_id: u64, liquidate_share_amount: U128, min_token_amounts: Vec<U128>) {
+    pub fn process_burrowland_liquidate_result(&mut self, sender_id: AccountId, liquidation_account_id: AccountId, pool_id: u64, liquidate_share_amount: U128, min_token_amounts: Vec<U128>) {
         assert!(self.burrowland_id == env::predecessor_account_id());
         let mut liquidation_account = self.internal_unwrap_account(&liquidation_account_id);
         liquidation_account.update_shadow_record(pool_id, ShadowActions::FromBurrowland, liquidate_share_amount.0);
@@ -332,7 +332,7 @@ impl Contract {
         self.internal_save_account(&liquidation_account_id, liquidation_account);
     }
 
-    pub fn process_burrowlnad_force_close_result(&mut self, liquidation_account_id: AccountId, pool_id: u64, liquidate_share_amount: U128, min_token_amounts: Vec<U128>) {
+    pub fn process_burrowland_force_close_result(&mut self, liquidation_account_id: AccountId, pool_id: u64, liquidate_share_amount: U128, min_token_amounts: Vec<U128>) {
         assert!(self.burrowland_id == env::predecessor_account_id());
         let mut liquidation_account = self.internal_unwrap_account(&liquidation_account_id);
         liquidation_account.update_shadow_record(pool_id, ShadowActions::FromBurrowland, liquidate_share_amount.0);

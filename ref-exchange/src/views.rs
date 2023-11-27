@@ -269,6 +269,18 @@ impl Contract {
         self.pools.get(pool_id).expect(ERR85_NO_POOL).get_volumes()
     }
 
+    pub fn get_pool_volumes_by_ids(&self, pool_ids: Vec<u64>) -> Vec<Vec<SwapVolume>> {
+        pool_ids.iter()
+            .map(|index| self.pools.get(*index).expect(ERR85_NO_POOL).get_volumes())
+            .collect()
+    }
+
+    pub fn list_pool_volumes(&self, from_index: u64, limit: u64) -> Vec<Vec<SwapVolume>> {
+        (from_index..std::cmp::min(from_index + limit, self.pools.len()))
+            .map(|index| self.pools.get(index).expect(ERR85_NO_POOL).get_volumes())
+            .collect()
+    }
+
     pub fn get_pool_share_price(&self, pool_id: u64) -> U128 {
         self.pools.get(pool_id).expect(ERR85_NO_POOL).get_share_price().into()
     }
