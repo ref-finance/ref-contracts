@@ -375,9 +375,9 @@ impl Contract {
         } = env::state_read().expect(ERR103_NOT_INITIALIZED);
         
         Self {
-            owner_id,
-            boost_farm_id: "boostfarm.ref-labs.near".to_string(),
-            burrowland_id: "contract.main.burrow.near".to_string(),
+            owner_id: owner_id.clone(),
+            boost_farm_id: owner_id.clone(),
+            burrowland_id: owner_id,
             admin_fee_bps,
             pools,
             accounts,

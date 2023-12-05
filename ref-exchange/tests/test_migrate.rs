@@ -51,8 +51,8 @@ fn test_upgrade() {
     // println!("{:#?}", metadata);
     assert_eq!(metadata.version, "1.8.0".to_string());
     assert_eq!(metadata.admin_fee_bps, 5);
-    assert_eq!(metadata.boost_farm_id, "boostfarm.ref-labs.near".to_string());
-    assert_eq!(metadata.burrowland_id, "contract.main.burrow.near".to_string());
+    assert_eq!(metadata.boost_farm_id, root.account_id());
+    assert_eq!(metadata.burrowland_id, root.account_id());
     assert_eq!(metadata.state, RunningState::Running);
 
     // Upgrade to the same code with insurfficient gas.

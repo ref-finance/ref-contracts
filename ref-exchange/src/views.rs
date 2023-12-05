@@ -177,15 +177,15 @@ impl From<Pool> for RatedPoolInfo {
 #[serde(crate = "near_sdk::serde")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 pub struct ShadowRecordInfo {
-    pub to_farming_amount: U128,
-    pub to_burrowland_amount: U128
+    pub shadow_in_farm: U128,
+    pub shadow_in_burrow: U128
 }
 
 impl From<ShadowRecord> for ShadowRecordInfo {
     fn from(v: ShadowRecord) -> Self {
         Self { 
-            to_farming_amount: U128(v.to_farming_amount), 
-            to_burrowland_amount: U128(v.to_burrowland_amount) 
+            shadow_in_farm: U128(v.shadow_in_farm), 
+            shadow_in_burrow: U128(v.shadow_in_burrow) 
         }
     }
 }
@@ -196,6 +196,14 @@ impl From<VShadowRecord> for ShadowRecordInfo {
             VShadowRecord::Current(v) => v.into(),
         }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+
+pub struct AccountBaseInfo {
+    pub near_amount: U128,
+    pub storage_used: U64,
 }
 
 #[near_bindgen]
@@ -314,6 +322,18 @@ impl Contract {
                 .collect()
         } else {
             HashMap::new()
+        }
+    }
+
+    pub fn get_account_basic_info(&self, account_id: AccountId) -> Option<AccountBaseInfo> {
+        let wrapped_account = self.internal_get_account(&account_id);
+        if let Some(account) = wrapped_account {
+            Some(AccountBaseInfo{
+                near_amount: U128(account.near_amount),
+                storage_used: U64(account.storage_used),
+            })
+        } else {
+            None
         }
     }
 

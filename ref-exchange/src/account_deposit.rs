@@ -74,6 +74,7 @@ pub struct Account {
     pub legacy_tokens: HashMap<AccountId, Balance>,
     pub tokens: UnorderedMap<AccountId, Balance>,
     pub storage_used: StorageUsage,
+    // pool_id -> ShadowRecord
     pub shadow_records: UnorderedMap<u64, VShadowRecord>
 }
 
@@ -224,22 +225,26 @@ impl Account {
 
 #[derive(BorshSerialize, BorshDeserialize, Default, Debug)]
 pub struct ShadowRecord {
-    pub to_farming_amount: Balance,
-    pub to_burrowland_amount: Balance
+    pub shadow_in_farm: Balance,
+    pub shadow_in_burrow: Balance
 }
 
 impl ShadowRecord {
+    pub fn is_empty(&self) -> bool {
+        self.shadow_in_burrow == 0 && self.shadow_in_farm == 0
+    }
+
     pub fn free_shares(&self, total_shares: Balance) -> Balance {
-        let shadow_used = std::cmp::max(self.to_farming_amount, self.to_burrowland_amount);
+        let shadow_used = std::cmp::max(self.shadow_in_farm, self.shadow_in_burrow);
         total_shares - shadow_used
     }
 
     pub fn available_farming_shares(&self, total_shares: Balance) -> Balance {
-        total_shares - self.to_farming_amount
+        total_shares - self.shadow_in_farm
     }
 
     pub fn available_burrowland_shares(&self, total_shares: Balance) -> Balance {
-        total_shares - self.to_burrowland_amount
+        total_shares - self.shadow_in_burrow
     }
 }
 
@@ -262,6 +267,8 @@ impl From<ShadowRecord> for VShadowRecord {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
 pub enum ShadowActions {
     ToFarming,
     FromFarming,
@@ -275,7 +282,7 @@ impl Account {
         self.shadow_records.get(&pool_id).map(|v| v.into())
     }
 
-    pub fn update_shadow_record(&mut self, pool_id: u64, action: ShadowActions, amount: Balance) {
+    pub fn update_shadow_record(&mut self, pool_id: u64, action: &ShadowActions, amount: Balance) {
         let mut record = if let Some(record) = self.shadow_records.get(&pool_id) {
             record.into()
         } else {
@@ -283,19 +290,19 @@ impl Account {
         };
         match action {
             ShadowActions::ToFarming => {
-                record.to_farming_amount += amount;
+                record.shadow_in_farm += amount;
             }
             ShadowActions::ToBurrowland => {
-                record.to_burrowland_amount += amount;
+                record.shadow_in_burrow += amount;
             }
             ShadowActions::FromFarming => {
-                record.to_farming_amount -= amount;
+                record.shadow_in_farm -= amount;
             }
             ShadowActions::FromBurrowland => {
-                record.to_burrowland_amount -= amount;
+                record.shadow_in_burrow -= amount;
             }
         }
-        if record.to_burrowland_amount == 0 && record.to_farming_amount == 0 {
+        if record.is_empty() {
             self.shadow_records.remove(&pool_id);
         } else {
             self.shadow_records.insert(&pool_id, &record.into());

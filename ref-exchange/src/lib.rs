@@ -344,7 +344,7 @@ impl Contract {
     //     self.add_stable_liquidity(pool_id, amounts, min_shares)
     // }
 
-    /// Remove liquidity from the pool into general pool of liquidity.
+    /// Remove liquidity from the pool and add tokens into user internal account.
     #[payable]
     pub fn remove_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) -> Vec<U128> {
         assert_one_yocto();
@@ -493,6 +493,7 @@ impl Contract {
     }
 
     /// Check how much storage taken costs and refund the left over back.
+    /// Return the storage costs due to this call by far.
     fn internal_check_storage(&self, prev_storage: StorageUsage) -> u128 {
         let storage_cost = env::storage_usage()
             .checked_sub(prev_storage)
