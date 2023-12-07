@@ -71,7 +71,13 @@ pub trait RefExchange {
         pool_id: u64,
         amount: U128,
         storage_fee: U128
-    ) -> bool ;
+    ) -> bool;
+    fn callback_on_burrow_liquidation(
+        &mut self,
+        sender_id: AccountId,
+        pool_id: u64,
+        amount: U128,
+    );
 }
 
 /// Adds given value to item stored in the given key in the LookupMap collection.
