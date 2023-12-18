@@ -75,9 +75,10 @@ impl Contract {
                 let amount = amount.unwrap_or(total_shares);
                 assert!(amount > 0, "transfer_amount must be greater than zero");
 
-                let sender_account = self.internal_unwrap_account(sender_id);
-                if let Some(record) = sender_account.get_shadow_record(pool_id) {
-                    assert!(record.free_shares(total_shares) >= amount, "Not enough free shares");
+                if let Some(sender_account) = self.internal_get_account(sender_id) {
+                    if let Some(record) = sender_account.get_shadow_record(pool_id) {
+                        assert!(record.free_shares(total_shares) >= amount, "Not enough free shares");
+                    }
                 }
                 
                 pool.share_transfer(sender_id, receiver_id, amount);
