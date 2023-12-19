@@ -72,14 +72,18 @@ impl Contract {
                 let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
 
                 let total_shares = pool.share_balances(sender_id);
-                let amount = amount.unwrap_or(total_shares);
-                assert!(amount > 0, "transfer_amount must be greater than zero");
-
-                if let Some(sender_account) = self.internal_get_account(sender_id) {
+                let available_shares = if let Some(sender_account) = self.internal_get_account(sender_id) {
                     if let Some(record) = sender_account.get_shadow_record(pool_id) {
-                        assert!(record.free_shares(total_shares) >= amount, "Not enough free shares");
+                        record.free_shares(total_shares)
+                    } else {
+                        total_shares
                     }
-                }
+                } else {
+                    total_shares
+                };
+                let amount = amount.unwrap_or(available_shares);
+                assert!(amount > 0, "transfer_amount must be greater than zero");
+                assert!(amount <= available_shares, "Not enough free shares");
                 
                 pool.share_transfer(sender_id, receiver_id, amount);
                 self.pools.replace(pool_id, &pool);
