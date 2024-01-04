@@ -385,7 +385,8 @@ impl Contract {
             guardians,
             state,
             frozen_tokens,
-            referrals
+            referrals,
+            unit_share_cumulative_infos: UnorderedMap::new(StorageKey::UnitShareCumulativeInfo),
         }
     }
 }

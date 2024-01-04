@@ -139,6 +139,10 @@ impl From<TokenCache> for HashMap<AccountId, U128> {
     }
 }
 
+pub fn nano_to_sec(nano: u64) -> u32 {
+    (nano / 10u64.pow(9)) as u32
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
