@@ -4,8 +4,7 @@ use crate::*;
 use crate::utils::*;
 use uint::construct_uint;
 
-pub const RECORD_INTERVAL_SEC: u32 = 10 * 60; // 10 min 
-pub const RECORD_COUNT_LIMIT: usize = 6;
+pub const RECORD_COUNT_LIMIT: usize = 60;
 
 construct_uint! {
     #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
@@ -96,7 +95,7 @@ impl UnitShareCumulativeInfo {
         }
     }
 
-    pub fn update(&mut self, current_time_sec: u32, amounts: Vec<u128>) {
+    pub fn update(&mut self, current_time_sec: u32, amounts: Vec<u128>, record_interval_sec: u32) {
         let amounts: Vec<U256> = amounts.into_iter().map(|x| U256::from(x)).collect();
         let last_record = &self.records[self.records.len() - 1];
         let time_elapsed = current_time_sec - self.last_update_sec;
@@ -109,7 +108,7 @@ impl UnitShareCumulativeInfo {
             self.last_update_sec = current_time_sec;
             self.cumulative_token_amounts = new_cumulative_token_amounts;
 
-            if current_time_sec - last_record.time_sec >= RECORD_INTERVAL_SEC {
+            if current_time_sec - last_record.time_sec >= record_interval_sec {
                 self.records.push(CumulativeRecord {
                     time_sec: current_time_sec,
                     cumulative_token_amounts: self.cumulative_token_amounts.clone()
@@ -135,18 +134,22 @@ impl UnitShareCumulativeInfo {
 }
 
 impl Contract {
-    pub fn internal_unit_share_token_amounts(&self, pool_id: u64) -> Vec<u128> {
+    pub fn internal_unit_share_token_amounts(&self, pool_id: u64) -> Option<Vec<u128>> {
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         let share_decimals = pool.get_share_decimal();
-        pool.remove_liquidity(&String::from("@view"), 10u128.pow(share_decimals as u32), vec![0; pool.tokens().len()], true)
+        if pool.share_total_balance() > 10u128.pow(share_decimals as u32) {
+            Some(pool.remove_liquidity(&String::from("@view"), 10u128.pow(share_decimals as u32), vec![0; pool.tokens().len()], true))
+        } else {
+            None
+        }
     }
 
     pub fn internal_update_unit_share_cumulative_info(&mut self, pool_id: u64) {
         if let Some(mut unit_share_cumulative_info) =  self.internal_get_unit_share_cumulative_infos(pool_id) {
-            let tokens = self.internal_unit_share_token_amounts(pool_id);
-            unit_share_cumulative_info.update(nano_to_sec(env::block_timestamp()), tokens);
-            self.internal_set_unit_share_cumulative_infos(pool_id, unit_share_cumulative_info);
-
+            if let Some(tokens) = self.internal_unit_share_token_amounts(pool_id) {
+                unit_share_cumulative_info.update(nano_to_sec(env::block_timestamp()), tokens, self.cumulative_info_record_interval_sec);
+                self.internal_set_unit_share_cumulative_infos(pool_id, unit_share_cumulative_info);
+            }
         }
     }
 }
@@ -158,7 +161,7 @@ impl Contract {
         assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         assert!(self.unit_share_cumulative_infos.get(&pool_id).is_none(), "Already register");
-        let amounts = self.internal_unit_share_token_amounts(pool_id);
+        let amounts = self.internal_unit_share_token_amounts(pool_id).expect("Too few shares in the pool");
         self.internal_set_unit_share_cumulative_infos(pool_id, UnitShareCumulativeInfo::new(nano_to_sec(env::block_timestamp()), amounts));
     }
 
@@ -169,10 +172,17 @@ impl Contract {
         self.unit_share_cumulative_infos.remove(&pool_id).expect(ERR85_NO_POOL);
     }
 
+    #[payable]
+    pub fn modify_cumulative_info_record_interval_sec(&mut self, record_interval_sec: u32) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        self.cumulative_info_record_interval_sec = record_interval_sec;
+    }
+
     pub fn sync_pool_twap_record(&mut self, pool_id: u64) {
         let mut unit_share_cumulative_info =  self.internal_unwrap_unit_share_cumulative_infos(pool_id);
-        let amounts = self.internal_unit_share_token_amounts(pool_id);
-        unit_share_cumulative_info.update(nano_to_sec(env::block_timestamp()), amounts);
+        let amounts = self.internal_unit_share_token_amounts(pool_id).expect("Too few shares in the pool");
+        unit_share_cumulative_info.update(nano_to_sec(env::block_timestamp()), amounts, self.cumulative_info_record_interval_sec);
         self.internal_set_unit_share_cumulative_infos(pool_id, unit_share_cumulative_info);
     }
 
@@ -199,15 +209,22 @@ impl Contract {
             .collect()
     }
 
-    pub fn get_unit_share_twap_token_amounts(&self, pool_id: u64) -> Vec<U128> {
+    pub fn get_unit_share_twap_token_amounts(&self, pool_id: u64) -> Option<Vec<U128>> {
         let mut unit_share_cumulative_info =  self.internal_unwrap_unit_share_cumulative_infos(pool_id);
-        let tokens = self.internal_unit_share_token_amounts(pool_id);
-        unit_share_cumulative_info.update(nano_to_sec(env::block_timestamp()), tokens);
-        unit_share_cumulative_info.twap_token_amounts().into_iter().map(|v| U128(v)).collect()
+        if let Some(tokens) = self.internal_unit_share_token_amounts(pool_id) {
+            unit_share_cumulative_info.update(nano_to_sec(env::block_timestamp()), tokens, self.cumulative_info_record_interval_sec);
+            if unit_share_cumulative_info.records.len() == RECORD_COUNT_LIMIT {
+                Some(unit_share_cumulative_info.twap_token_amounts().into_iter().map(|v| U128(v)).collect())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 
     pub fn get_unit_share_token_amounts(&self, pool_id: u64) -> Vec<U128> {
-        self.internal_unit_share_token_amounts(pool_id).into_iter().map(|v| U128(v)).collect()
+        self.internal_unit_share_token_amounts(pool_id).expect("Too few shares in the pool").into_iter().map(|v| U128(v)).collect()
     }
 }
 
@@ -232,6 +249,8 @@ impl Contract {
 mod twap {
     use super::*;
 
+    const TEST_RECORD_INTERVAL_SEC: u32 = 12 * 60;
+
     #[test]
     fn test_base() {
         let mut usci = UnitShareCumulativeInfo::new(1000, vec![100u128, 100, 100, 10000]);
@@ -240,7 +259,7 @@ mod twap {
         assert!(usci.records[0].time_sec == 1000);
         assert!(usci.records[0].cumulative_token_amounts.iter().zip(vec![100u128, 100, 100, 10000]).all(|(x, y)| x.as_u128() == y));
 
-        usci.update(2000, vec![200u128, 200, 200, 20000]);
+        usci.update(2000, vec![200u128, 200, 200, 20000], TEST_RECORD_INTERVAL_SEC);
         assert!(usci.records.len() == 2);
         
         assert!(usci.cumulative_token_amounts.iter()
@@ -259,7 +278,6 @@ mod twap {
             }));
     }
 
-
     #[test]
     fn test_long_time_no_operation() {
         let mut usci = UnitShareCumulativeInfo::new(1000, vec![100u128, 100, 100, 10000]);
@@ -268,32 +286,14 @@ mod twap {
         assert!(usci.records[0].time_sec == 1000);
         assert!(usci.records[0].cumulative_token_amounts.iter().zip(vec![100u128, 100, 100, 10000]).all(|(x, y)| x.as_u128() == y));
 
-        usci.update(1010, vec![100u128, 100, 100, 10000]);
+        usci.update(1010, vec![100u128, 100, 100, 10000], TEST_RECORD_INTERVAL_SEC);
         assert!(usci.records.len() == 1);
         assert!(usci.twap_token_amounts().into_iter().zip(vec![100u128, 100, 100, 10000]).all(|(x, y)| x == y));
 
-        usci.update(1000 + RECORD_INTERVAL_SEC, vec![100u128, 100, 100, 10000]);
-        assert!(usci.records.len() == 2);
-        assert!(usci.twap_token_amounts().into_iter().zip(vec![100u128, 100, 100, 10000]).all(|(x, y)| x == y));
-
-        usci.update(1000 + 2 * RECORD_INTERVAL_SEC, vec![100u128, 100, 100, 10000]);
-        assert!(usci.records.len() == 3);
-        assert!(usci.twap_token_amounts().into_iter().zip(vec![100u128, 100, 100, 10000]).all(|(x, y)| x == y));
-
-        usci.update(1000 + 6 * RECORD_INTERVAL_SEC, vec![100u128, 100, 100, 10000]);
-        assert!(usci.records.len() == 4);
-        assert!(usci.twap_token_amounts().into_iter().zip(vec![100u128, 100, 100, 10000]).all(|(x, y)| x == y));
-
-        usci.update(1000 + 7 * RECORD_INTERVAL_SEC, vec![100u128, 100, 100, 10000]);
-        assert!(usci.records.len() == 5);
-        assert!(usci.twap_token_amounts().into_iter().zip(vec![100u128, 100, 100, 10000]).all(|(x, y)| x == y));
-
-        usci.update(1000 + 20 * RECORD_INTERVAL_SEC, vec![100u128, 100, 100, 10000]);
-        assert!(usci.records.len() == 6);
-        assert!(usci.twap_token_amounts().into_iter().zip(vec![100u128, 100, 100, 10000]).all(|(x, y)| x == y));
-
-        usci.update(1000 + 50 * RECORD_INTERVAL_SEC, vec![100u128, 100, 100, 10000]);
-        assert!(usci.records.len() == 6);
-        assert!(usci.twap_token_amounts().into_iter().zip(vec![100u128, 100, 100, 10000]).all(|(x, y)| x == y));
+        for i in 1..RECORD_COUNT_LIMIT as u32 {
+            usci.update(1000 + i * if TEST_RECORD_INTERVAL_SEC == 0 {1} else {TEST_RECORD_INTERVAL_SEC}, vec![100u128, 100, 100, 10000], TEST_RECORD_INTERVAL_SEC);
+            assert!(usci.records.len() as u32 == i + 1);
+            assert!(usci.twap_token_amounts().into_iter().zip(vec![100u128, 100, 100, 10000]).all(|(x, y)| x == y));
+        }
     }
 }

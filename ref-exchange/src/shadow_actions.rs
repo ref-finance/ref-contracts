@@ -45,15 +45,16 @@ impl Contract {
         let current_timestamp = env::block_timestamp();
         for pool_id in pool_ids {
             let shadow_id = pool_id_to_shadow_id(pool_id);
-            let amounts: Vec<U128> = self.get_unit_share_twap_token_amounts(pool_id);
-            let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
-            let share_decimals = pool.get_share_decimal();
-            let tokens = pool.tokens().iter().zip(amounts.into_iter()).map(|(token_id, amount)| TokenAmount { token_id: token_id.clone(), amount }).collect();
-            result.insert(shadow_id, UnitShareTokens{
-                timestamp: current_timestamp,
-                decimals: share_decimals,
-                tokens
-            });
+            if let Some(amounts) = self.get_unit_share_twap_token_amounts(pool_id) {
+                let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+                let share_decimals = pool.get_share_decimal();
+                let tokens = pool.tokens().iter().zip(amounts.into_iter()).map(|(token_id, amount)| TokenAmount { token_id: token_id.clone(), amount }).collect();
+                result.insert(shadow_id, UnitShareTokens{
+                    timestamp: current_timestamp,
+                    decimals: share_decimals,
+                    tokens
+                });
+            }
         }
         result
     }
