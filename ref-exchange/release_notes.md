@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.8.0
+```
+Gnwp8fNWrPWZ7NR4867cNepgCkX2uj85zExzcMNZiGws
+```
+1. lp as collateral.
+
 ### Version 1.7.2
 ```
 9KuaBbp9FT1g17YCaCsaezGxWDuZkKrjPsXu1RCN8Ux7
