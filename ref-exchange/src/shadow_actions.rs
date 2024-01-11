@@ -3,8 +3,9 @@ use crate::*;
 use near_sdk::{is_promise_success, Timestamp};
 use crate::utils::ext_self;
 
-pub const GAS_FOR_ON_CAST_SHADOW: Gas = 40_000_000_000_000;
+pub const GAS_FOR_ON_CAST_SHADOW: Gas = 200_000_000_000_000;
 pub const GAS_FOR_ON_CAST_SHADOW_CALLBACK: Gas = 20_000_000_000_000;
+pub const GAS_FOR_ON_BURROW_LIQUIDATION: Gas = 40_000_000_000_000;
 pub const GAS_FOR_ON_BURROW_LIQUIDATION_CALLBACK: Gas = 5_000_000_000_000;
 
 #[ext_contract(ext_shadow_receiver)]
@@ -222,7 +223,7 @@ impl Contract {
                 "".to_string(),
                 &self.boost_farm_id,
                 0,
-                GAS_FOR_ON_CAST_SHADOW
+                GAS_FOR_ON_BURROW_LIQUIDATION
             )
             .then(ext_self::callback_on_burrow_liquidation(
                     liquidation_account_id,
