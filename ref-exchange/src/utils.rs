@@ -64,6 +64,20 @@ pub trait RefExchange {
         sender_id: AccountId,
         amount: U128,
     );
+    fn callback_on_shadow(
+        &mut self,
+        action: crate::account_deposit::ShadowActions,
+        sender_id: AccountId,
+        pool_id: u64,
+        amount: U128,
+        storage_fee: U128
+    ) -> bool;
+    fn callback_on_burrow_liquidation(
+        &mut self,
+        sender_id: AccountId,
+        pool_id: u64,
+        amount: U128,
+    );
 }
 
 /// Adds given value to item stored in the given key in the LookupMap collection.
@@ -123,6 +137,10 @@ impl From<TokenCache> for HashMap<AccountId, U128> {
     fn from(v: TokenCache) -> Self {
         v.0.into_iter().map(|(k, v)| (k, U128(v))).collect()
     }
+}
+
+pub fn nano_to_sec(nano: u64) -> u32 {
+    (nano / 10u64.pow(9)) as u32
 }
 
 #[cfg(test)]

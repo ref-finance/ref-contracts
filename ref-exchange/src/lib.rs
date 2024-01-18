@@ -10,11 +10,11 @@ use near_sdk::collections::{LookupMap, UnorderedSet, Vector, UnorderedMap};
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
     assert_one_yocto, env, log, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
-    PromiseResult, StorageUsage, BorshStorageKey, PromiseOrValue, ext_contract
+    PromiseResult, StorageUsage, BorshStorageKey, PromiseOrValue, ext_contract, Gas
 };
 use utils::{NO_DEPOSIT, GAS_FOR_BASIC_OP};
 
-use crate::account_deposit::{VAccount, Account};
+use crate::account_deposit::*;
 pub use crate::action::{SwapAction, Action, ActionResult, get_tokens_in_actions};
 use crate::errors::*;
 use crate::admin_fee::AdminFees;
@@ -24,8 +24,10 @@ use crate::stable_swap::StableSwapPool;
 use crate::rated_swap::{RatedSwapPool, rate::{RateTrait, global_get_rate, global_set_rate}};
 use crate::utils::{check_token_duplicates, TokenCache};
 pub use crate::custom_keys::*;
-pub use crate::views::{PoolInfo, RatedPoolInfo, ContractMetadata, RatedTokenInfo, AddLiquidityPrediction};
+pub use crate::views::{PoolInfo, ShadowRecordInfo, RatedPoolInfo, StablePoolInfo, ContractMetadata, RatedTokenInfo, AddLiquidityPrediction, RefStorageState};
 pub use crate::token_receiver::AddLiquidityInfo;
+pub use crate::shadow_actions::*;
+pub use crate::unit_lpt_cumulative_infos::*;
 
 mod account_deposit;
 mod action;
@@ -43,6 +45,8 @@ mod token_receiver;
 mod utils;
 mod views;
 mod custom_keys;
+mod shadow_actions;
+mod unit_lpt_cumulative_infos;
 
 near_sdk::setup_alloc!();
 
@@ -56,6 +60,8 @@ pub(crate) enum StorageKey {
     AccountTokens {account_id: AccountId},
     Frozenlist,
     Referral,
+    ShadowRecord {account_id: AccountId},
+    UnitShareCumulativeInfo,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]
@@ -84,6 +90,10 @@ pub trait SelfCallbacks {
 pub struct Contract {
     /// Account of the owner.
     owner_id: AccountId,
+    /// Account of the boost_farm contract.
+    boost_farm_id: AccountId,
+    /// Account of the burrowland contract.
+    burrowland_id: AccountId,
     /// Admin fee rate in total fee.
     admin_fee_bps: u32,
     /// List of all the pools.
@@ -100,14 +110,19 @@ pub struct Contract {
     frozen_tokens: UnorderedSet<AccountId>,
     /// Map of referrals
     referrals: UnorderedMap<AccountId, u32>,
+
+    cumulative_info_record_interval_sec: u32,
+    unit_share_cumulative_infos: UnorderedMap<u64, VUnitShareCumulativeInfo>,
 }
 
 #[near_bindgen]
 impl Contract {
     #[init]
-    pub fn new(owner_id: ValidAccountId, exchange_fee: u32, referral_fee: u32) -> Self {
+    pub fn new(owner_id: ValidAccountId, boost_farm_id: ValidAccountId, burrowland_id: ValidAccountId, exchange_fee: u32, referral_fee: u32) -> Self {
         Self {
             owner_id: owner_id.as_ref().clone(),
+            boost_farm_id: boost_farm_id.as_ref().clone(),
+            burrowland_id: burrowland_id.as_ref().clone(),
             admin_fee_bps: exchange_fee + referral_fee,
             pools: Vector::new(StorageKey::Pools),
             accounts: LookupMap::new(StorageKey::Accounts),
@@ -116,6 +131,8 @@ impl Contract {
             state: RunningState::Running,
             frozen_tokens: UnorderedSet::new(StorageKey::Frozenlist),
             referrals: UnorderedMap::new(StorageKey::Referral),
+            cumulative_info_record_interval_sec: 12 * 60, // 12 min
+            unit_share_cumulative_infos: UnorderedMap::new(StorageKey::UnitShareCumulativeInfo),
         }
     }
 
@@ -248,6 +265,7 @@ impl Contract {
             env::attached_deposit() > 0,
             "{}", ERR35_AT_LEAST_ONE_YOCTO
         );
+        self.internal_update_unit_share_cumulative_info(pool_id);
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let mut amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
@@ -276,7 +294,6 @@ impl Contract {
         self.internal_save_account(&sender_id, deposits);
         self.pools.replace(pool_id, &pool);
         self.internal_check_storage(prev_storage);
-
         U128(shares)
     }
 
@@ -297,6 +314,7 @@ impl Contract {
             env::attached_deposit() > 0,
             "{}", ERR35_AT_LEAST_ONE_YOCTO
         );
+        self.internal_update_unit_share_cumulative_info(pool_id);
         let prev_storage = env::storage_usage();
         let sender_id = env::predecessor_account_id();
         let amounts: Vec<u128> = amounts.into_iter().map(|amount| amount.into()).collect();
@@ -321,7 +339,6 @@ impl Contract {
         self.internal_save_account(&sender_id, deposits);
         self.pools.replace(pool_id, &pool);
         self.internal_check_storage(prev_storage);
-
         mint_shares.into()
     }
 
@@ -335,14 +352,18 @@ impl Contract {
     //     self.add_stable_liquidity(pool_id, amounts, min_shares)
     // }
 
-    /// Remove liquidity from the pool into general pool of liquidity.
+    /// Remove liquidity from the pool and add tokens into user internal account.
     #[payable]
     pub fn remove_liquidity(&mut self, pool_id: u64, shares: U128, min_amounts: Vec<U128>) -> Vec<U128> {
         assert_one_yocto();
         self.assert_contract_running();
-        let prev_storage = env::storage_usage();
+        self.internal_update_unit_share_cumulative_info(pool_id);
         let sender_id = env::predecessor_account_id();
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let mut deposits = self.internal_unwrap_account(&sender_id);
+        if let Some(record) = deposits.get_shadow_record(pool_id) {
+            assert!(shares.0 <= record.free_shares(pool.share_balances(&sender_id)), "Not enough free shares");
+        }
         // feature frozenlist
         self.assert_no_frozen_tokens(pool.tokens());
         let amounts = pool.remove_liquidity(
@@ -356,15 +377,8 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
-        let mut deposits = self.internal_unwrap_account(&sender_id);
         for i in 0..tokens.len() {
             deposits.deposit(&tokens[i], amounts[i]);
-        }
-        // Freed up storage balance from LP tokens will be returned to near_balance.
-        if prev_storage > env::storage_usage() {
-            deposits.near_amount +=
-                (prev_storage - env::storage_usage()) as Balance * env::storage_byte_cost();
         }
         self.internal_save_account(&sender_id, deposits);
 
@@ -386,9 +400,15 @@ impl Contract {
     ) -> U128 {
         assert_one_yocto();
         self.assert_contract_running();
-        let prev_storage = env::storage_usage();
+        self.internal_update_unit_share_cumulative_info(pool_id);
         let sender_id = env::predecessor_account_id();
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let mut deposits = self.internal_unwrap_account(&sender_id);
+        let free_shares = if let Some(record) = deposits.get_shadow_record(pool_id) {
+            record.free_shares(pool.share_balances(&sender_id))
+        } else {
+            pool.share_balances(&sender_id)
+        };
         // feature frozenlist
         self.assert_no_frozen_tokens(pool.tokens());
         let burn_shares = pool.remove_liquidity_by_tokens(
@@ -402,20 +422,13 @@ impl Contract {
             AdminFees::new(self.admin_fee_bps),
             false
         );
+        assert!(burn_shares <= free_shares, "Not enough free shares");
         self.pools.replace(pool_id, &pool);
         let tokens = pool.tokens();
-        // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
-        let mut deposits = self.internal_unwrap_account(&sender_id);
         for i in 0..tokens.len() {
             deposits.deposit(&tokens[i], amounts[i].into());
         }
-        // Freed up storage balance from LP tokens will be returned to near_balance.
-        if prev_storage > env::storage_usage() {
-            deposits.near_amount +=
-                (prev_storage - env::storage_usage()) as Balance * env::storage_byte_cost();
-        }
         self.internal_save_account(&sender_id, deposits);
-
         burn_shares.into()
     }
 
@@ -477,7 +490,8 @@ impl Contract {
     }
 
     /// Check how much storage taken costs and refund the left over back.
-    fn internal_check_storage(&self, prev_storage: StorageUsage) {
+    /// Return the storage costs due to this call by far.
+    fn internal_check_storage(&self, prev_storage: StorageUsage) -> u128 {
         let storage_cost = env::storage_usage()
             .checked_sub(prev_storage)
             .unwrap_or_default() as Balance
@@ -494,6 +508,7 @@ impl Contract {
         if refund > 0 {
             Promise::new(env::predecessor_account_id()).transfer(refund);
         }
+        storage_cost
     }
 
     /// Adds given pool to the list and returns it's id.
@@ -575,6 +590,7 @@ impl Contract {
         min_amount_out: u128,
         referral_info: &Option<(AccountId, u32)>,
     ) -> u128 {
+        self.internal_update_unit_share_cumulative_info(pool_id);
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
         let amount_out = pool.swap(
             token_in,
@@ -690,7 +706,7 @@ mod tests {
     fn setup_contract() -> (VMContextBuilder, Contract) {
         let mut context = VMContextBuilder::new();
         testing_env!(context.predecessor_account_id(accounts(0)).build());
-        let contract = Contract::new(accounts(0), 2000, 0);
+        let contract = Contract::new(accounts(0), "boost_farm".to_string().try_into().unwrap(), "burrowland".to_string().try_into().unwrap(), 2000, 0);
         (context, contract)
     }
 
@@ -1800,5 +1816,58 @@ mod tests {
         println!("{:?}", contract.get_pools(0, 100));
         println!("{:?}", contract.get_pool(0));
         println!("{:?}", contract.get_pool_by_ids(vec![0,2]));
+    }
+
+    #[test]
+    fn test_twap() {
+        let (mut context, mut contract) = setup_contract();
+        let token_amounts = vec![(accounts(1), to_yocto("5")), (accounts(2), to_yocto("5"))];
+        let tokens = token_amounts
+            .iter()
+            .map(|(x, _)| x.clone())
+            .collect::<Vec<_>>();
+        testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
+        contract.extend_whitelisted_tokens(tokens.clone());
+        assert_eq!(contract.get_whitelisted_tokens(), vec![accounts(1).to_string(), accounts(2).to_string()]);
+        assert_eq!(0, contract.get_user_whitelisted_tokens(accounts(3)).len());
+        testing_env!(context
+            .predecessor_account_id(accounts(0))
+            .attached_deposit(env::storage_byte_cost() * 334)
+            .build());
+        let pool_id = contract.add_stable_swap_pool(tokens, vec![18, 18], 25, 240);
+        
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(to_yocto("0.03"))
+            .build());
+        contract.storage_deposit(None, None);
+        assert_eq!(to_yocto("0.03"), contract.get_user_storage_state(accounts(3)).unwrap().deposit.0);
+        deposit_tokens(&mut context, &mut contract, accounts(3), token_amounts.clone());
+        deposit_tokens(&mut context, &mut contract, accounts(0), vec![]);
+
+        testing_env!(context
+            .predecessor_account_id(accounts(3))
+            .attached_deposit(to_yocto("0.0007"))
+            .build());
+        contract.add_stable_liquidity(
+            pool_id,
+            vec![to_yocto("4").into(), to_yocto("4").into()],
+            U128(1),
+        );
+        testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
+        contract.register_pool_twap_record(pool_id);
+
+        testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
+        contract.modify_cumulative_info_record_interval_sec(0);
+        for i in 1..RECORD_COUNT_LIMIT - 1 {
+            testing_env!(context.block_timestamp(i as u64 * 10u64.pow(9)).build());
+            contract.sync_pool_twap_record(pool_id);
+            assert_eq!(i + 1, contract.get_pool_twap_info_view(pool_id).unwrap().records.len());
+            assert!(contract.get_unit_share_twap_token_amounts(pool_id).is_none());
+        }
+        testing_env!(context.block_timestamp((RECORD_COUNT_LIMIT - 1) as u64 * 10u64.pow(9)).build());
+        contract.sync_pool_twap_record(pool_id);
+        assert_eq!(RECORD_COUNT_LIMIT, contract.get_pool_twap_info_view(pool_id).unwrap().records.len());
+        assert!(contract.get_unit_share_twap_token_amounts(pool_id).is_some());
     }
 }

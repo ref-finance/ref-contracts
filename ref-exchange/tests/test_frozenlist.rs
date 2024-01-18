@@ -11,6 +11,13 @@ fn frozenlist_scenario_01() {
     let guard1 = root.create_user("guard1".to_string(), to_yocto("100"));
     
     call!(
+        guard1,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
         owner,
         pool.extend_guardians(vec![guard1.valid_account_id()]),
         deposit=1
@@ -84,6 +91,20 @@ fn frozenlist_scenario_02() {
     let (root, owner, pool, token1, token2, _) = setup_pool_with_liquidity();
     let guard1 = root.create_user("guard1".to_string(), to_yocto("100"));
     let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
+
+    call!(
+        guard1,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        new_user,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
 
     call!(
         owner,
@@ -238,6 +259,20 @@ fn frozenlist_scenario_03() {
 
     let guard1 = root.create_user("guard1".to_string(), to_yocto("100"));
     let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
+
+    call!(
+        guard1,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        new_user,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
 
     call!(
         owner,

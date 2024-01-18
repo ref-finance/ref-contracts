@@ -228,7 +228,7 @@ pub fn init_pool_env() -> (
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va("owner".to_string()), 5, 0)
+        init_method: new(to_va("owner".to_string()), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 5, 0)
     );
 
     call!(
@@ -301,7 +301,7 @@ pub fn setup_stable_pool_with_liquidity_and_operators(
         contract_id: swap(),
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(owner.valid_account_id(), 1600, 0)
+        init_method: new(owner.valid_account_id(), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 1600, 0)
     );
 
     let mut users = Vec::new();

@@ -39,7 +39,7 @@ pub fn deploy_pool(root: &UserAccount, contract_id: AccountId, owner_id: Account
         contract_id: contract_id,
         bytes: &EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(to_va(owner_id), 4, 1)
+        init_method: new(to_va(owner_id), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 4, 1)
     );
     pool
 }

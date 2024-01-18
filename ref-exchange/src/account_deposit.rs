@@ -10,7 +10,7 @@ use near_sdk::{
     assert_one_yocto, env, near_bindgen, 
     AccountId, Balance, PromiseResult, StorageUsage,
 };
-use crate::legacy::AccountV1;
+use crate::legacy::{AccountV1, AccountV2};
 use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER};
 use crate::*;
 
@@ -42,6 +42,7 @@ pub const INIT_ACCOUNT_STORAGE: StorageUsage =
 #[derive(BorshDeserialize, BorshSerialize)]
 pub enum VAccount {
     V1(AccountV1),
+    V2(AccountV2),
     Current(Account),
 }
 
@@ -51,6 +52,7 @@ impl VAccount {
         match self {
             VAccount::Current(account) => account,
             VAccount::V1(account) => account.into_current(account_id),
+            VAccount::V2(account) => account.into_current(account_id),
         }
     }
 }
@@ -72,6 +74,8 @@ pub struct Account {
     pub legacy_tokens: HashMap<AccountId, Balance>,
     pub tokens: UnorderedMap<AccountId, Balance>,
     pub storage_used: StorageUsage,
+    // pool_id -> ShadowRecord
+    pub shadow_records: UnorderedMap<u64, VShadowRecord>
 }
 
 impl Account {
@@ -83,6 +87,9 @@ impl Account {
                 account_id: account_id.clone(),
             }),
             storage_used: 0,
+            shadow_records: UnorderedMap::new(StorageKey::ShadowRecord {
+                account_id: account_id.clone(),
+            }),
         }
     }
 
@@ -213,6 +220,93 @@ impl Account {
         assert_eq!(amount, 0, "{}", ERR24_NON_ZERO_TOKEN_BALANCE);
         let amount = self.tokens.remove(token_id).unwrap_or_default();
         assert_eq!(amount, 0, "{}", ERR24_NON_ZERO_TOKEN_BALANCE);
+    }
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Default, Debug)]
+pub struct ShadowRecord {
+    pub shadow_in_farm: Balance,
+    pub shadow_in_burrow: Balance
+}
+
+impl ShadowRecord {
+    pub fn is_empty(&self) -> bool {
+        self.shadow_in_burrow == 0 && self.shadow_in_farm == 0
+    }
+
+    pub fn free_shares(&self, total_shares: Balance) -> Balance {
+        let shadow_used = std::cmp::max(self.shadow_in_farm, self.shadow_in_burrow);
+        total_shares - shadow_used
+    }
+
+    pub fn available_farming_shares(&self, total_shares: Balance) -> Balance {
+        total_shares - self.shadow_in_farm
+    }
+
+    pub fn available_burrowland_shares(&self, total_shares: Balance) -> Balance {
+        total_shares - self.shadow_in_burrow
+    }
+}
+
+#[derive(BorshDeserialize, BorshSerialize)]
+pub enum VShadowRecord {
+    Current(ShadowRecord),
+}
+
+impl From<VShadowRecord> for ShadowRecord {
+    fn from(v: VShadowRecord) -> Self {
+        match v {
+            VShadowRecord::Current(c) => c,
+        }
+    }
+}
+
+impl From<ShadowRecord> for VShadowRecord {
+    fn from(shadow_record: ShadowRecord) -> Self {
+        VShadowRecord::Current(shadow_record)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub enum ShadowActions {
+    ToFarming,
+    FromFarming,
+    ToBurrowland,
+    FromBurrowland,
+}
+
+impl Account {
+
+    pub fn get_shadow_record(&self, pool_id: u64) -> Option<ShadowRecord> {
+        self.shadow_records.get(&pool_id).map(|v| v.into())
+    }
+
+    pub fn update_shadow_record(&mut self, pool_id: u64, action: &ShadowActions, amount: Balance) {
+        let mut record = if let Some(record) = self.shadow_records.get(&pool_id) {
+            record.into()
+        } else {
+            ShadowRecord::default()
+        };
+        match action {
+            ShadowActions::ToFarming => {
+                record.shadow_in_farm += amount;
+            }
+            ShadowActions::ToBurrowland => {
+                record.shadow_in_burrow += amount;
+            }
+            ShadowActions::FromFarming => {
+                record.shadow_in_farm -= amount;
+            }
+            ShadowActions::FromBurrowland => {
+                record.shadow_in_burrow -= amount;
+            }
+        }
+        if record.is_empty() {
+            self.shadow_records.remove(&pool_id);
+        } else {
+            self.shadow_records.insert(&pool_id, &record.into());
+        }
     }
 }
 

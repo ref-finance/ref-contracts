@@ -284,6 +284,13 @@ fn sim_stable_e13 () {
 
     let user = root.create_user("user".to_string(), to_yocto("100"));
 
+    call!(
+        user,
+        ex.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
     let outcome = call!(
         user,
         ex.remove_liquidity(0, U128(1), vec![U128(1), U128(1)]),
@@ -296,7 +303,7 @@ fn sim_stable_e13 () {
         ex.mft_transfer(":0".to_string(), root.valid_account_id(), U128(1), None),
         deposit = 1
     );
-    assert_failure(outcome, "E13: LP not registered");
+    assert_failure(outcome, "Not enough free shares");
 }
 
 #[test]
@@ -364,7 +371,7 @@ fn sim_stable_e34 () {
         ex.mft_transfer(":0".to_string(), owner.valid_account_id(), U128(2*ONE_LPT), None),
         deposit = 1
     );
-    assert_failure(outcome, "E34: insufficient lp shares");
+    assert_failure(outcome, "Not enough free shares");
 }
 
 #[test]

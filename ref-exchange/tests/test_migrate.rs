@@ -9,7 +9,7 @@ use crate::common::utils::*;
 pub mod common;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    PREV_EXCHANGE_WASM_BYTES => "../releases/ref_exchange_release_v171.wasm",
+    PREV_EXCHANGE_WASM_BYTES => "../releases/ref_exchange_release_v172.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
 }
 
@@ -22,7 +22,9 @@ fn test_upgrade() {
         contract_id: "swap".to_string(),
         bytes: &PREV_EXCHANGE_WASM_BYTES,
         signer_account: root,
-        init_method: new(ValidAccountId::try_from(root.account_id.clone()).unwrap(), 4, 1)
+        init_method: new(ValidAccountId::try_from(root.account_id.clone()).unwrap(),
+                ValidAccountId::try_from("boost_farm".to_string()).unwrap(),
+                ValidAccountId::try_from("burrowland".to_string()).unwrap(), 4, 1)
     );
 
     // Failed upgrade with no permissions.
@@ -47,8 +49,10 @@ fn test_upgrade() {
     .assert_success();
     let metadata = get_metadata(&pool);
     // println!("{:#?}", metadata);
-    assert_eq!(metadata.version, "1.7.2".to_string());
+    assert_eq!(metadata.version, "1.8.0".to_string());
     assert_eq!(metadata.admin_fee_bps, 5);
+    assert_eq!(metadata.boost_farm_id, root.account_id());
+    assert_eq!(metadata.burrowland_id, root.account_id());
     assert_eq!(metadata.state, RunningState::Running);
 
     // Upgrade to the same code with insurfficient gas.

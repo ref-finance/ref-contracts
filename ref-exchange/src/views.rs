@@ -15,10 +15,13 @@ use crate::*;
 pub struct ContractMetadata {
     pub version: String,
     pub owner: AccountId,
+    pub boost_farm_id: AccountId,
+    pub burrowland_id: AccountId,
     pub guardians: Vec<AccountId>,
     pub pool_count: u64,
     pub state: RunningState,
     pub admin_fee_bps: u32,
+    pub cumulative_info_record_interval_sec: u32
 }
 
 #[derive(Serialize, Deserialize, PartialEq)]
@@ -171,6 +174,39 @@ impl From<Pool> for RatedPoolInfo {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub struct ShadowRecordInfo {
+    pub shadow_in_farm: U128,
+    pub shadow_in_burrow: U128
+}
+
+impl From<ShadowRecord> for ShadowRecordInfo {
+    fn from(v: ShadowRecord) -> Self {
+        Self { 
+            shadow_in_farm: U128(v.shadow_in_farm), 
+            shadow_in_burrow: U128(v.shadow_in_burrow) 
+        }
+    }
+}
+
+impl From<VShadowRecord> for ShadowRecordInfo {
+    fn from(v_shadow_record: VShadowRecord) -> Self {
+        match v_shadow_record {
+            VShadowRecord::Current(v) => v.into(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+
+pub struct AccountBaseInfo {
+    pub near_amount: U128,
+    pub storage_used: U64,
+}
+
 #[near_bindgen]
 impl Contract {
 
@@ -179,10 +215,13 @@ impl Contract {
         ContractMetadata {
             version: env!("CARGO_PKG_VERSION").to_string(),
             owner: self.owner_id.clone(),
+            boost_farm_id: self.boost_farm_id.clone(),
+            burrowland_id: self.burrowland_id.clone(),
             guardians: self.guardians.to_vec(),
             pool_count: self.pools.len(),
             state: self.state.clone(),
             admin_fee_bps: self.admin_fee_bps,
+            cumulative_info_record_interval_sec: self.cumulative_info_record_interval_sec,
         }
     }
 
@@ -240,6 +279,18 @@ impl Contract {
         self.pools.get(pool_id).expect(ERR85_NO_POOL).get_volumes()
     }
 
+    pub fn get_pool_volumes_by_ids(&self, pool_ids: Vec<u64>) -> Vec<Vec<SwapVolume>> {
+        pool_ids.iter()
+            .map(|index| self.pools.get(*index).expect(ERR85_NO_POOL).get_volumes())
+            .collect()
+    }
+
+    pub fn list_pool_volumes(&self, from_index: u64, limit: u64) -> Vec<Vec<SwapVolume>> {
+        (from_index..std::cmp::min(from_index + limit, self.pools.len()))
+            .map(|index| self.pools.get(index).expect(ERR85_NO_POOL).get_volumes())
+            .collect()
+    }
+
     pub fn get_pool_share_price(&self, pool_id: u64) -> U128 {
         self.pools.get(pool_id).expect(ERR85_NO_POOL).get_share_price().into()
     }
@@ -270,6 +321,30 @@ impl Contract {
             account.get_tokens()
                 .iter()
                 .map(|token| (token.clone(), U128(account.get_balance(token).unwrap())))
+                .collect()
+        } else {
+            HashMap::new()
+        }
+    }
+
+    pub fn get_account_basic_info(&self, account_id: AccountId) -> Option<AccountBaseInfo> {
+        let wrapped_account = self.internal_get_account(&account_id);
+        if let Some(account) = wrapped_account {
+            Some(AccountBaseInfo{
+                near_amount: U128(account.near_amount),
+                storage_used: U64(account.storage_used),
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn get_shadow_records(&self, account_id: ValidAccountId) -> HashMap<u64, ShadowRecordInfo> {
+        let wrapped_account = self.internal_get_account(account_id.as_ref());
+        if let Some(account) = wrapped_account {
+            account.shadow_records
+                .iter()
+                .map(|(pool_id, vshadow_record)| (pool_id, vshadow_record.into()))
                 .collect()
         } else {
             HashMap::new()
