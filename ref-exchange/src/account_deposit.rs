@@ -554,4 +554,30 @@ impl Contract {
             GAS_FOR_RESOLVE_TRANSFER,
         ))
     }
+
+    pub(crate) fn internal_send_token_with_msg(
+        &self,
+        sender_id: &AccountId,
+        token_id: &AccountId,
+        amount: Balance,
+        msg: String
+    ) -> Promise {
+        ext_fungible_token::ft_transfer_call(
+            sender_id.clone(),
+            U128(amount),
+            None,
+            msg,
+            token_id,
+            1,
+            GAS_FOR_FT_TRANSFER,
+        )
+        .then(ext_self::exchange_callback_post_withdraw(
+            token_id.clone(),
+            sender_id.clone(),
+            U128(amount),
+            &env::current_account_id(),
+            0,
+            GAS_FOR_RESOLVE_TRANSFER,
+        ))
+    }
 }
