@@ -11,7 +11,7 @@ use near_sdk::{
     AccountId, Balance, PromiseResult, StorageUsage,
 };
 use crate::legacy::{AccountV1, AccountV2};
-use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER};
+use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER, GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_RESOLVE_TRANSFER};
 use crate::*;
 
 // [AUDIT_01]
@@ -569,7 +569,7 @@ impl Contract {
             msg,
             token_id,
             1,
-            GAS_FOR_FT_TRANSFER,
+            GAS_FOR_FT_TRANSFER_CALL,
         )
         .then(ext_self::exchange_callback_post_withdraw(
             token_id.clone(),

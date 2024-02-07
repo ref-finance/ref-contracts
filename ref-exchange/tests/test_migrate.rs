@@ -49,7 +49,7 @@ fn test_upgrade() {
     .assert_success();
     let metadata = get_metadata(&pool);
     // println!("{:#?}", metadata);
-    assert_eq!(metadata.version, "1.8.0".to_string());
+    assert_eq!(metadata.version, "1.8.1".to_string());
     assert_eq!(metadata.admin_fee_bps, 5);
     assert_eq!(metadata.boost_farm_id, root.account_id());
     assert_eq!(metadata.burrowland_id, root.account_id());
