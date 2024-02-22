@@ -214,7 +214,7 @@ fn frozenlist_scenario_02() {
     // withdraw token would fail
     let out_come = call!(
         root,
-        pool.withdraw(to_va(dai()), U128(to_yocto("1")), None),
+        pool.withdraw(to_va(dai()), U128(to_yocto("1")), None, None),
         deposit = 1
     );
     assert!(!out_come.is_ok());

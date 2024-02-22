@@ -113,6 +113,8 @@ pub struct Contract {
 
     cumulative_info_record_interval_sec: u32,
     unit_share_cumulative_infos: UnorderedMap<u64, VUnitShareCumulativeInfo>,
+
+    wnear_id: Option<AccountId>,
 }
 
 #[near_bindgen]
@@ -133,6 +135,7 @@ impl Contract {
             referrals: UnorderedMap::new(StorageKey::Referral),
             cumulative_info_record_interval_sec: 12 * 60, // 12 min
             unit_share_cumulative_infos: UnorderedMap::new(StorageKey::UnitShareCumulativeInfo),
+            wnear_id: None
         }
     }
 
@@ -887,6 +890,7 @@ mod tests {
             accounts(1),
             contract.get_deposit(accounts(3), accounts(1)),
             None,
+            None,
         );
         assert_eq!(contract.get_deposit(accounts(3), accounts(1)).0, 0);
     }
@@ -1129,7 +1133,7 @@ mod tests {
             .predecessor_account_id(acc.clone())
             .attached_deposit(1)
             .build());
-        contract.withdraw(custom_token, U128(1_000), Some(true));
+        contract.withdraw(custom_token, U128(1_000), Some(true), None);
         let new = contract.storage_balance_of(acc.clone()).unwrap();
         // More available storage after withdrawing & unregistering the token.
         assert!(new.available.0 > prev.available.0);
@@ -1653,7 +1657,7 @@ mod tests {
         testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
         contract.remove_exchange_fee_liquidity(0, to_yocto("0.0001").into(), vec![1.into(), 1.into()]);
         testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
-        contract.withdraw_owner_token(accounts(1), to_yocto("0.00001").into());
+        contract.withdraw_owner_token(accounts(1), to_yocto("0.00001").into(), None);
         testing_env!(context.predecessor_account_id(accounts(0)).block_timestamp(2*86400 * 1_000_000_000).attached_deposit(1).build());
         contract.stable_swap_ramp_amp(0,250, (3*86400 * 1_000_000_000).into());
         testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
@@ -1761,7 +1765,7 @@ mod tests {
         testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
         contract.remove_exchange_fee_liquidity(0, to_yocto("100").into(), vec![1.into(), 1.into()]);
         testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
-        contract.withdraw_owner_token(accounts(1), to_yocto("0.00001").into());
+        contract.withdraw_owner_token(accounts(1), to_yocto("0.00001").into(), None);
         testing_env!(context.predecessor_account_id(accounts(0)).block_timestamp(2*86400 * 1_000_000_000).attached_deposit(1).build());
         contract.stable_swap_ramp_amp(0,250, (3*86400 * 1_000_000_000).into());
         testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());

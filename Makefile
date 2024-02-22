@@ -28,7 +28,7 @@ else
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange --tests
 endif
 
-test-exchange: build-exchange mock-ft mock-rated mock-boost-farming
+test-exchange: build-exchange mock-ft mock-rated mock-boost-farming mock-wnear
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange 
 
 test-farm: build-farm mock-ft
@@ -56,6 +56,12 @@ mock-farming: mock-boost-farming
 	RUSTFLAGS=$(RFLAGS) cargo build -p mock-boost-farming --target wasm32-unknown-unknown --release
 	mkdir -p res
 	cp target/wasm32-unknown-unknown/release/mock_boost_farming.wasm ./res/mock_boost_farming.wasm
+
+mock-wnear:
+	rustup target add wasm32-unknown-unknown
+	RUSTFLAGS=$(RFLAGS) cargo build -p mock-wnear --target wasm32-unknown-unknown --release
+	mkdir -p res
+	cp target/wasm32-unknown-unknown/release/mock_wnear.wasm ./res/mock_wnear.wasm
 
 release:
 	$(call docker_build,_rust_setup.sh)

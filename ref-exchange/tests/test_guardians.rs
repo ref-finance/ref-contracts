@@ -244,7 +244,7 @@ fn guardians_scenario_01() {
     // withdraw token would fail
     let out_come = call!(
         root,
-        pool.withdraw(to_va(eth()), U128(to_yocto("1")), None),
+        pool.withdraw(to_va(eth()), U128(to_yocto("1")), None, None),
         deposit = 1
     );
     assert!(!out_come.is_ok());
@@ -365,7 +365,7 @@ fn guardians_scenario_02() {
     println!("Guardians Case 0203: withdraw owner token fail if owner not registered on token");
     let out_come = call!(
         guard1,
-        pool.withdraw_owner_token(token2.valid_account_id(), U128(413378144755595527105)),
+        pool.withdraw_owner_token(token2.valid_account_id(), U128(413378144755595527105), None),
         deposit = 1
     );
     out_come.assert_success();
@@ -385,7 +385,7 @@ fn guardians_scenario_02() {
     .assert_success();
     let out_come = call!(
         guard1,
-        pool.withdraw_owner_token(token2.valid_account_id(), U128(413378144755595527105)),
+        pool.withdraw_owner_token(token2.valid_account_id(), U128(413378144755595527105), None),
         deposit = 1
     );
     out_come.assert_success();

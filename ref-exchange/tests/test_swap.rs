@@ -11,10 +11,12 @@ use near_sdk_sim::{
 
 use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
 use test_token::ContractContract as TestToken;
+use mock_wnear::ContractContract as MockWnear;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
+    MOCK_WNEAR_WASM_BYTES => "../res/mock_wnear.wasm",
 }
 
 pub fn should_fail(r: ExecutionResult) {
@@ -59,7 +61,41 @@ fn test_token(
     t
 }
 
+fn test_wnear(
+    root: &UserAccount,
+    accounts_to_register: Vec<AccountId>,
+) -> ContractAccount<MockWnear> {
+    let t = deploy!(
+        contract: MockWnear,
+        contract_id: "wnear".to_string(),
+        bytes: &MOCK_WNEAR_WASM_BYTES,
+        signer_account: root,
+        init_method: new()
+    );
+    call!(
+        root,
+        t.near_deposit(),
+        deposit = to_yocto("1000")
+    )
+    .assert_success();
+    for account_id in accounts_to_register {
+        call!(
+            root,
+            t.storage_deposit(Some(to_va(account_id)), None),
+            deposit = to_yocto("1")
+        )
+        .assert_success();
+    }
+    t
+}
+
 fn balance_of(token: &ContractAccount<TestToken>, account_id: &AccountId) -> u128 {
+    view!(token.ft_balance_of(to_va(account_id.clone())))
+        .unwrap_json::<U128>()
+        .0
+}
+
+fn wnear_balance_of(token: &ContractAccount<MockWnear>, account_id: &AccountId) -> u128 {
     view!(token.ft_balance_of(to_va(account_id.clone())))
         .unwrap_json::<U128>()
         .0
@@ -81,6 +117,10 @@ fn dai() -> AccountId {
 
 fn eth() -> AccountId {
     "eth".to_string()
+}
+
+fn wnear() -> AccountId {
+    "wnear".to_string()
 }
 
 fn swap() -> AccountId {
@@ -213,12 +253,12 @@ fn test_swap() {
 
     call!(
         root,
-        pool.withdraw(to_va(eth()), U128(to_yocto("101")), None),
+        pool.withdraw(to_va(eth()), U128(to_yocto("101")), None, None),
         deposit = 1
     );
     call!(
         root,
-        pool.withdraw(to_va(dai()), U128(to_yocto("99")), None),
+        pool.withdraw(to_va(dai()), U128(to_yocto("99")), None, None),
         deposit = 1
     );
 
@@ -309,7 +349,7 @@ fn test_withdraw_failure() {
     // Root tries to withdraw and the transfer fails
     let withdrawal_result = call!(
         root,
-        pool.withdraw(to_va(dai()), to_yocto("30").into(), None),
+        pool.withdraw(to_va(dai()), to_yocto("30").into(), None, None),
         deposit = 1
     );
 
@@ -404,4 +444,114 @@ fn test_direct_swap() {
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("6"));
     assert_eq!(balance_of(&token2, &new_user.account_id), 0);
     assert!(mft_balance_of(&pool, &token2.account_id(), &new_user.account_id) > to_yocto("0.5"));
+}
+
+#[test]
+fn test_direct_swap_wnear() {
+    let root = init_simulator(None);
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let pool = deploy!(
+        contract: Exchange,
+        contract_id: swap(),
+        bytes: &EXCHANGE_WASM_BYTES,
+        signer_account: root,
+        init_method: new(to_va("owner".to_string()), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 5, 0)
+    );
+    call!(
+        owner,
+        pool.modify_wnear_id(wnear()),
+        deposit = 1
+    )
+    .assert_success();
+    let token1 = test_token(&root, dai(), vec![swap()]);
+    let token2 = test_wnear(&root, vec![swap()]);
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(wnear())]),
+        deposit=1
+    );
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(dai()), to_va(wnear())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        token1.ft_transfer_call(to_va(swap()), to_yocto("105").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        token2.ft_transfer_call(to_va(swap()), to_yocto("110").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_liquidity(0, vec![U128(to_yocto("5")), U128(to_yocto("10"))], None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+
+
+    let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
+    call!(
+        new_user,
+        token1.mint(to_va(new_user.account_id.clone()), U128(to_yocto("10")))
+    )
+    .assert_success();
+
+    // skip unwrap near
+    call!(
+        new_user,
+        token2.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    let new_user_wnear_balance = wnear_balance_of(&token2, &new_user.account_id);
+    call!(
+        new_user,
+        token1.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("1").into(),
+            None,
+            format!("{{\"actions\": [{{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"wnear\", \"min_amount_out\": \"1\"}}]}}")
+        ),
+        deposit = 1
+    ).assert_success();
+    assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("9"));
+    assert!(wnear_balance_of(&token2, &new_user.account_id) > new_user_wnear_balance + to_yocto("1"));
+
+    let new_user_near_balance = new_user.account().unwrap().amount;
+    let new_user_wnear_balance = wnear_balance_of(&token2, &new_user.account_id);
+    call!(
+        new_user,
+        token1.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("1").into(),
+            None,
+            format!("{{\"skip_unwrap_near\": false, \"actions\": [{{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"wnear\", \"min_amount_out\": \"1\"}}]}}")
+        ),
+        deposit = 1
+    ).assert_success();
+    assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("8"));
+    assert_eq!(wnear_balance_of(&token2, &new_user.account_id), new_user_wnear_balance);
+    assert!(new_user.account().unwrap().amount > new_user_near_balance + to_yocto("1"));
 }

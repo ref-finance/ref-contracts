@@ -26,6 +26,7 @@ enum TokenReceiverMessage {
         referral_id: Option<ValidAccountId>,
         /// List of sequential actions.
         actions: Vec<Action>,
+        skip_unwrap_near: Option<bool>,
     },
     HotZap {
         referral_id: Option<ValidAccountId>,
@@ -99,6 +100,7 @@ impl FungibleTokenReceiver for Contract {
                 TokenReceiverMessage::Execute {
                     referral_id,
                     actions,
+                    skip_unwrap_near
                 } => {
                     let referral_id = referral_id.map(|x| x.to_string());
                     let out_amounts = self.internal_direct_actions(
@@ -108,7 +110,7 @@ impl FungibleTokenReceiver for Contract {
                         &actions,
                     );
                     for (token_out, amount_out) in out_amounts.into_iter() {
-                        self.internal_send_tokens(sender_id.as_ref(), &token_out, amount_out);
+                        self.internal_send_tokens(sender_id.as_ref(), &token_out, amount_out, skip_unwrap_near);
                     }
                     // Even if send tokens fails, we don't return funds back to sender.
                     PromiseOrValue::Value(U128(0))
