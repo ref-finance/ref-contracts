@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.9.0
+```
+JDL5FPvBGcTEqj2JDLYwzvPSCv7fo8UvkeuYqy6CPi8S
+```
+1. support skip_unwrap_near indication in swap.
+
 ### Version 1.8.0
 ```
 Gnwp8fNWrPWZ7NR4867cNepgCkX2uj85zExzcMNZiGws
