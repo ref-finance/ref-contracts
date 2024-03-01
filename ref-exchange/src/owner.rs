@@ -4,7 +4,6 @@ use near_sdk::json_types::WrappedTimestamp;
 use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 
 use crate::*;
-use crate::legacy::ContractV2;
 use crate::rated_swap::rate::{global_register_rate, global_unregister_rate};
 use crate::utils::{FEE_DIVISOR, MAX_ADMIN_FEE_BPS, GAS_FOR_BASIC_OP};
 
@@ -86,6 +85,14 @@ impl Contract {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         log!("Modify burrowland_id from {} to {}", self.burrowland_id, burrowland_id);  
         self.burrowland_id = burrowland_id;
+    }
+
+    #[payable]
+    pub fn modify_wnear_id(&mut self, wnear_id: AccountId) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        log!("Modify wnear_id from {:?} to {}", self.wnear_id, wnear_id);  
+        self.wnear_id = Some(wnear_id);
     }
 
     /// Change state of contract, Only can be called by owner or guardians.
@@ -263,6 +270,7 @@ impl Contract {
         &mut self,
         token_id: ValidAccountId,
         amount: U128,
+        skip_unwrap_near: Option<bool>
     ) -> Promise {
         assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
@@ -275,7 +283,7 @@ impl Contract {
         // Note: subtraction and deregistration will be reverted if the promise fails.
         account.withdraw(&token_id, amount);
         self.internal_save_account(&owner_id, account);
-        self.internal_send_tokens(&owner_id, &token_id, amount)
+        self.internal_send_tokens(&owner_id, &token_id, amount, skip_unwrap_near)
     }
 
     /// to eventually change a stable pool's amp factor
@@ -362,33 +370,8 @@ impl Contract {
     // [AUDIT_09]
     #[private]
     pub fn migrate() -> Self {
-        let ContractV2{
-            owner_id,
-            admin_fee_bps,
-            pools,
-            accounts,
-            whitelisted_tokens,
-            guardians,
-            state,
-            frozen_tokens,
-            referrals
-        } = env::state_read().expect(ERR103_NOT_INITIALIZED);
-        
-        Self {
-            owner_id: owner_id.clone(),
-            boost_farm_id: owner_id.clone(),
-            burrowland_id: owner_id,
-            admin_fee_bps,
-            pools,
-            accounts,
-            whitelisted_tokens,
-            guardians,
-            state,
-            frozen_tokens,
-            referrals,
-            cumulative_info_record_interval_sec: 12 * 60, // 12 min
-            unit_share_cumulative_infos: UnorderedMap::new(StorageKey::UnitShareCumulativeInfo),
-        }
+        let contract = env::state_read().expect(ERR103_NOT_INITIALIZED);
+        contract
     }
 }
 

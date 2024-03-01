@@ -1474,6 +1474,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock-wnear"
+version = "0.0.1"
+dependencies = [
+ "near-contract-standards",
+ "near-sdk",
+ "uint",
+]
+
+[[package]]
 name = "more-asserts"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2322,9 +2331,10 @@ dependencies = [
 
 [[package]]
 name = "ref-exchange"
-version = "1.8.1"
+version = "1.9.1"
 dependencies = [
  "mock-boost-farming",
+ "mock-wnear",
  "near-contract-standards",
  "near-sdk",
  "near-sdk-sim",

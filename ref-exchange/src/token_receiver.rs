@@ -29,6 +29,7 @@ enum TokenReceiverMessage {
         /// If not None, use ft_transfer_call
         /// to send token_out back to predecessor with this msg.
         client_echo: Option<String>,
+        skip_unwrap_near: Option<bool>,
     },
     HotZap {
         referral_id: Option<ValidAccountId>,
@@ -102,7 +103,8 @@ impl FungibleTokenReceiver for Contract {
                 TokenReceiverMessage::Execute {
                     referral_id,
                     actions,
-                    client_echo
+                    client_echo,
+                    skip_unwrap_near
                 } => {
                     let referral_id = referral_id.map(|x| x.to_string());
                     let out_amounts = self.internal_direct_actions(
@@ -118,7 +120,7 @@ impl FungibleTokenReceiver for Contract {
                         if let Some(ref message) = client_echo {
                             self.internal_send_token_with_msg(sender_id.as_ref(), &token_out, amount_out, message.clone());
                         } else {
-                            self.internal_send_tokens(sender_id.as_ref(), &token_out, amount_out);
+                            self.internal_send_tokens(sender_id.as_ref(), &token_out, amount_out, skip_unwrap_near);
                         }
                     }
                     // Even if send tokens fails, we don't return funds back to sender.
