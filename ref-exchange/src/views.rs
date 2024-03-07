@@ -23,6 +23,7 @@ pub struct ContractMetadata {
     pub admin_fee_bps: u32,
     pub cumulative_info_record_interval_sec: u32,
     pub wnear_id: Option<AccountId>,
+    pub auto_whitelisted_postfix: HashSet<String>
 }
 
 #[derive(Serialize, Deserialize, PartialEq)]
@@ -223,7 +224,8 @@ impl Contract {
             state: self.state.clone(),
             admin_fee_bps: self.admin_fee_bps,
             cumulative_info_record_interval_sec: self.cumulative_info_record_interval_sec,
-            wnear_id: self.wnear_id.clone()
+            wnear_id: self.wnear_id.clone(),
+            auto_whitelisted_postfix: self.auto_whitelisted_postfix.clone()
         }
     }
 

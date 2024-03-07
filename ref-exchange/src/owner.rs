@@ -73,6 +73,25 @@ impl Contract {
     }
 
     #[payable]
+    pub fn extend_auto_whitelisted_postfix(&mut self, postfixes: Vec<String>) {
+        assert_one_yocto();
+        self.is_owner_or_guardians();
+        for postfix in postfixes {
+            self.auto_whitelisted_postfix.insert(postfix.clone());
+        }
+    }
+
+    #[payable]
+    pub fn remove_auto_whitelisted_postfix(&mut self, postfixes: Vec<String>) {
+        assert_one_yocto();
+        self.is_owner_or_guardians();
+        for postfix in postfixes {
+            let exist = self.auto_whitelisted_postfix.remove(&postfix);
+            assert!(exist, "{}", ERR105_WHITELISTED_POSTFIX_NOT_IN_LIST);
+        }
+    }
+
+    #[payable]
     pub fn modify_boost_farm_id(&mut self, boost_farm_id: AccountId) {
         assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
@@ -401,7 +420,8 @@ impl Contract {
             referrals,
             cumulative_info_record_interval_sec,
             unit_share_cumulative_infos,
-            wnear_id: None
+            wnear_id: None,
+            auto_whitelisted_postfix: HashSet::new()
         }
     }
 }

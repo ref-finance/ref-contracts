@@ -1,5 +1,6 @@
 use std::convert::TryInto;
 use std::fmt;
+use std::collections::{HashMap, HashSet};
 
 use near_contract_standards::storage_management::{
     StorageBalance, StorageBalanceBounds, StorageManagement,
@@ -115,6 +116,7 @@ pub struct Contract {
     unit_share_cumulative_infos: UnorderedMap<u64, VUnitShareCumulativeInfo>,
 
     wnear_id: Option<AccountId>,
+    auto_whitelisted_postfix: HashSet<String>
 }
 
 #[near_bindgen]
@@ -135,7 +137,8 @@ impl Contract {
             referrals: UnorderedMap::new(StorageKey::Referral),
             cumulative_info_record_interval_sec: 12 * 60, // 12 min
             unit_share_cumulative_infos: UnorderedMap::new(StorageKey::UnitShareCumulativeInfo),
-            wnear_id: None
+            wnear_id: None,
+            auto_whitelisted_postfix: HashSet::new()
         }
     }
 
@@ -217,7 +220,7 @@ impl Contract {
                 for token in action.tokens() {
                     assert!(
                         account.get_balance(&token).is_some() 
-                            || self.whitelisted_tokens.contains(&token),
+                            || self.is_whitelisted_token(&token),
                         "{}",
                         // [AUDIT_05]
                         ERR27_DEPOSIT_NEEDED
@@ -492,6 +495,10 @@ impl Contract {
         assert_eq!(frozens.len(), 0, "{}", ERR52_FROZEN_TOKEN);
     }
 
+    fn is_whitelisted_token(&self, token_id: &AccountId) -> bool {
+        self.whitelisted_tokens.contains(token_id) || self.auto_whitelisted_postfix.iter().any(|postfix| token_id.ends_with(postfix))
+    }
+
     /// Check how much storage taken costs and refund the left over back.
     /// Return the storage costs due to this call by far.
     fn internal_check_storage(&self, prev_storage: StorageUsage) -> u128 {
@@ -612,7 +619,6 @@ impl Contract {
     }
 }
 
-use std::collections::HashMap;
 
 impl Contract {
     fn internal_execute_actions_by_cache(
@@ -1112,6 +1118,60 @@ mod tests {
             .predecessor_account_id(ValidAccountId::try_from("malicious").unwrap())
             .build());
         contract.ft_on_transfer(acc, U128(1_000), "".to_string());
+    }
+
+    #[test]
+    fn test_auto_whitelisted_postfix() {
+        let (mut context, mut contract) = setup_contract();
+        let acc = ValidAccountId::try_from("test_user").unwrap();
+        let token1 = ValidAccountId::try_from("test.abc.near").unwrap();
+        let token2 = ValidAccountId::try_from("test.def.near").unwrap();
+        testing_env!(context
+            .predecessor_account_id(acc.clone())
+            .attached_deposit(to_yocto("1"))
+            .build());
+        contract.storage_deposit(None, None);
+        testing_env!(context.predecessor_account_id(accounts(0)).attached_deposit(1).build());
+        contract.extend_auto_whitelisted_postfix(vec!["abc.near".to_string(), "def.near".to_string()]);
+        testing_env!(context
+            .predecessor_account_id(token1.clone())
+            .attached_deposit(1)
+            .build());
+        contract.ft_on_transfer(acc.clone(), U128(1_000_000), "".to_string());
+
+        testing_env!(context
+            .predecessor_account_id(token2.clone())
+            .attached_deposit(1)
+            .build());
+        contract.ft_on_transfer(acc.clone(), U128(1_000_000), "".to_string());
+
+        testing_env!(context
+            .predecessor_account_id(acc.clone())
+            .attached_deposit(env::storage_byte_cost() * 500)
+            .build());
+        let pool_id = contract.add_simple_pool(vec![token1.clone(), token2.clone()], 25);
+        testing_env!(context
+            .predecessor_account_id(acc.clone())
+            .attached_deposit(to_yocto("0.1"))
+            .build());
+        contract.add_liquidity(
+            pool_id,
+            vec![U128(10000), U128(10000)],
+            None,
+        );
+        
+        let actions: Vec<Action> = vec![Action::Swap(SwapAction{
+            pool_id,
+            token_in: token1.to_string(),
+            amount_in: Some(U128(10)),
+            token_out: token2.to_string(),
+            min_amount_out: U128(0),
+        })];
+        
+        testing_env!(context
+            .predecessor_account_id(acc.clone())
+            .build());
+        contract.execute_actions(actions, None);
     }
 
     #[test]
