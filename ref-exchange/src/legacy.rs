@@ -4,7 +4,7 @@ use near_sdk::collections::{UnorderedMap, Vector, LookupMap, UnorderedSet};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, Balance, StorageUsage};
 use crate::account_deposit::{Account, VAccount};
-use crate::StorageKey;
+use crate::{StorageKey, VUnitShareCumulativeInfo};
 use crate::pool::Pool;
 use crate::RunningState;
 
@@ -108,4 +108,33 @@ pub struct ContractV2 {
     pub frozen_tokens: UnorderedSet<AccountId>,
     /// Map of referrals
     pub referrals: UnorderedMap<AccountId, u32>,
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
+pub struct ContractV3 {
+    /// Account of the owner.
+    pub owner_id: AccountId,
+    /// Account of the boost_farm contract.
+    pub boost_farm_id: AccountId,
+    /// Account of the burrowland contract.
+    pub burrowland_id: AccountId,
+    /// Admin fee rate in total fee.
+    pub admin_fee_bps: u32,
+    /// List of all the pools.
+    pub pools: Vector<Pool>,
+    /// Accounts registered, keeping track all the amounts deposited, storage and more.
+    pub accounts: LookupMap<AccountId, VAccount>,
+    /// Set of whitelisted tokens by "owner".
+    pub whitelisted_tokens: UnorderedSet<AccountId>,
+    /// Set of guardians.
+    pub guardians: UnorderedSet<AccountId>,
+    /// Running state
+    pub state: RunningState,
+    /// Set of frozenlist tokens
+    pub frozen_tokens: UnorderedSet<AccountId>,
+    /// Map of referrals
+    pub referrals: UnorderedMap<AccountId, u32>,
+
+    pub cumulative_info_record_interval_sec: u32,
+    pub unit_share_cumulative_infos: UnorderedMap<u64, VUnitShareCumulativeInfo>,
 }

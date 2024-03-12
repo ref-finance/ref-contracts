@@ -11,7 +11,7 @@ use near_sdk::{
     AccountId, Balance, PromiseResult, StorageUsage,
 };
 use crate::legacy::{AccountV1, AccountV2};
-use crate::utils::{ext_self, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER};
+use crate::utils::{ext_self, ext_wrap_near, GAS_FOR_FT_TRANSFER, GAS_FOR_RESOLVE_TRANSFER, GAS_FOR_NEAR_WITHDRAW};
 use crate::*;
 
 // [AUDIT_01]
@@ -355,6 +355,7 @@ impl Contract {
         token_id: ValidAccountId,
         amount: U128,
         unregister: Option<bool>,
+        skip_unwrap_near: Option<bool>
     ) -> Promise {
         assert_one_yocto();
         self.assert_contract_running();
@@ -377,9 +378,67 @@ impl Contract {
             account.unregister(&token_id);
         }
         self.internal_save_account(&sender_id, account);
-        self.internal_send_tokens(&sender_id, &token_id, amount)
+        self.internal_send_tokens(&sender_id, &token_id, amount, skip_unwrap_near)
     }
 
+    #[private]
+    pub fn exchange_callback_post_withdraw_near(
+        &mut self,
+        sender_id: AccountId,
+        amount: U128,
+    ) -> U128 {
+        assert_eq!(
+            env::promise_results_count(),
+            1,
+            "{}",
+            ERR25_CALLBACK_POST_WITHDRAW_INVALID
+        );
+        match env::promise_result(0) {
+            PromiseResult::NotReady => unreachable!(),
+            PromiseResult::Successful(_) => {
+                Promise::new(sender_id).transfer(amount.into());
+                amount
+            },
+            PromiseResult::Failed => {
+                // This reverts the changes from withdraw function.
+                // If account doesn't exit, deposits to the owner's account as lostfound.
+                let mut failed = false;
+                let token_id = self.wnear_id.as_ref().unwrap().clone();
+                if let Some(mut account) = self.internal_get_account(&sender_id) {
+                    if account.deposit_with_storage_check(&token_id, amount.0) {
+                        // cause storage already checked, here can directly save
+                        self.accounts.insert(&sender_id, &account.into());
+                    } else {
+                        // we can ensure that internal_get_account here would NOT cause a version upgrade, 
+                        // cause it is callback, the account must be the current version or non-exist,
+                        // so, here we can just leave it without insert, won't cause storage collection inconsistency.
+                        env::log(
+                            format!(
+                                "Account {} has not enough storage. Depositing to owner.",
+                                sender_id
+                            )
+                            .as_bytes(),
+                        );
+                        failed = true;
+                    }
+                } else {
+                    env::log(
+                        format!(
+                            "Account {} is not registered. Depositing to owner.",
+                            sender_id
+                        )
+                        .as_bytes(),
+                    );
+                    failed = true;
+                }
+                if failed {
+                    self.internal_lostfound(&token_id, amount.0);
+                }
+                0.into()
+            }
+        }
+    }
+        
     #[private]
     pub fn exchange_callback_post_withdraw(
         &mut self,
@@ -448,7 +507,7 @@ impl Contract {
     /// save token to owner account as lostfound, no need to care about storage
     /// only global whitelisted token can be stored in lost-found
     pub(crate) fn internal_lostfound(&mut self, token_id: &AccountId, amount: u128) {
-        if self.whitelisted_tokens.contains(token_id) {
+        if self.is_whitelisted_token(token_id) {
             let mut lostfound = self.internal_unwrap_or_default_account(&self.owner_id);
             lostfound.deposit(token_id, amount);
             self.accounts.insert(&self.owner_id, &lostfound.into());
@@ -493,7 +552,7 @@ impl Contract {
     ) {
         let mut account = self.internal_unwrap_account(sender_id);
         assert!(
-            self.whitelisted_tokens.contains(token_id) 
+            self.is_whitelisted_token(token_id) 
                 || account.get_balance(token_id).is_some(),
             "{}",
             ERR12_TOKEN_NOT_WHITELISTED
@@ -536,22 +595,44 @@ impl Contract {
         sender_id: &AccountId,
         token_id: &AccountId,
         amount: Balance,
+        skip_unwrap_near: Option<bool>,
     ) -> Promise {
-        ext_fungible_token::ft_transfer(
-            sender_id.clone(),
-            U128(amount),
-            None,
-            token_id,
-            1,
-            GAS_FOR_FT_TRANSFER,
-        )
-        .then(ext_self::exchange_callback_post_withdraw(
-            token_id.clone(),
-            sender_id.clone(),
-            U128(amount),
-            &env::current_account_id(),
-            0,
-            GAS_FOR_RESOLVE_TRANSFER,
-        ))
+        let is_wnear_id = if let Some(wnear_id) = self.wnear_id.as_ref() {
+            token_id == wnear_id
+        } else {
+            false
+        };
+        if is_wnear_id && !skip_unwrap_near.unwrap_or(true) {
+            ext_wrap_near::near_withdraw(
+                U128(amount),
+                token_id,
+                1,
+                GAS_FOR_NEAR_WITHDRAW,
+            )
+            .then(ext_self::exchange_callback_post_withdraw_near(
+                sender_id.clone(),
+                U128(amount),
+                &env::current_account_id(),
+                0,
+                GAS_FOR_RESOLVE_TRANSFER,
+            ))
+        } else {
+            ext_fungible_token::ft_transfer(
+                sender_id.clone(),
+                U128(amount),
+                None,
+                token_id,
+                1,
+                GAS_FOR_FT_TRANSFER,
+            )
+            .then(ext_self::exchange_callback_post_withdraw(
+                token_id.clone(),
+                sender_id.clone(),
+                U128(amount),
+                &env::current_account_id(),
+                0,
+                GAS_FOR_RESOLVE_TRANSFER,
+            ))
+        }
     }
 }

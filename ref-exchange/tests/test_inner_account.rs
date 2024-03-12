@@ -34,7 +34,7 @@ fn inner_account_scenario_01() {
     println!("Inner Account Case 0101: withdraw half");
     let out_come = call!(
         new_user,
-        pool.withdraw(token1.valid_account_id(), U128(to_yocto("5")), None),
+        pool.withdraw(token1.valid_account_id(), U128(to_yocto("5")), None, None),
         deposit = 1
     );
     out_come.assert_success();
@@ -45,7 +45,7 @@ fn inner_account_scenario_01() {
     println!("Inner Account Case 0102: withdraw more than have");
     let out_come = call!(
         new_user,
-        pool.withdraw(token1.valid_account_id(), U128(to_yocto("6")), None),
+        pool.withdraw(token1.valid_account_id(), U128(to_yocto("6")), None, None),
         deposit = 1
     );
     assert!(!out_come.is_ok());
@@ -57,7 +57,7 @@ fn inner_account_scenario_01() {
     println!("Inner Account Case 0103: withdraw some and unregister");
     let out_come = call!(
         new_user,
-        pool.withdraw(token1.valid_account_id(), U128(to_yocto("1")), Some(true)),
+        pool.withdraw(token1.valid_account_id(), U128(to_yocto("1")), Some(true), None),
         deposit = 1
     );
     assert!(!out_come.is_ok());
@@ -69,7 +69,7 @@ fn inner_account_scenario_01() {
     println!("Inner Account Case 0104: withdraw non-empty token with 0 amonut");
     let out_come = call!(
         new_user,
-        pool.withdraw(token1.valid_account_id(), U128(0), None),
+        pool.withdraw(token1.valid_account_id(), U128(0), None, None),
         deposit = 1
     );
     out_come.assert_success();
@@ -80,7 +80,7 @@ fn inner_account_scenario_01() {
     println!("Inner Account Case 0105: withdraw unregister token");
     let out_come = call!(
         new_user,
-        pool.withdraw(token2.valid_account_id(), U128(to_yocto("1")), None),
+        pool.withdraw(token2.valid_account_id(), U128(to_yocto("1")), None, None),
         deposit = 1
     );
     assert!(!out_come.is_ok());
@@ -90,7 +90,7 @@ fn inner_account_scenario_01() {
     println!("Inner Account Case 0106: withdraw empty token with 0 amount");
     let out_come = call!(
         new_user,
-        pool.withdraw(token1.valid_account_id(), U128(0), None),
+        pool.withdraw(token1.valid_account_id(), U128(0), None, None),
         deposit = 1
     );
     assert!(!out_come.is_ok());

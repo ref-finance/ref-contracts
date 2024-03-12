@@ -1,0 +1,13 @@
+[package]
+name = "mock-wnear"
+version = "0.0.1"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+uint = { version = "0.9.3", default-features = false }
+near-sdk = "3.1.0"
+near-contract-standards = "3.1.0"

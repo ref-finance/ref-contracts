@@ -84,6 +84,7 @@ pub const ERR101_ILLEGAL_FEE: &str = "E101: illegal fee";
 pub const ERR102_INVALID_TOKEN_ID: &str = "E102: invalid token id";
 pub const ERR103_NOT_INITIALIZED: &str = "E103: contract is not initialized";
 pub const ERR104_GUARDIAN_NOT_IN_LIST: &str = "E104: guardian not in list";
+pub const ERR105_WHITELISTED_POSTFIX_NOT_IN_LIST: &str = "E105: whitelisted postfix not in list";
 
 
 //mft

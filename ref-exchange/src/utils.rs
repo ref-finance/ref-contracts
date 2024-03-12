@@ -21,6 +21,7 @@ pub const GAS_FOR_FT_TRANSFER_CALL: Gas = 25_000_000_000_000 + GAS_FOR_RESOLVE_T
 
 /// Amount of gas for fungible token transfers, increased to 20T to support AS token contracts.
 pub const GAS_FOR_FT_TRANSFER: Gas = 20_000_000_000_000;
+pub const GAS_FOR_NEAR_WITHDRAW: Gas = 20_000_000_000_000;
 
 /// Fee divisor, allowing to provide fee in bps.
 pub const FEE_DIVISOR: u32 = 10_000;
@@ -56,8 +57,18 @@ impl Default for SwapVolume {
     }
 }
 
+#[ext_contract(ext_wrap_near)]
+pub trait WrapNear {
+    fn near_withdraw(&mut self, amount: U128);
+}
+
 #[ext_contract(ext_self)]
 pub trait RefExchange {
+    fn exchange_callback_post_withdraw_near(
+        &mut self,
+        sender_id: AccountId,
+        amount: U128,
+    ) -> U128 ;
     fn exchange_callback_post_withdraw(
         &mut self,
         token_id: AccountId,

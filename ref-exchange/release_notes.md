@@ -1,5 +1,12 @@
 # Release Notes
 
+### Version 1.9.0
+```
+B168SPA7hbfwWyNnQnTrgtYZf85XdaafXj9SydkhWkZT
+```
+1. support skip_unwrap_near indication in swap.
+2. support auto_whitelist tokens according to their postfix of account ids.
+
 ### Version 1.8.0
 ```
 Gnwp8fNWrPWZ7NR4867cNepgCkX2uj85zExzcMNZiGws
