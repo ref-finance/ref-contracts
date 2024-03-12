@@ -11,12 +11,16 @@ use near_sdk_sim::{
 
 use ref_exchange::{ContractContract as Exchange, PoolInfo, ContractMetadata};
 use test_token::ContractContract as TestToken;
+use mock_price_oracle::ContractContract as PriceOracle;
+use mock_pyth::ContractContract as PythOracle;
 use test_rated_token::ContractContract as TestRatedToken;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
     TEST_RATED_TOKEN_WASM_BYTES => "../res/test_rated_token.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
+    PRICE_ORACLE_WASM_BYTES => "../res/mock_price_oracle.wasm",
+    PYTH_WASM_BYTES => "../res/mock_pyth.wasm"
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -287,6 +291,14 @@ pub fn swap() -> AccountId {
     "swap".to_string()
 }
 
+pub fn price_oracle() -> AccountId {
+    "price_oracle".to_string()
+}
+
+pub fn pyth_oracle() -> AccountId {
+    "pyth_oracle".to_string()
+}
+
 pub fn near() -> AccountId {
     "near".to_string()
 }
@@ -301,6 +313,14 @@ pub fn linear() -> AccountId {
 
 pub fn nearx() -> AccountId {
     "nearx".to_string()
+}
+
+pub fn frax() -> AccountId {
+    "frax".to_string()
+}
+
+pub fn sfrax() -> AccountId {
+    "sfrax".to_string()
 }
 
 pub fn to_va(a: AccountId) -> ValidAccountId {
@@ -697,6 +717,26 @@ pub fn setup_rated_pool(
     (root, owner, pool, token_contracts, token_rated_contracts)
 }
 
+pub fn setup_price_oracle(root: &UserAccount) -> ContractAccount<PriceOracle>{
+    deploy!(
+        contract: PriceOracle,
+        contract_id: price_oracle(),
+        bytes: &PRICE_ORACLE_WASM_BYTES,
+        signer_account: root,
+        init_method: new()
+    )
+}
+
+pub fn setup_pyth_oracle(root: &UserAccount) -> ContractAccount<PythOracle>{
+    deploy!(
+        contract: PythOracle,
+        contract_id: pyth_oracle(),
+        bytes: &PYTH_WASM_BYTES,
+        signer_account: root,
+        init_method: new()
+    )
+}
+
 pub fn mint_and_deposit_rated_token(
     user: &UserAccount,
     token: &ContractAccount<TestRatedToken>,
@@ -815,4 +855,8 @@ pub fn deposit_token(
         )
         .assert_success();
     }
+}
+
+pub fn nano_to_sec(nano: u64) -> u32 {
+    (nano / 10u64.pow(9)) as u32
 }
