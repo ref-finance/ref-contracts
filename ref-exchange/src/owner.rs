@@ -109,7 +109,7 @@ impl Contract {
     #[payable]
     pub fn modify_wnear_id(&mut self, wnear_id: AccountId) {
         assert_one_yocto();
-        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        self.assert_owner();
         log!("Modify wnear_id from {:?} to {}", self.wnear_id, wnear_id);  
         self.wnear_id = Some(wnear_id);
     }
