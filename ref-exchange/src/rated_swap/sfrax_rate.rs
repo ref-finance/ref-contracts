@@ -9,12 +9,33 @@ use near_sdk::{
 
 // default expire time is 24 hours
 const EXPIRE_TS: u64 = 24 * 3600 * 10u64.pow(9);
+const MAX_DURATION_SEC: u32 = 10;
+const MIN_DURATION_SEC: u32 = 60 * 5;
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub enum SfraxExtraInfo {
     PriceOracle(price_oracle::PriceOracle),
     PythOracle(pyth_oracle::PythOracle),
+}
+
+impl SfraxExtraInfo {
+    pub fn assert_valid(&self) {
+        match self {
+            SfraxExtraInfo::PriceOracle(e) => {
+                assert!(e.maximum_staleness_duration_sec >= MIN_DURATION_SEC &&
+                    e.maximum_staleness_duration_sec <= MAX_DURATION_SEC,
+                    "Invalid maximum_staleness_duration_sec"
+                );
+            }
+            SfraxExtraInfo::PythOracle(e) => {
+                assert!(e.pyth_price_valid_duration_sec >= MIN_DURATION_SEC &&
+                    e.pyth_price_valid_duration_sec <= MAX_DURATION_SEC,
+                    "Invalid pyth_price_valid_duration_sec"
+                );
+            }
+        }
+    }
 }
 
 #[derive(BorshSerialize, BorshDeserialize, Clone)]
@@ -73,7 +94,7 @@ mod price_oracle {
     }
 
     #[ext_contract(ext_price_oracle)]
-    pub trait ExtPriceOralce {
+    pub trait ExtPriceOracle {
         fn get_price_data(&self, asset_ids: Option<Vec<AssetId>>) -> PriceData;
     }
 }
@@ -170,7 +191,7 @@ mod pyth_oracle {
     }
 
     #[ext_contract(ext_pyth_oracle)]
-    pub trait ExtPythOralce {
+    pub trait ExtPythOracle {
         fn get_price(&self, price_identifier: PriceIdentifier) -> Option<Price>;
     }
 }
@@ -264,6 +285,7 @@ impl SfraxRate {
     pub fn new(contract_id: AccountId, extra_info_string: String) -> Self {
         let extra_info =
                 near_sdk::serde_json::from_str::<SfraxExtraInfo>(&extra_info_string).expect(ERR128_INVALID_EXTRA_INFO_MSG_FORMAT);
+        extra_info.assert_valid();
         Self {
             stored_rates: PRECISION, 
             rates_updated_at: 0,
@@ -275,6 +297,7 @@ impl SfraxRate {
     pub fn update_extra_info(&mut self, extra_info_string: String) {
         let extra_info =
                 near_sdk::serde_json::from_str::<SfraxExtraInfo>(&extra_info_string).expect(ERR128_INVALID_EXTRA_INFO_MSG_FORMAT);
+        extra_info.assert_valid();
         self.extra_info = extra_info;
     }
 }

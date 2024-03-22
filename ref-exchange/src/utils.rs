@@ -159,12 +159,12 @@ pub fn to_nano(ts: u32) -> Timestamp {
     Timestamp::from(ts) * 10u64.pow(9)
 }
 
-pub fn pair_rated_price_to_vec_u8(pirce1: Vec<u8>, pirce2: Vec<u8>) -> Vec<u8> {
+pub fn pair_rated_price_to_vec_u8(price1: Vec<u8>, price2: Vec<u8>) -> Vec<u8> {
     let mut cross_call_result = vec![];
     let offset = (usize::BITS / u8::BITS) as usize;
-    cross_call_result.extend((pirce1.len() + offset).to_be_bytes());
-    cross_call_result.extend(pirce1);
-    cross_call_result.extend(pirce2);
+    cross_call_result.extend((price1.len() + offset).to_be_bytes());
+    cross_call_result.extend(price1);
+    cross_call_result.extend(price2);
     cross_call_result
 }
 
