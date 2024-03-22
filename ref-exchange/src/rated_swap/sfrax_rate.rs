@@ -9,8 +9,8 @@ use near_sdk::{
 
 // default expire time is 24 hours
 const EXPIRE_TS: u64 = 24 * 3600 * 10u64.pow(9);
-const MAX_DURATION_SEC: u32 = 10;
-const MIN_DURATION_SEC: u32 = 60 * 5;
+const MAX_DURATION_SEC: u32 = 60 * 5;
+const MIN_DURATION_SEC: u32 = 10;
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
