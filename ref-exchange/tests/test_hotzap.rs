@@ -739,7 +739,8 @@ fn test_hotzap_rate_pool() {
         owner,
         pool.register_rated_token(
             "STNEAR".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -921,7 +922,8 @@ fn test_hotzap_rate_pool_add_two() {
         owner,
         pool.register_rated_token(
             "STNEAR".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();

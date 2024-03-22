@@ -1,6 +1,6 @@
 [package]
 name = "ref-exchange"
-version = "1.9.0"
+version = "1.9.1"
 authors = ["Illia Polosukhin <illia.polosukhin@gmail.com>"]
 edition = "2018"
 publish = false
@@ -13,6 +13,7 @@ uint = { version = "0.9.3", default-features = false }
 near-sdk = "3.1.0"
 near-contract-standards = "3.1.0"
 once_cell = "=1.8.0"
+hex = "0.4.3"
 
 [dev-dependencies]
 near-sdk-sim = "3.1.0"
@@ -20,5 +21,7 @@ test-token = { path = "../test-token" }
 test-rated-token = { path = "../test-rated-token" }
 mock-boost-farming = { path = "../mock-boost-farming" }
 mock-wnear = { path = "../mock-wnear" }
+mock-price-oracle = { path = "../mock-price-oracle" }
+mock-pyth = { path = "../mock-pyth" }
 rand = "0.8"
 rand_pcg = "0.3"

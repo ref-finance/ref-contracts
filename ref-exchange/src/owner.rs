@@ -4,8 +4,7 @@ use near_sdk::json_types::WrappedTimestamp;
 use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 
 use crate::*;
-use crate::legacy::ContractV3;
-use crate::rated_swap::rate::{global_register_rate, global_unregister_rate};
+use crate::rated_swap::rate::{global_register_rate, global_unregister_rate, global_update_rated_token_extra_info};
 use crate::utils::{FEE_DIVISOR, MAX_ADMIN_FEE_BPS, GAS_FOR_BASIC_OP};
 
 #[near_bindgen]
@@ -347,11 +346,11 @@ impl Contract {
 
     /// Register new rated token.
     #[payable]
-    pub fn register_rated_token(&mut self, rate_type: String, token_id: ValidAccountId) {
+    pub fn register_rated_token(&mut self, rate_type: String, token_id: ValidAccountId, extra_info: Option<String>) {
         assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         let token_id: AccountId = token_id.into();
-        if global_register_rate(&rate_type, &token_id) {
+        if global_register_rate(&rate_type, &token_id, extra_info) {
             log!("New {} typed rated token {} registered by {}", rate_type, token_id, env::predecessor_account_id());
         } else {
             env::panic(format!("Rated token {} already exist", token_id).as_bytes());
@@ -369,6 +368,15 @@ impl Contract {
         } else {
             log!("Rated token {} not exist in rate list.", token_id);
         }
+    }
+
+    #[payable]
+    pub fn update_rated_token_extra_info(&mut self, token_id: ValidAccountId, extra_info: String) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        let token_id: AccountId = token_id.into();
+        global_update_rated_token_extra_info(&token_id, extra_info.clone());
+        log!("Update rated token {} extra info: {}", token_id, extra_info);
     }
 
     pub(crate) fn assert_owner(&self) {
@@ -390,39 +398,7 @@ impl Contract {
     // [AUDIT_09]
     #[private]
     pub fn migrate() -> Self {
-        let ContractV3{
-            owner_id,
-            boost_farm_id,
-            burrowland_id,
-            admin_fee_bps,
-            pools,
-            accounts,
-            whitelisted_tokens,
-            guardians,
-            state,
-            frozen_tokens,
-            referrals,
-            cumulative_info_record_interval_sec,
-            unit_share_cumulative_infos
-        } = env::state_read().expect(ERR103_NOT_INITIALIZED);
-        
-        Self {
-            owner_id,
-            boost_farm_id,
-            burrowland_id,
-            admin_fee_bps,
-            pools,
-            accounts,
-            whitelisted_tokens,
-            guardians,
-            state,
-            frozen_tokens,
-            referrals,
-            cumulative_info_record_interval_sec,
-            unit_share_cumulative_infos,
-            wnear_id: None,
-            auto_whitelisted_postfix: HashSet::new()
-        }
+        env::state_read().expect(ERR103_NOT_INITIALIZED)
     }
 }
 

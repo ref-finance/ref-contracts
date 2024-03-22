@@ -18,6 +18,7 @@ pub mod rate;
 mod stnear_rate;
 mod linear_rate;
 mod nearx_rate;
+mod sfrax_rate;
 
 pub const TARGET_DECIMAL: u8 = 24;
 pub const MIN_DECIMAL: u8 = 1;
@@ -816,7 +817,7 @@ mod tests {
     }
 
     fn new_rated_stnear_pool(decimals: u8, amp_factor: u128, total_fee: u32) -> RatedSwapPool {
-        global_register_rate(&"STNEAR".to_string(), accounts(1).as_ref());
+        global_register_rate(&"STNEAR".to_string(), accounts(1).as_ref(), None);
         RatedSwapPool::new(
             0,
             vec![accounts(1), accounts(2)],

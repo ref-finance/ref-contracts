@@ -5,7 +5,9 @@ members = [
     "./ref-farming",
     "./test-rated-token",
     "./mock-boost-farming",
-    "./mock-wnear"
+    "./mock-price-oracle",
+    "./mock-wnear",
+    "./mock-pyth"
 ]
 
 

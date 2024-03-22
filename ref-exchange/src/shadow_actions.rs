@@ -1,7 +1,7 @@
 
 use crate::*;
 use near_sdk::{is_promise_success, Timestamp};
-use crate::utils::ext_self;
+use crate::utils::{ext_self, u64_dec_format};
 
 pub const GAS_FOR_ON_CAST_SHADOW: Gas = 200_000_000_000_000;
 pub const GAS_FOR_ON_CAST_SHADOW_CALLBACK: Gas = 20_000_000_000_000;
@@ -294,26 +294,5 @@ impl Contract {
     ) {
         log!("pool_id {}, {} remove {} farming seed {}", pool_id, sender_id, amount.0, 
             if is_promise_success() { "successful" } else { "failed" });
-    }
-}
-
-pub mod u64_dec_format {
-    use near_sdk::serde::de;
-    use near_sdk::serde::{Deserialize, Deserializer, Serializer};
-
-    pub fn serialize<S>(num: &u64, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(&num.to_string())
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<u64, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        String::deserialize(deserializer)?
-            .parse()
-            .map_err(de::Error::custom)
     }
 }

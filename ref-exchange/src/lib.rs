@@ -23,7 +23,7 @@ use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
 use crate::rated_swap::{RatedSwapPool, rate::{RateTrait, global_get_rate, global_set_rate}};
-use crate::utils::{check_token_duplicates, TokenCache};
+use crate::utils::{check_token_duplicates, pair_rated_price_to_vec_u8, TokenCache};
 pub use crate::custom_keys::*;
 pub use crate::views::{PoolInfo, ShadowRecordInfo, RatedPoolInfo, StablePoolInfo, ContractMetadata, RatedTokenInfo, AddLiquidityPrediction, RefStorageState};
 pub use crate::token_receiver::AddLiquidityInfo;
@@ -459,12 +459,25 @@ impl Contract {
     /// the async return of update_token_rate
     #[private]
     pub fn update_token_rate_callback(&mut self, token_id: AccountId) {
-        assert_eq!(env::promise_results_count(), 1, "{}", ERR123_ONE_PROMISE_RESULT);
-        let cross_call_result = match env::promise_result(0) {
-            PromiseResult::Successful(result) => result,
-            _ => env::panic(ERR124_CROSS_CALL_FAILED.as_bytes()),
+        let cross_call_result = if env::promise_results_count() == 1 {
+            let cross_call_result = match env::promise_result(0) {
+                PromiseResult::Successful(result) => result,
+                _ => env::panic(ERR124_CROSS_CALL_FAILED.as_bytes()),
+            };
+            cross_call_result
+        } else {
+            // Only SfraxRate + pyth
+            assert_eq!(env::promise_results_count(), 2, "{}", ERR123_TWO_PROMISE_RESULT);
+            let cross_call_result1 = match env::promise_result(0) {
+                PromiseResult::Successful(result) => result,
+                _ => env::panic(ERR124_CROSS_CALL_FAILED.as_bytes()),
+            };
+            let cross_call_result2 = match env::promise_result(1) {
+                PromiseResult::Successful(result) => result,
+                _ => env::panic(ERR124_CROSS_CALL_FAILED.as_bytes()),
+            };
+            pair_rated_price_to_vec_u8(cross_call_result1, cross_call_result2)
         };
-
         if let Some(mut rate) = global_get_rate(&token_id) {
             let new_rate = rate.set(&cross_call_result);
             global_set_rate(&token_id, &rate);

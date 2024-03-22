@@ -1,3 +1,4 @@
+use super::sfrax_rate::SfraxRate;
 use super::stnear_rate::StnearRate;
 use super::linear_rate::LinearRate;
 use super::nearx_rate::NearxRate;
@@ -20,6 +21,7 @@ pub enum Rate {
     Stnear(StnearRate),
     Linear(LinearRate),
     Nearx(NearxRate),
+    Sfrax(SfraxRate)
 }
 
 pub trait RateTrait {
@@ -36,6 +38,7 @@ impl RateTrait for Rate {
             Rate::Stnear(rates) => rates.are_actual(),
             Rate::Linear(rates) => rates.are_actual(),
             Rate::Nearx(rates) => rates.are_actual(),
+            Rate::Sfrax(rates) => rates.are_actual(),
         }
     }
     fn get(&self) -> Balance {
@@ -43,6 +46,7 @@ impl RateTrait for Rate {
             Rate::Stnear(rates) => rates.get(),
             Rate::Linear(rates) => rates.get(),
             Rate::Nearx(rates) => rates.get(),
+            Rate::Sfrax(rates) => rates.get(),
         }
     }
     fn last_update_ts(&self) -> u64 {
@@ -50,6 +54,7 @@ impl RateTrait for Rate {
             Rate::Stnear(rates) => rates.last_update_ts(),
             Rate::Linear(rates) => rates.last_update_ts(),
             Rate::Nearx(rates) => rates.last_update_ts(),
+            Rate::Sfrax(rates) => rates.last_update_ts(),
         }
     }
     fn async_update(&self) -> Promise {
@@ -57,6 +62,7 @@ impl RateTrait for Rate {
             Rate::Stnear(rates) => rates.async_update(),
             Rate::Linear(rates) => rates.async_update(),
             Rate::Nearx(rates) => rates.async_update(),
+            Rate::Sfrax(rates) => rates.async_update(),
         }
     }
     fn set(&mut self, cross_call_result: &Vec<u8>) -> u128 {
@@ -64,16 +70,18 @@ impl RateTrait for Rate {
             Rate::Stnear(rates) => rates.set(cross_call_result),
             Rate::Linear(rates) => rates.set(cross_call_result),
             Rate::Nearx(rates) => rates.set(cross_call_result),
+            Rate::Sfrax(rates) => rates.set(cross_call_result),
         }
     }
 }
 
 impl Rate {
-    pub fn new(rates_type: String, contract_id: AccountId) -> Self {
+    pub fn new(rates_type: String, contract_id: AccountId, extra_info: Option<String>) -> Self {
         match rates_type.as_str() {
             "STNEAR" => Rate::Stnear(StnearRate::new(contract_id)),
             "LINEAR" => Rate::Linear(LinearRate::new(contract_id)),
             "NEARX" => Rate::Nearx(NearxRate::new(contract_id)),
+            "SFRAX" => Rate::Sfrax(SfraxRate::new(contract_id, extra_info.expect("Missing extra_info"))),
             _ => unimplemented!(),
         }
     }
@@ -83,6 +91,7 @@ impl Rate {
             Rate::Stnear(_) => "STNEAR".to_string(),
             Rate::Linear(_) => "LINEAR".to_string(),
             Rate::Nearx(_) => "NEARX".to_string(),
+            Rate::Sfrax(_) => "SFRAX".to_string(),
         }
     }
 
@@ -91,6 +100,7 @@ impl Rate {
             "STNEAR" => true,
             "LINEAR" => true,
             "NEARX" => true,
+            "SFRAX" => true,
             _ => false,
         }
     }
@@ -99,7 +109,7 @@ impl Rate {
 /// Register a rate token with given type.
 /// if token already exist, return false; otherwise, return true
 /// if rate_type is invalid, would panic
-pub fn global_register_rate(rate_type: &String, token_id: &AccountId) -> bool {
+pub fn global_register_rate(rate_type: &String, token_id: &AccountId, extra_info: Option<String>) -> bool {
     assert!(Rate::is_valid_rate_type(rate_type.as_str()), "{}", ERR127_INVALID_RATE_TYPE);
     // read from storage
     let mut rates: HashMap<String, Rate> = if let Some(content) = env::storage_read(RATE_STORAGE_KEY.as_bytes()) {
@@ -109,7 +119,7 @@ pub fn global_register_rate(rate_type: &String, token_id: &AccountId) -> bool {
     };
 
     if !rates.contains_key(token_id) {
-        rates.insert(token_id.clone(), Rate::new(rate_type.clone(), token_id.clone()));
+        rates.insert(token_id.clone(), Rate::new(rate_type.clone(), token_id.clone(), extra_info));
         // save back to storage
         env::storage_write(
             RATE_STORAGE_KEY.as_bytes(), 
@@ -142,6 +152,22 @@ pub fn global_unregister_rate(token_id: &AccountId) -> bool {
     } else {
         false
     }
+}
+
+pub fn global_update_rated_token_extra_info(token_id: &AccountId, extra_info: String) {
+    // read from storage
+    let content = env::storage_read(RATE_STORAGE_KEY.as_bytes()).expect("Rate storage empty");
+    let mut rates: HashMap<String, Rate> = HashMap::try_from_slice(&content).expect("Deserialize failed.");
+    let rate = rates.get_mut(token_id).expect("Invalid token_id");
+    match rate {
+        Rate::Sfrax(r) => r.update_extra_info(extra_info),
+        _ => unimplemented!()
+    }
+    // save back to storage
+    env::storage_write(
+        RATE_STORAGE_KEY.as_bytes(), 
+        &rates.try_to_vec().unwrap(),
+    );
 }
 
 pub fn global_get_rate(token_id: &AccountId) -> Option<Rate> {
