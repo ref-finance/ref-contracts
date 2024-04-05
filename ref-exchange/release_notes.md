@@ -1,5 +1,12 @@
 # Release Notes
 
+
+### Version 1.9.1
+```
+3eyjcNnDFCKcD7oLuKuKQ36x2riRiDnv5H9b4hwA3hrE
+```
+1. support new rated token: sFrax.
+
 ### Version 1.9.0
 ```
 B83JY6Ga7A82ojKyYjQBsFBA45EAxgAPpjjzqqHcp9rH
