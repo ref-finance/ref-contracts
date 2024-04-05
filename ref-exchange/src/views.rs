@@ -41,7 +41,8 @@ pub struct RatedTokenInfo {
     pub rate_type: String,
     pub rate_price: U128,
     pub last_update_ts: U64,
-    pub is_valid: bool
+    pub is_valid: bool,
+    pub extra_info: Option<String>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -475,13 +476,25 @@ impl Contract {
         rates
         .iter()
         .map(|(k, v)| {
-            (k.clone(), 
-            RatedTokenInfo {
-                rate_type: v.get_type(),
-                rate_price: v.get().into(),
-                last_update_ts: v.last_update_ts().into(),
-                is_valid: v.are_actual(),
-            })
+            match v {
+                Rate::Sfrax(r) => (k.clone(), 
+                    RatedTokenInfo {
+                        rate_type: v.get_type(),
+                        rate_price: v.get().into(),
+                        last_update_ts: v.last_update_ts().into(),
+                        is_valid: v.are_actual(),
+                        extra_info: Some(near_sdk::serde_json::to_string(&r.extra_info).unwrap())
+                    }),
+                _ => (k.clone(), 
+                    RatedTokenInfo {
+                        rate_type: v.get_type(),
+                        rate_price: v.get().into(),
+                        last_update_ts: v.last_update_ts().into(),
+                        is_valid: v.are_actual(),
+                        extra_info: None
+                    })
+            }
+            
         })
         .collect()
     }

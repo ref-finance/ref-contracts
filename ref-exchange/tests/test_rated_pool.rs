@@ -1,7 +1,11 @@
 use std::collections::HashMap;
+use std::convert::TryInto;
 
+use mock_price_oracle::{Price, PriceData};
+use mock_pyth::{PriceIdentifier, PythPrice};
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
-use near_sdk::json_types::{U128};
+use near_sdk::serde_json::json;
+use near_sdk::json_types::{I64, U128, U64};
 use near_sdk::AccountId;
 use near_sdk_sim::{
     call, view, to_yocto
@@ -16,6 +20,8 @@ const ONE_NEAR: u128 = 10u128.pow(24 as u32);
 const ONE_STNEAR: u128 = 10u128.pow(24 as u32);
 const ONE_LINEAR: u128 = 10u128.pow(24 as u32);
 const ONE_NEARX: u128 = 10u128.pow(24 as u32);
+const ONE_FRAX: u128 = 10u128.pow(18 as u32);
+const ONE_SFRAX: u128 = 10u128.pow(18 as u32);
 
 #[test]
 fn sim_rated_swap_liquidity_two() {
@@ -34,7 +40,8 @@ fn sim_rated_swap_liquidity_two() {
         owner,
         pool.register_rated_token(
             "STNEAR".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -122,7 +129,8 @@ fn sim_rated_swap_liquidity_three_one_rated() {
         owner,
         pool.register_rated_token(
             "STNEAR".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -204,7 +212,8 @@ fn sim_rated_swap_liquidity_three_two_rated() {
         owner,
         pool.register_rated_token(
             "STNEAR".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -213,7 +222,8 @@ fn sim_rated_swap_liquidity_three_two_rated() {
         owner,
         pool.register_rated_token(
             "LINEAR".to_string(),
-            token_rated_contracts[1].valid_account_id()
+            token_rated_contracts[1].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -425,7 +435,8 @@ fn sim_rated_swap_rate_one_with_fee() {
         owner,
         pool.register_rated_token(
             "STNEAR".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -531,7 +542,8 @@ fn sim_rated_swap_rate_one_no_fee() {
         owner,
         pool.register_rated_token(
             "STNEAR".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -707,7 +719,8 @@ fn sim_rated_swap() {
         owner,
         pool.register_rated_token(
             "STNEAR".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -723,7 +736,8 @@ fn sim_rated_swap() {
         owner,
         pool.register_rated_token(
             "STNEAR1".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     );
@@ -734,7 +748,8 @@ fn sim_rated_swap() {
         owner,
         pool.register_rated_token(
             "STNEAR".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     );
@@ -745,7 +760,8 @@ fn sim_rated_swap() {
         owner,
         pool.register_rated_token(
             "LINEAR".to_string(),
-            token_rated_contracts[1].valid_account_id()
+            token_rated_contracts[1].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -859,7 +875,8 @@ fn sim_rated_swap_register_unregister() {
         owner,
         pool.register_rated_token(
             "STNEAR".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -875,7 +892,8 @@ fn sim_rated_swap_register_unregister() {
         owner,
         pool.register_rated_token(
             "STNEAR1".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     );
@@ -886,7 +904,8 @@ fn sim_rated_swap_register_unregister() {
         owner,
         pool.register_rated_token(
             "STNEAR".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     );
@@ -897,7 +916,8 @@ fn sim_rated_swap_register_unregister() {
         owner,
         pool.register_rated_token(
             "LINEAR".to_string(),
-            token_rated_contracts[1].valid_account_id()
+            token_rated_contracts[1].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -973,7 +993,8 @@ fn sim_rated_swap_out_zero() {
         owner,
         pool.register_rated_token(
             "STNEAR".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -1373,7 +1394,8 @@ fn sim_rated_swap_liquidity_two_with_nearx() {
         owner,
         pool.register_rated_token(
             "NEARX".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -1580,7 +1602,8 @@ fn sim_rated_swap_rate_one_with_fee_with_nearx() {
         owner,
         pool.register_rated_token(
             "NEARX".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -1685,7 +1708,8 @@ fn sim_rated_swap_rate_one_no_fee_with_nearx() {
         owner,
         pool.register_rated_token(
             "NEARX".to_string(),
-            token_rated_contracts[0].valid_account_id()
+            token_rated_contracts[0].valid_account_id(),
+            None
         ),
         deposit = 1
     ).assert_success();
@@ -1735,4 +1759,492 @@ fn sim_rated_swap_rate_one_no_fee_with_nearx() {
             shares_total_supply: U128(200000*ONE_LPT),
         }
     );
+}
+
+#[test]
+fn sim_sfrax_rated_swap_liquidity_two_price_oracle() {
+    let (root, owner, pool, tokens, token_rated_contracts) = 
+        setup_rated_pool(
+            vec![frax()],
+            vec![sfrax()],
+            vec![18, 18],
+            25,
+            10000,
+        );
+    let sfrax_contract = &token_rated_contracts[0];
+
+    call!(
+        owner,
+        pool.register_rated_token(
+            "SFRAX".to_string(),
+            token_rated_contracts[0].valid_account_id(),
+            Some(json!({
+                "PriceOracle": {
+                    "oracle_id": price_oracle(),
+                    "base_contract_id": frax(),
+                    "maximum_recency_duration_sec": 90,
+                    "maximum_staleness_duration_sec": 30
+                }
+            }).to_string())
+        ),
+        deposit = 1
+    ).assert_success();
+
+    let price_oracle_contract = setup_price_oracle(&root);
+
+    call!(
+        root,
+        price_oracle_contract.set_price_data(frax(), Price {
+            multiplier: 10000,
+            decimals: 22,
+        })
+    ).assert_success();
+
+    call!(
+        root,
+        price_oracle_contract.set_price_data(sfrax(), Price {
+            multiplier: 20000,
+            decimals: 22,
+        })
+    ).assert_success();
+
+    println!("{:?}", view!(price_oracle_contract.get_price_data(None)).unwrap_json::<PriceData>());
+    println!("{:?}", view!(pool.list_rated_tokens()).unwrap_json::<HashMap<String, RatedTokenInfo>>());
+
+    println!("{:?}", call!(
+        owner,
+        pool.update_token_rate(
+            sfrax_contract.valid_account_id()
+        )
+    ));
+
+    println!("{:?}", view!(pool.list_rated_tokens()).unwrap_json::<HashMap<String, RatedTokenInfo>>());
+
+
+    let user = root.create_user("user".to_string(), to_yocto("100"));
+    mint_and_deposit_token(&user, &tokens[0], &pool, 100000*ONE_FRAX);
+    mint_and_deposit_rated_token(&user, &token_rated_contracts[0], &pool, 100000*ONE_SFRAX);
+    let out_come = call!(
+        user,
+        pool.add_stable_liquidity(0, vec![
+            U128(100000*ONE_FRAX), U128(50000*ONE_SFRAX)], U128(1)),
+        deposit = to_yocto("0.0007") 
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+    assert_eq!(mft_balance_of(&pool, ":0", &user.account_id()), 200000*ONE_LPT);
+    assert_eq!(mft_total_supply(&pool, ":0"), 200000*ONE_LPT);
+    let last_share_price = pool_share_price(&pool, 0);
+    assert_eq!(100000000, last_share_price);
+
+    let user1 = root.create_user("user1".to_string(), to_yocto("100"));
+    mint_and_deposit_token(&user1, &tokens[0], &pool, 100000*ONE_FRAX);
+    mint_and_deposit_rated_token(&user1, &token_rated_contracts[0], &pool, 100000*ONE_SFRAX);
+    let out_come = call!(
+        user1,
+        pool.add_stable_liquidity(0, vec![
+            U128(100000*ONE_FRAX), U128(50000*ONE_SFRAX)], U128(1)),
+        deposit = to_yocto("0.0007") 
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 200000*ONE_LPT);
+    assert_eq!(mft_total_supply(&pool, ":0"), 400000*ONE_LPT);
+    let last_share_price = pool_share_price(&pool, 0);
+    assert_eq!(100000000, last_share_price);
+
+    let out_come = call!(
+        user1,
+        pool.remove_liquidity(0, U128(200000*ONE_LPT), vec![U128(1*ONE_FRAX), U128(1*ONE_SFRAX)]),
+        deposit = 1 
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 0);
+    assert_eq!(mft_total_supply(&pool, ":0"), 200000*ONE_LPT);
+    assert_eq!(100000000, pool_share_price(&pool, 0));
+
+    let out_come = call!(
+        user,
+        pool.remove_liquidity(0, U128(200000*ONE_LPT), vec![U128(1*ONE_FRAX), U128(1*ONE_SFRAX)]),
+        deposit = 1 
+    );
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E69: pool reserved token balance less than MIN_RESERVE"));
+
+}
+
+#[test]
+fn sim_sfrax_rated_swap_rate_one_price_oracle() {
+    let (root, owner, pool, tokens, token_rated_contracts) = 
+        setup_rated_pool_with_liquidity(
+            vec![frax()],
+            vec![sfrax()],
+            vec![100000*ONE_FRAX],
+            vec![100000*ONE_SFRAX],
+            vec![18, 18],
+            25,
+            10000,
+        );
+    let sfrax_contract = &token_rated_contracts[0];
+    assert_eq!(
+        view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
+        PoolInfo {
+            pool_kind: "RATED_SWAP".to_string(),
+            amp: 10000,
+            token_account_ids: vec![frax(), sfrax()],
+            amounts: vec![U128(100000*ONE_FRAX), U128(100000*ONE_SFRAX)],
+            total_fee: 25,
+            shares_total_supply: U128(200000*ONE_LPT),
+        }
+    );
+    assert_eq!(
+        view!(pool.mft_metadata(":0".to_string()))
+            .unwrap_json::<FungibleTokenMetadata>()
+            .name,
+        "ref-pool-0"
+    );
+    assert_eq!(
+        view!(pool.mft_balance_of(":0".to_string(), to_va(root.account_id.clone())))
+            .unwrap_json::<U128>()
+            .0,
+        200000*ONE_LPT
+    );
+    let balances = view!(pool.get_deposits(root.valid_account_id()))
+        .unwrap_json::<HashMap<AccountId, U128>>();
+    let balances = balances.values().cloned().collect::<Vec<_>>();
+    assert_eq!(balances, vec![U128(0), U128(0)]);
+
+    let c = tokens.get(0).unwrap();
+    call!(
+        root,
+        c.ft_transfer_call(pool.valid_account_id(), U128(ONE_NEAR), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.register_rated_token(
+            "SFRAX".to_string(),
+            token_rated_contracts[0].valid_account_id(),
+            Some(json!({
+                "PriceOracle": {
+                    "oracle_id": price_oracle(),
+                    "base_contract_id": frax(),
+                    "maximum_recency_duration_sec": 90,
+                    "maximum_staleness_duration_sec": 30
+                }
+            }).to_string())
+        ),
+        deposit = 1
+    ).assert_success();
+
+    let price_oracle_contract = setup_price_oracle(&root);
+
+    call!(
+        root,
+        price_oracle_contract.set_price_data(frax(), Price {
+            multiplier: 10000,
+            decimals: 22,
+        })
+    ).assert_success();
+
+    call!(
+        root,
+        price_oracle_contract.set_price_data(sfrax(), Price {
+            multiplier: 20000,
+            decimals: 22,
+        })
+    ).assert_success();
+
+    call!(
+        owner,
+        pool.update_token_rate(
+            sfrax_contract.valid_account_id()
+        ),
+        deposit = 1
+    ).assert_success();
+
+    let rated_infos = view!(pool.list_rated_tokens()).unwrap_json::<HashMap<String, RatedTokenInfo>>();
+
+    println!("{:?}", rated_infos);
+
+    assert_eq!(498771039615167716, view!(pool.get_return(0, to_va(frax()), U128(ONE_FRAX), to_va(sfrax()))).unwrap_json::<U128>().0);
+
+    let balances = view!(pool.get_deposits(root.valid_account_id()))
+    .unwrap_json::<HashMap<AccountId, U128>>();
+    assert_eq!(balances[&frax()].0, 1000000000000000000000000);
+    assert_eq!(balances[&sfrax()].0, 0);
+
+    let out_come = call!(
+        root,
+        pool.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in: frax(),
+                amount_in: Some(U128(ONE_FRAX)),
+                token_out: sfrax(),
+                min_amount_out: U128(1)
+            }],
+            None
+        ),
+        deposit = 1
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+
+    let balances = view!(pool.get_deposits(root.valid_account_id()))
+        .unwrap_json::<HashMap<AccountId, U128>>();
+    assert_eq!(balances[&frax()].0, 999999000000000000000000);
+    assert_eq!(balances[&sfrax()].0, 498771039615167716);
+}
+
+#[test]
+fn sim_sfrax_rated_swap_liquidity_two_pyth() {
+    let (root, owner, pool, tokens, token_rated_contracts) = 
+        setup_rated_pool(
+            vec![frax()],
+            vec![sfrax()],
+            vec![18, 18],
+            25,
+            10000,
+        );
+
+    let sfrax_contract = &token_rated_contracts[0];
+
+    call!(
+        owner,
+        pool.register_rated_token(
+            "SFRAX".to_string(),
+            token_rated_contracts[0].valid_account_id(),
+            Some(json!({
+                "PythOracle": {
+                    "oracle_id": pyth_oracle(),
+                    "base_price_identifier": "c3d5d8d6d17081b3d0bbca6e2fa3a6704bb9a9561d9f9e1dc52db47629f862ad",
+                    "rate_price_identifier": "853d955acef822db058eb8505911ed77f175b99e561d9f9e1dc52db47629f862",
+                    "pyth_price_valid_duration_sec": 60
+                }
+            }).to_string())
+        ),
+        deposit = 1
+    ).assert_success();
+
+    let pyth_contract = setup_pyth_oracle(&root);
+    
+    let block_timestamp = root.borrow_runtime().current_block().block_timestamp;
+    call!(
+        root,
+        pyth_contract.set_price(PriceIdentifier(hex::decode("c3d5d8d6d17081b3d0bbca6e2fa3a6704bb9a9561d9f9e1dc52db47629f862ad").unwrap().try_into().unwrap()), PythPrice {
+            price: I64(100000000),
+            conf: U64(397570),
+            expo: -8,
+            publish_time: nano_to_sec(block_timestamp) as i64,
+        })
+    ).assert_success();
+
+    call!(
+        root,
+        pyth_contract.set_price(PriceIdentifier(hex::decode("853d955acef822db058eb8505911ed77f175b99e561d9f9e1dc52db47629f862").unwrap().try_into().unwrap()), PythPrice {
+            price: I64(200000000),
+            conf: U64(397570),
+            expo: -8,
+            publish_time: nano_to_sec(block_timestamp) as i64,
+        })
+    ).assert_success();
+
+    println!("{:?}", view!(pool.list_rated_tokens()).unwrap_json::<HashMap<String, RatedTokenInfo>>());
+
+    println!("{:?}", call!(
+        owner,
+        pool.update_token_rate(
+            sfrax_contract.valid_account_id()
+        )
+    ));
+
+    println!("{:?}", view!(pool.list_rated_tokens()).unwrap_json::<HashMap<String, RatedTokenInfo>>());
+
+    let user = root.create_user("user".to_string(), to_yocto("100"));
+    mint_and_deposit_token(&user, &tokens[0], &pool, 100000*ONE_FRAX);
+    mint_and_deposit_rated_token(&user, &token_rated_contracts[0], &pool, 100000*ONE_SFRAX);
+    let out_come = call!(
+        user,
+        pool.add_stable_liquidity(0, vec![
+            U128(100000*ONE_FRAX), U128(50000*ONE_SFRAX)], U128(1)),
+        deposit = to_yocto("0.0007") 
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+    assert_eq!(mft_balance_of(&pool, ":0", &user.account_id()), 200000*ONE_LPT);
+    assert_eq!(mft_total_supply(&pool, ":0"), 200000*ONE_LPT);
+    let last_share_price = pool_share_price(&pool, 0);
+    assert_eq!(100000000, last_share_price);
+
+    let user1 = root.create_user("user1".to_string(), to_yocto("100"));
+    mint_and_deposit_token(&user1, &tokens[0], &pool, 100000*ONE_FRAX);
+    mint_and_deposit_rated_token(&user1, &token_rated_contracts[0], &pool, 100000*ONE_SFRAX);
+    let out_come = call!(
+        user1,
+        pool.add_stable_liquidity(0, vec![
+            U128(100000*ONE_FRAX), U128(50000*ONE_SFRAX)], U128(1)),
+        deposit = to_yocto("0.0007") 
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 200000*ONE_LPT);
+    assert_eq!(mft_total_supply(&pool, ":0"), 400000*ONE_LPT);
+    let last_share_price = pool_share_price(&pool, 0);
+    assert_eq!(100000000, last_share_price);
+
+    let out_come = call!(
+        user1,
+        pool.remove_liquidity(0, U128(200000*ONE_LPT), vec![U128(1*ONE_FRAX), U128(1*ONE_SFRAX)]),
+        deposit = 1 
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+    assert_eq!(mft_balance_of(&pool, ":0", &user1.account_id()), 0);
+    assert_eq!(mft_total_supply(&pool, ":0"), 200000*ONE_LPT);
+    assert_eq!(100000000, pool_share_price(&pool, 0));
+
+    let out_come = call!(
+        user,
+        pool.remove_liquidity(0, U128(200000*ONE_LPT), vec![U128(1*ONE_FRAX), U128(1*ONE_SFRAX)]),
+        deposit = 1 
+    );
+    assert_eq!(get_error_count(&out_come), 1);
+    assert!(get_error_status(&out_come).contains("E69: pool reserved token balance less than MIN_RESERVE"));
+
+}
+
+
+#[test]
+fn sim_sfrax_rated_swap_rate_one_pyth() {
+    let (root, owner, pool, tokens, token_rated_contracts) = 
+        setup_rated_pool_with_liquidity(
+            vec![frax()],
+            vec![sfrax()],
+            vec![100000*ONE_FRAX],
+            vec![100000*ONE_SFRAX],
+            vec![18, 18],
+            25,
+            10000,
+        );
+    let sfrax_contract = &token_rated_contracts[0];
+    assert_eq!(
+        view!(pool.get_pool(0)).unwrap_json::<PoolInfo>(),
+        PoolInfo {
+            pool_kind: "RATED_SWAP".to_string(),
+            amp: 10000,
+            token_account_ids: vec![frax(), sfrax()],
+            amounts: vec![U128(100000*ONE_FRAX), U128(100000*ONE_SFRAX)],
+            total_fee: 25,
+            shares_total_supply: U128(200000*ONE_LPT),
+        }
+    );
+    assert_eq!(
+        view!(pool.mft_metadata(":0".to_string()))
+            .unwrap_json::<FungibleTokenMetadata>()
+            .name,
+        "ref-pool-0"
+    );
+    assert_eq!(
+        view!(pool.mft_balance_of(":0".to_string(), to_va(root.account_id.clone())))
+            .unwrap_json::<U128>()
+            .0,
+        200000*ONE_LPT
+    );
+    let balances = view!(pool.get_deposits(root.valid_account_id()))
+        .unwrap_json::<HashMap<AccountId, U128>>();
+    let balances = balances.values().cloned().collect::<Vec<_>>();
+    assert_eq!(balances, vec![U128(0), U128(0)]);
+
+    let c = tokens.get(0).unwrap();
+    call!(
+        root,
+        c.ft_transfer_call(pool.valid_account_id(), U128(ONE_NEAR), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.register_rated_token(
+            "SFRAX".to_string(),
+            token_rated_contracts[0].valid_account_id(),
+            Some(json!({
+                "PythOracle": {
+                    "oracle_id": pyth_oracle(),
+                    "base_price_identifier": "c3d5d8d6d17081b3d0bbca6e2fa3a6704bb9a9561d9f9e1dc52db47629f862ad",
+                    "rate_price_identifier": "853d955acef822db058eb8505911ed77f175b99e561d9f9e1dc52db47629f862",
+                    "pyth_price_valid_duration_sec": 60
+                }
+            }).to_string())
+        ),
+        deposit = 1
+    ).assert_success();
+
+    let pyth_contract = setup_pyth_oracle(&root);
+    
+    let block_timestamp = root.borrow_runtime().current_block().block_timestamp;
+    call!(
+        root,
+        pyth_contract.set_price(PriceIdentifier(hex::decode("c3d5d8d6d17081b3d0bbca6e2fa3a6704bb9a9561d9f9e1dc52db47629f862ad").unwrap().try_into().unwrap()), PythPrice {
+            price: I64(100000000),
+            conf: U64(397570),
+            expo: -8,
+            publish_time: nano_to_sec(block_timestamp) as i64,
+        })
+    ).assert_success();
+
+    call!(
+        root,
+        pyth_contract.set_price(PriceIdentifier(hex::decode("853d955acef822db058eb8505911ed77f175b99e561d9f9e1dc52db47629f862").unwrap().try_into().unwrap()), PythPrice {
+            price: I64(200000000),
+            conf: U64(397570),
+            expo: -8,
+            publish_time: nano_to_sec(block_timestamp) as i64,
+        })
+    ).assert_success();
+
+    call!(
+        owner,
+        pool.update_token_rate(
+            sfrax_contract.valid_account_id()
+        ),
+        deposit = 1
+    ).assert_success();
+
+    let rated_infos = view!(pool.list_rated_tokens()).unwrap_json::<HashMap<String, RatedTokenInfo>>();
+
+    println!("{:?}", rated_infos);
+
+    assert_eq!(498771039615167716, view!(pool.get_return(0, to_va(frax()), U128(ONE_FRAX), to_va(sfrax()))).unwrap_json::<U128>().0);
+
+    let balances = view!(pool.get_deposits(root.valid_account_id()))
+    .unwrap_json::<HashMap<AccountId, U128>>();
+    assert_eq!(balances[&frax()].0, 1000000000000000000000000);
+    assert_eq!(balances[&sfrax()].0, 0);
+
+    let out_come = call!(
+        root,
+        pool.swap(
+            vec![SwapAction {
+                pool_id: 0,
+                token_in: frax(),
+                amount_in: Some(U128(ONE_FRAX)),
+                token_out: sfrax(),
+                min_amount_out: U128(1)
+            }],
+            None
+        ),
+        deposit = 1
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+
+    let balances = view!(pool.get_deposits(root.valid_account_id()))
+        .unwrap_json::<HashMap<AccountId, U128>>();
+    assert_eq!(balances[&frax()].0, 999999000000000000000000);
+    assert_eq!(balances[&sfrax()].0, 498771039615167716);
 }
