@@ -3,7 +3,7 @@
 
 ### Version 1.9.1
 ```
-3eyjcNnDFCKcD7oLuKuKQ36x2riRiDnv5H9b4hwA3hrE
+Fdv9RSb4JgK7E76Z1RhJw69ZzzYQ2gG5XfnSdYi5nksq
 ```
 1. support new rated token: sFrax.
 
