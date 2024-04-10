@@ -1,10 +1,18 @@
 # Release Notes
 
+
+### Version 1.9.1
+```
+Fdv9RSb4JgK7E76Z1RhJw69ZzzYQ2gG5XfnSdYi5nksq
+```
+1. support new rated token: sFrax.
+
 ### Version 1.9.0
 ```
-JDL5FPvBGcTEqj2JDLYwzvPSCv7fo8UvkeuYqy6CPi8S
+B83JY6Ga7A82ojKyYjQBsFBA45EAxgAPpjjzqqHcp9rH
 ```
 1. support skip_unwrap_near indication in swap.
+2. support auto_whitelist tokens according to their postfix of account ids.
 
 ### Version 1.8.0
 ```

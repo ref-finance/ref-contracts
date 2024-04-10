@@ -23,6 +23,7 @@ pub struct ContractMetadata {
     pub admin_fee_bps: u32,
     pub cumulative_info_record_interval_sec: u32,
     pub wnear_id: Option<AccountId>,
+    pub auto_whitelisted_postfix: HashSet<String>
 }
 
 #[derive(Serialize, Deserialize, PartialEq)]
@@ -40,7 +41,8 @@ pub struct RatedTokenInfo {
     pub rate_type: String,
     pub rate_price: U128,
     pub last_update_ts: U64,
-    pub is_valid: bool
+    pub is_valid: bool,
+    pub extra_info: Option<String>
 }
 
 #[derive(Serialize, Deserialize)]
@@ -223,7 +225,8 @@ impl Contract {
             state: self.state.clone(),
             admin_fee_bps: self.admin_fee_bps,
             cumulative_info_record_interval_sec: self.cumulative_info_record_interval_sec,
-            wnear_id: self.wnear_id.clone()
+            wnear_id: self.wnear_id.clone(),
+            auto_whitelisted_postfix: self.auto_whitelisted_postfix.clone()
         }
     }
 
@@ -473,13 +476,25 @@ impl Contract {
         rates
         .iter()
         .map(|(k, v)| {
-            (k.clone(), 
-            RatedTokenInfo {
-                rate_type: v.get_type(),
-                rate_price: v.get().into(),
-                last_update_ts: v.last_update_ts().into(),
-                is_valid: v.are_actual(),
-            })
+            match v {
+                Rate::Sfrax(r) => (k.clone(), 
+                    RatedTokenInfo {
+                        rate_type: v.get_type(),
+                        rate_price: v.get().into(),
+                        last_update_ts: v.last_update_ts().into(),
+                        is_valid: v.are_actual(),
+                        extra_info: Some(near_sdk::serde_json::to_string(&r.extra_info).unwrap())
+                    }),
+                _ => (k.clone(), 
+                    RatedTokenInfo {
+                        rate_type: v.get_type(),
+                        rate_price: v.get().into(),
+                        last_update_ts: v.last_update_ts().into(),
+                        is_valid: v.are_actual(),
+                        extra_info: None
+                    })
+            }
+            
         })
         .collect()
     }

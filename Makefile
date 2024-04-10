@@ -21,20 +21,20 @@ else
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange --lib -- --nocapture
 endif
 
-test: build-exchange mock-ft mock-rated mock-farming test-wnear
+test: build-exchange mock-ft mock-rated mock-farming test-wnear test-price-oracle test-pyth
 ifdef TF
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange --test $(TF) -- --nocapture
 else
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange --tests
 endif
 
-test-exchange: build-exchange mock-ft mock-rated mock-farming test-wnear
+test-exchange: build-exchange mock-ft mock-rated mock-farming test-wnear test-price-oracle test-pyth
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange 
 
 test-farm: build-farm mock-ft
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref_farming 
 
-test-release: mock-ft mock-rated mock-farming test-wnear
+test-release: mock-ft mock-rated mock-farming test-wnear test-price-oracle test-pyth
 	mkdir -p res
 	cp ./releases/ref_exchange_release.wasm ./res/ref_exchange.wasm
 	RUSTFLAGS=$(RFLAGS) cargo test -p ref-exchange 
@@ -62,6 +62,18 @@ test-wnear: mock-wnear
 	RUSTFLAGS=$(RFLAGS) cargo build -p mock-wnear --target wasm32-unknown-unknown --release
 	mkdir -p res
 	cp target/wasm32-unknown-unknown/release/mock_wnear.wasm ./res/mock_wnear.wasm
+	
+test-price-oracle: mock-price-oracle
+	rustup target add wasm32-unknown-unknown
+	RUSTFLAGS=$(RFLAGS) cargo build -p mock-price-oracle --target wasm32-unknown-unknown --release
+	mkdir -p res
+	cp target/wasm32-unknown-unknown/release/mock_price_oracle.wasm ./res/mock_price_oracle.wasm
+
+test-pyth: mock-pyth
+	rustup target add wasm32-unknown-unknown
+	RUSTFLAGS=$(RFLAGS) cargo build -p mock-pyth --target wasm32-unknown-unknown --release
+	mkdir -p res
+	cp target/wasm32-unknown-unknown/release/mock_pyth.wasm ./res/mock_pyth.wasm
 
 release:
 	$(call docker_build,_rust_setup.sh)

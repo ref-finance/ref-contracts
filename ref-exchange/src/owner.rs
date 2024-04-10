@@ -4,7 +4,7 @@ use near_sdk::json_types::WrappedTimestamp;
 use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 
 use crate::*;
-use crate::rated_swap::rate::{global_register_rate, global_unregister_rate};
+use crate::rated_swap::rate::{global_register_rate, global_unregister_rate, global_update_rated_token_extra_info};
 use crate::utils::{FEE_DIVISOR, MAX_ADMIN_FEE_BPS, GAS_FOR_BASIC_OP};
 
 #[near_bindgen]
@@ -72,6 +72,25 @@ impl Contract {
     }
 
     #[payable]
+    pub fn extend_auto_whitelisted_postfix(&mut self, postfixes: Vec<String>) {
+        assert_one_yocto();
+        self.is_owner_or_guardians();
+        for postfix in postfixes {
+            self.auto_whitelisted_postfix.insert(postfix.clone());
+        }
+    }
+
+    #[payable]
+    pub fn remove_auto_whitelisted_postfix(&mut self, postfixes: Vec<String>) {
+        assert_one_yocto();
+        self.is_owner_or_guardians();
+        for postfix in postfixes {
+            let exist = self.auto_whitelisted_postfix.remove(&postfix);
+            assert!(exist, "{}", ERR105_WHITELISTED_POSTFIX_NOT_IN_LIST);
+        }
+    }
+
+    #[payable]
     pub fn modify_boost_farm_id(&mut self, boost_farm_id: AccountId) {
         assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
@@ -90,7 +109,7 @@ impl Contract {
     #[payable]
     pub fn modify_wnear_id(&mut self, wnear_id: AccountId) {
         assert_one_yocto();
-        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        self.assert_owner();
         log!("Modify wnear_id from {:?} to {}", self.wnear_id, wnear_id);  
         self.wnear_id = Some(wnear_id);
     }
@@ -327,11 +346,11 @@ impl Contract {
 
     /// Register new rated token.
     #[payable]
-    pub fn register_rated_token(&mut self, rate_type: String, token_id: ValidAccountId) {
+    pub fn register_rated_token(&mut self, rate_type: String, token_id: ValidAccountId, extra_info: Option<String>) {
         assert_one_yocto();
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         let token_id: AccountId = token_id.into();
-        if global_register_rate(&rate_type, &token_id) {
+        if global_register_rate(&rate_type, &token_id, extra_info) {
             log!("New {} typed rated token {} registered by {}", rate_type, token_id, env::predecessor_account_id());
         } else {
             env::panic(format!("Rated token {} already exist", token_id).as_bytes());
@@ -349,6 +368,15 @@ impl Contract {
         } else {
             log!("Rated token {} not exist in rate list.", token_id);
         }
+    }
+
+    #[payable]
+    pub fn update_rated_token_extra_info(&mut self, token_id: ValidAccountId, extra_info: String) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        let token_id: AccountId = token_id.into();
+        global_update_rated_token_extra_info(&token_id, extra_info.clone());
+        log!("Update rated token {} extra info: {}", token_id, extra_info);
     }
 
     pub(crate) fn assert_owner(&self) {
@@ -370,8 +398,7 @@ impl Contract {
     // [AUDIT_09]
     #[private]
     pub fn migrate() -> Self {
-        let contract = env::state_read().expect(ERR103_NOT_INITIALIZED);
-        contract
+        env::state_read().expect(ERR103_NOT_INITIALIZED)
     }
 }
 

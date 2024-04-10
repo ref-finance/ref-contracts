@@ -1474,6 +1474,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock-price-oracle"
+version = "0.1.0"
+dependencies = [
+ "near-contract-standards",
+ "near-sdk",
+]
+
+[[package]]
+name = "mock-pyth"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "near-contract-standards",
+ "near-sdk",
+]
+
+[[package]]
 name = "mock-wnear"
 version = "0.0.1"
 dependencies = [
@@ -2331,9 +2348,12 @@ dependencies = [
 
 [[package]]
 name = "ref-exchange"
-version = "1.9.1"
+version = "1.9.2"
 dependencies = [
+ "hex",
  "mock-boost-farming",
+ "mock-price-oracle",
+ "mock-pyth",
  "mock-wnear",
  "near-contract-standards",
  "near-sdk",

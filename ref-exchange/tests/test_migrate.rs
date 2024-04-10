@@ -27,7 +27,7 @@ fn test_upgrade() {
                 ValidAccountId::try_from("burrowland".to_string()).unwrap(), 4, 1)
     );
     let metadata = get_metadata(&pool);
-    assert_eq!(metadata.version, "1.9.0".to_string());
+    assert_eq!(metadata.version, "1.9.1".to_string());
     
     // Failed upgrade with no permissions.
     let result = test_user
@@ -51,7 +51,7 @@ fn test_upgrade() {
     .assert_success();
     let metadata = get_metadata(&pool);
     // println!("{:#?}", metadata);
-    assert_eq!(metadata.version, "1.9.1".to_string());
+    assert_eq!(metadata.version, "1.9.2".to_string());
     assert_eq!(metadata.admin_fee_bps, 5);
     assert_eq!(metadata.boost_farm_id, "boost_farm".to_string());
     assert_eq!(metadata.burrowland_id, "burrowland".to_string());

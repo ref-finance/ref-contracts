@@ -1,10 +1,11 @@
 use std::collections::{HashSet, HashMap};
+use std::convert::TryInto;
 
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LookupMap;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{ext_contract, AccountId, Balance, Gas};
+use near_sdk::{ext_contract, AccountId, Balance, Gas, Timestamp};
 use uint::construct_uint;
 use crate::errors::*;
 
@@ -152,6 +153,67 @@ impl From<TokenCache> for HashMap<AccountId, U128> {
 
 pub fn nano_to_sec(nano: u64) -> u32 {
     (nano / 10u64.pow(9)) as u32
+}
+
+pub fn to_nano(ts: u32) -> Timestamp {
+    Timestamp::from(ts) * 10u64.pow(9)
+}
+
+pub fn pair_rated_price_to_vec_u8(price1: Vec<u8>, price2: Vec<u8>) -> Vec<u8> {
+    let mut cross_call_result = vec![];
+    let offset = (usize::BITS / u8::BITS) as usize;
+    cross_call_result.extend((price1.len() + offset).to_be_bytes());
+    cross_call_result.extend(price1);
+    cross_call_result.extend(price2);
+    cross_call_result
+}
+
+pub fn unpair_rated_price_from_vec_u8(pair_rated_price: &Vec<u8>) -> (Vec<u8>, Vec<u8>) {
+    let offset = (usize::BITS / u8::BITS) as usize;
+    let base_price_bytes_len = usize::from_be_bytes(pair_rated_price[0..offset].try_into().unwrap());
+    (pair_rated_price[offset..base_price_bytes_len].to_vec(), pair_rated_price[base_price_bytes_len..].to_vec())
+}
+
+pub mod u128_dec_format {
+    use near_sdk::serde::de;
+    use near_sdk::serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(num: &u128, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&num.to_string())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<u128, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(de::Error::custom)
+    }
+}
+
+pub mod u64_dec_format {
+    use near_sdk::serde::de;
+    use near_sdk::serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(num: &u64, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&num.to_string())
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<u64, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        String::deserialize(deserializer)?
+            .parse()
+            .map_err(de::Error::custom)
+    }
 }
 
 #[cfg(test)]
