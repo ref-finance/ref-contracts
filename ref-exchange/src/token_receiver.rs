@@ -57,11 +57,12 @@ impl Contract {
             .map(|fee| (referral_id.unwrap().into(), fee));
 
         account.deposit(&token_in, amount_in);
+        let is_swap_by_output = matches!(actions[0], Action::SwapByOutput(_));
         let _ = self.internal_execute_actions(
             &mut account,
             &referral_info,
             &actions,
-            ActionResult::Amount(U128(amount_in)),
+            if is_swap_by_output { ActionResult::None } else { ActionResult::Amount(U128(amount_in)) },
         );
 
         let mut result = vec![];
@@ -106,6 +107,7 @@ impl FungibleTokenReceiver for Contract {
                     client_echo,
                     skip_unwrap_near
                 } => {
+                    assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
                     let referral_id = referral_id.map(|x| x.to_string());
                     let out_amounts = self.internal_direct_actions(
                         token_in,

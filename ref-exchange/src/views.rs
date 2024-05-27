@@ -374,6 +374,18 @@ impl Contract {
         pool.swap(token_in.as_ref(), amount_in.into(), token_out.as_ref(), 0, AdminFees::new(self.admin_fee_bps), true).into()
     }
 
+    /// Given a specific pool, returns the amount of token_in required to receive amount_out of token_out.
+    pub fn get_return_by_output(
+        &self,
+        pool_id: u64,
+        token_in: ValidAccountId,
+        amount_out: U128,
+        token_out: ValidAccountId,
+    ) -> U128 {
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        pool.swap_by_output(token_in.as_ref(), amount_out.into(), token_out.as_ref(), None, AdminFees::new(self.admin_fee_bps), true).into()
+    }
+
     /// List referrals
     pub fn list_referrals(&self, from_index: Option<u64>, limit: Option<u64>) -> HashMap<AccountId, u32> {
         let keys = self.referrals.keys_as_vector();
@@ -574,12 +586,13 @@ impl Contract {
             .as_ref().and_then(|rid| self.referrals.get(&rid))
             .map(|fee| (referral_id.unwrap().into(), fee));
 
+        let is_swap_by_output = matches!(hot_zap_actions[0], Action::SwapByOutput(_));
         self.internal_execute_actions_by_cache(
             &mut pool_cache,
             &mut token_cache,
             &referral_info,
             &hot_zap_actions,
-            ActionResult::Amount(amount_in),
+            if is_swap_by_output { ActionResult::None } else { ActionResult::Amount(amount_in) },
         );
 
         for add_liquidity_info in add_liquidity_infos {

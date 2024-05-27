@@ -256,6 +256,28 @@ impl SimplePool {
             .as_u128()
     }
 
+    /// Returns amount of input tokens required to obtain the given amount of output tokens.
+    /// Tokens are provided as indexes into token list for the given pool.
+    fn internal_get_return_by_output(
+        &self,
+        token_in: usize,
+        amount_out: Balance,
+        token_out: usize,
+    ) -> Balance {
+        let in_balance = U256::from(self.amounts[token_in]);
+        let out_balance = U256::from(self.amounts[token_out]);
+        assert!(
+            in_balance > U256::zero()
+                && out_balance > U256::zero()
+                && token_in != token_out
+                && amount_out > 0,
+            "{}", ERR76_INVALID_PARAMS
+        );
+        let numerator = in_balance * U256::from(amount_out) * U256::from(FEE_DIVISOR);
+        let denominator = (out_balance - U256::from(amount_out)) * U256::from(FEE_DIVISOR - self.total_fee);
+        (numerator / denominator + U256::one()).as_u128()
+    }
+
     /// Returns given pool's total fee.
     pub fn get_fee(&self) -> u32 {
         self.total_fee
@@ -291,7 +313,49 @@ impl SimplePool {
                 .as_bytes(),
             );
         }
+        self.update_pool_and_distribute_fee(in_idx, amount_in, out_idx, amount_out, admin_fee, is_view);
+        amount_out
+    }
 
+    /// Swap a given amount of `token_in` to receive a specified amount of `token_out`.
+    /// Assuming that the `token_amount_in` was already received from `sender_id`.
+    /// Returns the amount of `token_in` that was actually spent to receive the specified amount of `token_out`.
+    pub fn swap_by_output(
+        &mut self,
+        token_in: &AccountId,
+        amount_out: Balance,
+        token_out: &AccountId,
+        max_amount_in: Option<u128>,
+        admin_fee: &AdminFees,
+        is_view: bool
+    ) -> Balance {
+        assert_ne!(token_in, token_out, "{}", ERR73_SAME_TOKEN);
+        let in_idx = self.token_index(token_in);
+        let out_idx = self.token_index(token_out);
+        let amount_in = self.internal_get_return_by_output(in_idx, amount_out, out_idx);
+        assert!(max_amount_in.is_none() || amount_in <= max_amount_in.unwrap(), "{}", ERR68_SLIPPAGE);
+        if !is_view {
+            env::log(
+                format!(
+                    "Swap_by_output {} {} for {} {}",
+                    amount_in, token_in, amount_out, token_out
+                )
+                .as_bytes(),
+            );
+        }
+        self.update_pool_and_distribute_fee(in_idx, amount_in, out_idx, amount_out, admin_fee, is_view);
+        amount_in
+    }
+
+    pub fn update_pool_and_distribute_fee(
+        &mut self, 
+        in_idx: usize,
+        amount_in: Balance,
+        out_idx: usize,
+        amount_out: Balance,
+        admin_fee: &AdminFees,
+        is_view: bool
+    ) {
         let prev_invariant =
             integer_sqrt(U256::from(self.amounts[in_idx]) * U256::from(self.amounts[out_idx]));
 
@@ -357,8 +421,6 @@ impl SimplePool {
         // Reported volume with fees will be sum of `input`, without fees will be sum of `output`.
         self.volumes[in_idx].input.0 += amount_in;
         self.volumes[in_idx].output.0 += amount_out;
-
-        amount_out
     }
 }
 

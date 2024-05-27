@@ -171,6 +171,29 @@ impl Pool {
         }
     }
 
+    /// Swaps token_in for a given amount of token_out and returns the amount of token_in spent.
+    pub fn swap_by_output(
+        &mut self,
+        token_in: &AccountId,
+        amount_out: Balance,
+        token_out: &AccountId,
+        max_amount_in: Option<u128>,
+        admin_fee: AdminFees,
+        is_view: bool
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(pool) => {
+                pool.swap_by_output(token_in, amount_out, token_out, max_amount_in, &admin_fee, is_view)
+            }
+            Pool::StableSwapPool(_) => {
+                unimplemented!()
+            }
+            Pool::RatedSwapPool(_) => {
+                unimplemented!()
+            }
+        }
+    }
+    
     pub fn share_total_balance(&self) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.share_total_balance(),

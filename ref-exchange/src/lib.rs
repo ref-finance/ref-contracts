@@ -16,7 +16,7 @@ use near_sdk::{
 use utils::{NO_DEPOSIT, GAS_FOR_BASIC_OP};
 
 use crate::account_deposit::*;
-pub use crate::action::{SwapAction, Action, ActionResult, get_tokens_in_actions};
+pub use crate::action::{SwapAction, SwapByOutputAction, Action, ActionResult, get_tokens_in_actions, assert_all_same_action_type};
 use crate::errors::*;
 use crate::admin_fee::AdminFees;
 use crate::pool::Pool;
@@ -251,6 +251,25 @@ impl Contract {
                 actions
                     .into_iter()
                     .map(|swap_action| Action::Swap(swap_action))
+                    .collect(),
+                referral_id,
+            )
+            .to_amount(),
+        )
+    }
+
+    /// Execute set of swap_by_output actions between pools.
+    /// If referrer provided, pays referral_fee to it.
+    /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
+    #[payable]
+    pub fn swap_by_output(&mut self, actions: Vec<SwapByOutputAction>, referral_id: Option<ValidAccountId>) -> U128 {
+        self.assert_contract_running();
+        assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
+        U128(
+            self.execute_actions(
+                actions
+                    .into_iter()
+                    .map(|swap_by_output_action| Action::SwapByOutput(swap_by_output_action))
                     .collect(),
                 referral_id,
             )
@@ -556,6 +575,7 @@ impl Contract {
         actions: &[Action],
         prev_result: ActionResult,
     ) -> ActionResult {
+        assert_all_same_action_type(actions);
         // fronzen token feature
         // [AUDITION_AMENDMENT] 2.3.8 Code Optimization (II)
         self.assert_no_frozen_tokens(
@@ -599,6 +619,23 @@ impl Contract {
                 // [AUDIT_02]
                 ActionResult::Amount(U128(amount_out))
             }
+            Action::SwapByOutput(swap_by_output_action) => {
+                let amount_out = swap_by_output_action
+                    .amount_out
+                    .map(|value| value.0)
+                    .unwrap_or_else(|| prev_result.to_amount());
+                let amount_in = self.internal_pool_swap_by_output(
+                    swap_by_output_action.pool_id,
+                    &swap_by_output_action.token_in,
+                    amount_out,
+                    &swap_by_output_action.token_out,
+                    swap_by_output_action.max_amount_in.map(|v| v.0),
+                    referral_info,
+                );
+                account.withdraw(&swap_by_output_action.token_in, amount_in);
+                account.deposit(&swap_by_output_action.token_out, amount_out);
+                ActionResult::Amount(U128(amount_in))
+            }
         }
     }
 
@@ -629,6 +666,35 @@ impl Contract {
         );
         self.pools.replace(pool_id, &pool);
         amount_out
+    }
+
+    /// Swaps token_in into the given amount_out of token_out via a specified pool.
+    /// Should be at most max_amount_in or swap will fail (prevents front running and other slippage issues).
+    fn internal_pool_swap_by_output(
+        &mut self,
+        pool_id: u64,
+        token_in: &AccountId,
+        amount_out: u128,
+        token_out: &AccountId,
+        max_amount_in: Option<u128>,
+        referral_info: &Option<(AccountId, u32)>,
+    ) -> u128 {
+        self.internal_update_unit_share_cumulative_info(pool_id);
+        let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let amount_in = pool.swap_by_output(
+            token_in,
+            amount_out,
+            token_out,
+            max_amount_in,
+            AdminFees {
+                admin_fee_bps: self.admin_fee_bps,
+                exchange_id: env::current_account_id(),
+                referral_info: referral_info.clone(),
+            },
+            false
+        );
+        self.pools.replace(pool_id, &pool);
+        amount_in
     }
 }
 
@@ -682,6 +748,24 @@ impl Contract {
                 token_cache.add(&swap_action.token_out, amount_out);
                 ActionResult::Amount(U128(amount_out))
             }
+            Action::SwapByOutput(swap_by_output_action) => {
+                let amount_out = swap_by_output_action
+                    .amount_out
+                    .map(|value| value.0)
+                    .unwrap_or_else(|| prev_result.to_amount());
+                let amount_in = self.internal_pool_swap_by_output_by_cache(
+                    pool_cache,
+                    swap_by_output_action.pool_id,
+                    &swap_by_output_action.token_in,
+                    amount_out,
+                    &swap_by_output_action.token_out,
+                    swap_by_output_action.max_amount_in.map(|v| v.0),
+                    referral_info,
+                );
+                token_cache.sub(&swap_by_output_action.token_in, amount_in);
+                token_cache.add(&swap_by_output_action.token_out, amount_out);
+                ActionResult::Amount(U128(amount_in))
+            }
         }
     }
 
@@ -710,6 +794,33 @@ impl Contract {
         );
         pool_cache.insert(pool_id, pool);
         amount_out
+    }
+
+    fn internal_pool_swap_by_output_by_cache(
+        &self,
+        pool_cache: &mut HashMap<u64, Pool>,
+        pool_id: u64,
+        token_in: &AccountId,
+        amount_out: u128,
+        token_out: &AccountId,
+        max_amount_in: Option<u128>,
+        referral_info: &Option<(AccountId, u32)>,
+    ) -> u128 {
+        let mut pool = pool_cache.remove(&pool_id).unwrap_or(self.pools.get(pool_id).expect(ERR85_NO_POOL));
+        let amount_in = pool.swap_by_output(
+            token_in,
+            amount_out,
+            token_out,
+            max_amount_in,
+            AdminFees {
+                admin_fee_bps: self.admin_fee_bps,
+                exchange_id: env::current_account_id(),
+                referral_info: referral_info.clone(),
+            },
+            false
+        );
+        pool_cache.insert(pool_id, pool);
+        amount_in
     }
 }
 

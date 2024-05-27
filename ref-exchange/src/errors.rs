@@ -61,6 +61,7 @@ pub const ERR72_AT_LEAST_ONE_SWAP: &str = "E72: at least one swap";
 pub const ERR73_SAME_TOKEN: &str = "E73: same token swap";
 pub const ERR75_INVARIANT_REDUCE: &str = "E75: invariant can not reduce ";
 pub const ERR76_INVALID_PARAMS: &str = "E76: invalid params";
+pub const ERR77_INVALID_ACTION_TYPE: &str = "E77: all action types must be the same";
 
 // pool manage
 pub const ERR81_AMP_IN_LOCK: &str = "E81: amp is currently in lock";
