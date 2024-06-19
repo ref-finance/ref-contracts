@@ -1,5 +1,10 @@
 # Release Notes
 
+### Version 1.9.2
+```
+52Fmd38fqZbHoGQGRTmoXxr9xMu8zKQWaGggHSJYi23T
+```
+1. margin trading
 
 ### Version 1.9.1
 ```
