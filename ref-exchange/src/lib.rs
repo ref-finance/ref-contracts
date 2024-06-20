@@ -708,6 +708,7 @@ impl Contract {
         actions: &[Action],
         prev_result: ActionResult,
     ) {
+        assert_all_same_action_type(actions);
         self.assert_no_frozen_tokens(
             &get_tokens_in_actions(actions)
             .into_iter()
