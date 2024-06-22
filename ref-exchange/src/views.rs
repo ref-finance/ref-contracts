@@ -47,6 +47,18 @@ pub struct RatedTokenInfo {
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
+pub struct DegenTokenInfo {
+    pub degen_type: String,
+    pub degen_price: U128,
+    pub last_update_ts: U64,
+    pub is_price_valid: bool,
+    pub price_identifier: Option<pyth_oracle::PriceIdentifier>,
+    pub decimals: Option<u8>
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
 pub struct PoolInfo {
     /// Pool kind.
@@ -98,6 +110,14 @@ impl From<Pool> for PoolInfo {
                 total_fee: pool.total_fee,
                 shares_total_supply: U128(pool.shares_total_supply),
             },
+            Pool::DegenSwapPool(pool) => Self {
+                pool_kind,
+                amp: pool.get_amp(),
+                amounts: pool.get_amounts().into_iter().map(|a| U128(a)).collect(),
+                token_account_ids: pool.token_account_ids,
+                total_fee: pool.total_fee,
+                shares_total_supply: U128(pool.shares_total_supply),
+            },
         }
     }
 }
@@ -134,6 +154,7 @@ impl From<Pool> for StablePoolInfo {
                 shares_total_supply: U128(pool.shares_total_supply),
             },
             Pool::RatedSwapPool(_) => unimplemented!(),
+            Pool::DegenSwapPool(_) => unimplemented!(),
         }
     }
 }
@@ -164,6 +185,47 @@ impl From<Pool> for RatedPoolInfo {
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(pool) => Self {
                 rates: pool.get_rates().into_iter().map(|a| U128(a)).collect(),
+                amp: pool.get_amp(),
+                amounts: pool.get_amounts().into_iter().map(|a| U128(a)).collect(),
+                decimals: pool.token_decimals,
+                c_amounts: pool.c_amounts.into_iter().map(|a| U128(a)).collect(),
+                token_account_ids: pool.token_account_ids,
+                total_fee: pool.total_fee,
+                shares_total_supply: U128(pool.shares_total_supply),
+                
+            },
+            Pool::DegenSwapPool(_) => unimplemented!(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
+pub struct DegenPoolInfo {
+    /// List of tokens in the pool.
+    pub token_account_ids: Vec<AccountId>,
+    pub decimals: Vec<u8>,
+    /// backend tokens.
+    pub amounts: Vec<U128>,
+    /// backend tokens in comparable precision
+    pub c_amounts: Vec<U128>,
+    /// Fee charged for swap.
+    pub total_fee: u32,
+    /// Total number of shares.
+    pub shares_total_supply: U128,
+    pub amp: u64,
+    pub degens: Vec<U128>,
+}
+
+impl From<Pool> for DegenPoolInfo {
+    fn from(pool: Pool) -> Self {
+        match pool {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(_) => unimplemented!(),
+            Pool::DegenSwapPool(pool) => Self {
+                degens: pool.get_degens().into_iter().map(|a| U128(a)).collect(),
                 amp: pool.get_amp(),
                 amounts: pool.get_amounts().into_iter().map(|a| U128(a)).collect(),
                 decimals: pool.token_decimals,
@@ -274,6 +336,11 @@ impl Contract {
         self.pools.get(pool_id).expect(ERR85_NO_POOL).into()
     }
 
+    /// Returns degen pool information about specified pool.
+    pub fn get_degen_pool(&self, pool_id: u64) -> DegenPoolInfo {
+        self.pools.get(pool_id).expect(ERR85_NO_POOL).into()
+    }
+
     /// Return total fee of the given pool.
     pub fn get_pool_fee(&self, pool_id: u64) -> u32 {
         self.pools.get(pool_id).expect(ERR85_NO_POOL).get_fee()
@@ -329,6 +396,22 @@ impl Contract {
                 .collect()
         } else {
             HashMap::new()
+        }
+    }
+
+    pub fn get_tokens_paged(&self, account_id: ValidAccountId, from_index: Option<u64>, limit: Option<u64>) -> HashMap<AccountId, U128> {
+        if let Some(account) = self.internal_get_account(account_id.as_ref()) {
+            let keys = account.tokens.keys_as_vector();
+            let from_index = from_index.unwrap_or(0);
+            let limit = limit.unwrap_or(keys.len() as u64);
+            (from_index..std::cmp::min(keys.len() as u64, from_index + limit))
+                .map(|idx| {
+                    let key = keys.get(idx).unwrap();
+                    (key.clone(), account.tokens.get(&key).unwrap().into())
+                })
+                .collect()
+        } else {
+            Default::default()
         }
     }
 
@@ -511,6 +594,38 @@ impl Contract {
         .collect()
     }
 
+    pub fn list_degen_tokens(&self) -> HashMap<String, DegenTokenInfo> {
+        let degens = read_degens_from_storage();
+        degens
+        .iter()
+        .map(|(k, v)| {
+            (
+                k.clone(),  
+                DegenTokenInfo {
+                    degen_type: v.get_type(),
+                    degen_price: v.get_price_info().stored_degen.into(),
+                    last_update_ts: v.get_price_info().degen_updated_at.into(),
+                    is_price_valid: v.is_price_valid(),
+                    price_identifier: if let Degen::PythOracle(d) = v {
+                        Some(d.price_identifier.clone())
+                    } else {
+                        None
+                    },
+                    decimals: if let Degen::PriceOracle(d) = v {
+                        Some(d.decimals)
+                    } else {
+                        None
+                    },
+                }
+            )
+        })
+        .collect()
+    }
+
+    pub fn list_degen_configs(&self) -> HashMap<String, DegenOracleConfig> {
+        read_degen_oracle_configs_from_storage()
+    }
+
     /// get predicted result of add_liquidity for a given rated token price
     pub fn predict_add_rated_liquidity(
         &self,
@@ -526,6 +641,25 @@ impl Contract {
         pool.predict_add_rated_liquidity(
             &amounts.into_iter().map(|x| x.0).collect(),
             &rates,
+            &AdminFees::new(self.admin_fee_bps)
+        ).into()
+    }
+
+    /// get predicted result of add_liquidity for a given degen token price
+    pub fn predict_add_degen_liquidity(
+        &self,
+        pool_id: u64,
+        amounts: &Vec<U128>,
+        degens: &Option<Vec<U128>>,
+    ) -> U128 {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let degens = match degens {
+            Some(degens) => Some(degens.into_iter().map(|x| x.0).collect()),
+            _ => None
+        };
+        pool.predict_add_degen_liquidity(
+            &amounts.into_iter().map(|x| x.0).collect(),
+            &degens,
             &AdminFees::new(self.admin_fee_bps)
         ).into()
     }
@@ -546,6 +680,22 @@ impl Contract {
             .into()
     }
 
+    /// get predicted result of remove_liquidity_by_tokens for a given degen token price 
+    pub fn predict_remove_degen_liquidity_by_tokens(
+        &self,
+        pool_id: u64,
+        amounts: &Vec<U128>,
+        degens: &Option<Vec<U128>>,
+    ) -> U128 {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let degens = match degens {
+            Some(degens) => Some(degens.into_iter().map(|x| x.0).collect()),
+            _ => None
+        };
+        pool.predict_remove_degen_liquidity_by_tokens(&amounts.into_iter().map(|x| x.0).collect(), &degens, &AdminFees::new(self.admin_fee_bps))
+            .into()
+    }
+
     /// get predicted swap result of a rated stable swap pool for given rated token price 
     pub fn get_rated_return(
         &self,
@@ -562,6 +712,54 @@ impl Contract {
         };
         pool.get_rated_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &rates, &AdminFees::new(self.admin_fee_bps))
             .into()
+    }
+
+    /// get predicted swap result of a rated stable swap pool for given degen token price 
+    pub fn get_degen_return(
+        &self,
+        pool_id: u64,
+        token_in: ValidAccountId,
+        amount_in: U128,
+        token_out: ValidAccountId,
+        degens: &Option<Vec<U128>>,
+    ) -> U128 {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let degens = match degens {
+            Some(degens) => Some(degens.into_iter().map(|x| x.0).collect()),
+            _ => None
+        };
+        pool.get_degen_return(token_in.as_ref(), amount_in.into(), token_out.as_ref(), &degens, &AdminFees::new(self.admin_fee_bps))
+            .into()
+    }
+
+    pub fn predict_swap_actions(
+        &self, 
+        token_deposit: HashMap<AccountId, U128>,
+        actions: Vec<Action>,
+    ) -> HashMap<AccountId, U128> {
+        let mut pool_cache = HashMap::new();
+        let mut token_cache = TokenCache(token_deposit.into_iter().map(|(k, v)| (k, v.into())).collect());
+
+        self.internal_execute_actions_by_cache(
+            &mut pool_cache,
+            &mut token_cache,
+            &None,
+            &actions,
+            ActionResult::None,
+        );
+        token_cache.0.into_iter().map(|(k, v)| (k, v.into())).collect()
+    }
+
+    pub fn batch_predict_swap_actions(
+        &self, 
+        batch_token_deposit: Vec<HashMap<AccountId, U128>>,
+        batch_actions: Vec<Vec<Action>>,
+    ) -> Vec<HashMap<AccountId, U128>> {
+        let mut results = vec![];
+        for index in 0..batch_actions.len() {
+            results.push(self.predict_swap_actions(batch_token_deposit[index].clone(), batch_actions[index].clone()));
+        }
+        results
     }
 
     pub fn predict_hot_zap(
@@ -602,6 +800,7 @@ impl Contract {
                 Pool::SimplePool(p) => p.token_account_ids.clone(),
                 Pool::RatedSwapPool(p) => p.token_account_ids.clone(),
                 Pool::StableSwapPool(p) => p.token_account_ids.clone(),
+                Pool::DegenSwapPool(p) => p.token_account_ids.clone(),
             };
             
             let mut add_liquidity_amounts = add_liquidity_info.amounts.iter().map(|v| v.0).collect();
@@ -615,7 +814,7 @@ impl Contract {
                     );
                     shares
                 },
-                Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) => {
+                Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) | Pool::DegenSwapPool(_) => {
                     let shares = pool.add_stable_liquidity(
                         &view_account_id,
                         &add_liquidity_amounts,

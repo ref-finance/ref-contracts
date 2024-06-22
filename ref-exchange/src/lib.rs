@@ -2,6 +2,8 @@ use std::convert::TryInto;
 use std::fmt;
 use std::collections::{HashMap, HashSet};
 
+use degen_swap::degen::{global_get_degen, global_set_degen, DegenTrait};
+use degen_swap::DegenSwapPool;
 use near_contract_standards::storage_management::{
     StorageBalance, StorageBalanceBounds, StorageManagement,
 };
@@ -25,10 +27,12 @@ use crate::stable_swap::StableSwapPool;
 use crate::rated_swap::{RatedSwapPool, rate::{RateTrait, global_get_rate, global_set_rate}};
 use crate::utils::{check_token_duplicates, pair_rated_price_to_vec_u8, TokenCache};
 pub use crate::custom_keys::*;
-pub use crate::views::{PoolInfo, ShadowRecordInfo, RatedPoolInfo, StablePoolInfo, ContractMetadata, RatedTokenInfo, AddLiquidityPrediction, RefStorageState};
+pub use crate::views::{PoolInfo, ShadowRecordInfo, RatedPoolInfo, StablePoolInfo, ContractMetadata, RatedTokenInfo, DegenTokenInfo, AddLiquidityPrediction, RefStorageState};
 pub use crate::token_receiver::AddLiquidityInfo;
 pub use crate::shadow_actions::*;
 pub use crate::unit_lpt_cumulative_infos::*;
+pub use crate::oracle::*;
+pub use crate::degen_swap::*;
 
 mod account_deposit;
 mod action;
@@ -41,6 +45,8 @@ mod pool;
 mod simple_pool;
 mod stable_swap;
 mod rated_swap;
+mod degen_swap;
+mod oracle;
 mod storage_impl;
 mod token_receiver;
 mod utils;
@@ -84,6 +90,7 @@ impl fmt::Display for RunningState {
 #[ext_contract(ext_self)]
 pub trait SelfCallbacks {
     fn update_token_rate_callback(&mut self, token_id: AccountId);
+    fn update_degen_token_price_callback(&mut self, token_id: AccountId);
 }
 
 #[near_bindgen]
@@ -192,6 +199,25 @@ impl Contract {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::RatedSwapPool(RatedSwapPool::new(
+            self.pools.len() as u32,
+            tokens,
+            decimals,
+            amp_factor as u128,
+            fee,
+        )))
+    }
+
+    #[payable]
+    pub fn add_degen_swap_pool(
+        &mut self,
+        tokens: Vec<ValidAccountId>,
+        decimals: Vec<u8>,
+        fee: u32,
+        amp_factor: u64,
+    ) -> u64 {
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        check_token_duplicates(&tokens);
+        self.internal_add_pool(Pool::DegenSwapPool(DegenSwapPool::new(
             self.pools.len() as u32,
             tokens,
             decimals,
@@ -503,6 +529,29 @@ impl Contract {
             log!(
                 "Token {} got new rate {} from cross-contract call.",
                 token_id, new_rate
+            );
+        }
+    }
+
+    /// anyone can trigger an update for some degen token
+    pub fn update_degen_token_price(& self, token_id: ValidAccountId) {
+        let caller = env::predecessor_account_id();
+        let token_id: AccountId = token_id.into();
+        let degen = global_get_degen(&token_id);
+        log!("Caller {} invokes token {} rait async-update.", caller, token_id);
+        degen.sync_token_price(&token_id);
+    }
+
+    /// the async return of update_degen_token_price
+    #[private]
+    pub fn update_degen_token_price_callback(&mut self, token_id: AccountId) {
+        if let Some(cross_call_result) = near_sdk::promise_result_as_success() {
+            let mut degen = global_get_degen(&token_id);
+            let new_degen = degen.set_price(&cross_call_result);
+            global_set_degen(&token_id, &degen);
+            log!(
+                "Token {} got new degen {} from cross-contract call.",
+                token_id, new_degen
             );
         }
     }

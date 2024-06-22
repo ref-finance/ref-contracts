@@ -4,7 +4,7 @@ use near_sdk::{env, json_types::U128, AccountId, Balance};
 use std::collections::HashSet;
 
 /// Single swap action.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct SwapAction {
     /// Pool which should be used for swapping.
@@ -22,7 +22,7 @@ pub struct SwapAction {
 }
 
 /// Single swap by output action.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct SwapByOutputAction {
     /// Pool which should be used for swapping.
@@ -40,7 +40,7 @@ pub struct SwapByOutputAction {
 }
 
 /// Single action. Allows to execute sequence of various actions initiated by an account.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 #[serde(untagged)]
 pub enum Action {

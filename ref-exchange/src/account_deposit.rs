@@ -507,14 +507,9 @@ impl Contract {
     /// save token to owner account as lostfound, no need to care about storage
     /// only global whitelisted token can be stored in lost-found
     pub(crate) fn internal_lostfound(&mut self, token_id: &AccountId, amount: u128) {
-        if self.is_whitelisted_token(token_id) {
-            let mut lostfound = self.internal_unwrap_or_default_account(&self.owner_id);
-            lostfound.deposit(token_id, amount);
-            self.accounts.insert(&self.owner_id, &lostfound.into());
-        } else {
-            log!("Deposit {} {} failed due to non global whitelisted token", amount, token_id);
-        }
-        
+        let mut lostfound = self.internal_unwrap_or_default_account(&self.owner_id);
+        lostfound.deposit(token_id, amount);
+        self.accounts.insert(&self.owner_id, &lostfound.into());
     }
     
 

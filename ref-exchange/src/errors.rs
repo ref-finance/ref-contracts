@@ -100,6 +100,7 @@ pub const ERR124_CROSS_CALL_FAILED: &str = "E124: Cross-contract call failed";
 pub const ERR126_FAILED_TO_PARSE_RESULT: &str = "E126: Failed to parse cross-contract call result";
 pub const ERR127_INVALID_RATE_TYPE: &str = "E127: Invalid rate type";
 pub const ERR128_INVALID_EXTRA_INFO_MSG_FORMAT: &str = "E128: Invalid extra info message format";
+pub const ERR129_DEGENS_EXPIRED: &str = "E129: Degens expired";
 
 // referrals
 pub const ERR130_REFERRAL_EXIST: &str = "E130: Referral already exist";

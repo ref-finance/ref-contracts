@@ -9,7 +9,7 @@ use crate::common::utils::*;
 pub mod common;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    PREV_EXCHANGE_WASM_BYTES => "../releases/ref_exchange_release_v191.wasm",
+    PREV_EXCHANGE_WASM_BYTES => "../releases/ref_exchange_release_v192.wasm",
     EXCHANGE_WASM_BYTES => "../res/ref_exchange.wasm",
 }
 
@@ -27,7 +27,7 @@ fn test_upgrade() {
                 ValidAccountId::try_from("burrowland".to_string()).unwrap(), 4, 1)
     );
     let metadata = get_metadata(&pool);
-    assert_eq!(metadata.version, "1.9.1".to_string());
+    assert_eq!(metadata.version, "1.9.2".to_string());
     
     // Failed upgrade with no permissions.
     let result = test_user
