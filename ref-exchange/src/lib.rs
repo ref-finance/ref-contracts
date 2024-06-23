@@ -238,6 +238,7 @@ impl Contract {
         referral_id: Option<ValidAccountId>,
     ) -> ActionResult {
         self.assert_contract_running();
+        assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
         let sender_id = env::predecessor_account_id();
         let mut account = self.internal_unwrap_account(&sender_id);
         // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
@@ -271,7 +272,6 @@ impl Contract {
     #[payable]
     pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
         self.assert_contract_running();
-        assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
         U128(
             self.execute_actions(
                 actions
@@ -290,7 +290,6 @@ impl Contract {
     #[payable]
     pub fn swap_by_output(&mut self, actions: Vec<SwapByOutputAction>, referral_id: Option<ValidAccountId>) -> U128 {
         self.assert_contract_running();
-        assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
         U128(
             self.execute_actions(
                 actions
@@ -635,14 +634,34 @@ impl Contract {
         );
 
         let mut result = prev_result;
-        let mut prev_action = None;
-        for index in 0..actions.len() {
-            let action = &actions[index];
-            let is_last_action = index == actions.len() - 1;
-            result = self.internal_execute_action(account, referral_info, action, result, prev_action, is_last_action);
-            prev_action = Some(action);
+        match actions[0] {
+            Action::Swap(_) => {
+                for action in actions {
+                    result = self.internal_execute_action(account, referral_info, action, result);
+                }
+            }
+            Action::SwapByOutput(_) => {
+                let mut prev_action: Option<&Action> = None;
+                for action in actions {
+                    if let Some(U128(amount_out)) = action.get_amount_out() {
+                        self.finalize_prev_swap_chain(account, prev_action, &result);
+                        account.deposit(action.get_token_out(), amount_out);
+                    } else {
+                        assert!(prev_action.unwrap().get_token_in() == action.get_token_out());
+                    }
+                    result = self.internal_execute_action(account, referral_info, action, result);
+                    prev_action = Some(action);
+                }
+                self.finalize_prev_swap_chain(account, prev_action, &result);
+            }
         }
         result
+    }
+
+    fn finalize_prev_swap_chain(&mut self, account: &mut Account, prev_action: Option<&Action>, prev_result: &ActionResult){
+        if prev_action.is_some() {
+            account.withdraw(prev_action.unwrap().get_token_in(), prev_result.to_amount());
+        }
     }
 
     /// Executes single action on given account. Modifies passed account. Returns a result based on type of action.
@@ -652,8 +671,6 @@ impl Contract {
         referral_info: &Option<(AccountId, u32)>,
         action: &Action,
         prev_result: ActionResult,
-        prev_action: Option<&Action>,
-        is_last_action: bool
     ) -> ActionResult {
         match action {
             Action::Swap(swap_action) => {
@@ -687,29 +704,6 @@ impl Contract {
                     swap_by_output_action.max_amount_in.map(|v| v.0),
                     referral_info,
                 );
-                if let Some(Action::SwapByOutput(prev_action)) = prev_action {
-                    if is_last_action {
-                        // last action of actions list
-                        account.withdraw(&swap_by_output_action.token_in, amount_in);
-                    }
-                    if prev_action.token_in == swap_by_output_action.token_out {
-                        // middle or last action of the swap chain
-                        account.deposit(&swap_by_output_action.token_out, amount_out - prev_result.to_amount());
-                    } else {
-                        // first action of the new swap chain
-                        account.deposit(&swap_by_output_action.token_out, amount_out);
-                        account.withdraw(&prev_action.token_in, prev_result.to_amount());
-                    }
-                } else {
-                    if is_last_action {
-                        // first action of actions list && only one action
-                        account.withdraw(&swap_by_output_action.token_in, amount_in);
-                        account.deposit(&swap_by_output_action.token_out, amount_out);
-                    } else {
-                        // first action of actions list
-                        account.deposit(&swap_by_output_action.token_out, amount_out);
-                    }
-                }
                 ActionResult::Amount(U128(amount_in))
             }
         }
@@ -793,12 +787,32 @@ impl Contract {
         );
 
         let mut result = prev_result;
-        let mut prev_action = None;
-        for index in 0..actions.len() {
-            let action = &actions[index];
-            let is_last_action = index == actions.len() - 1;
-            result = self.internal_execute_action_by_cache(pool_cache, token_cache, referral_info, action, result, prev_action, is_last_action);
-            prev_action = Some(action);
+        match actions[0] {
+            Action::Swap(_) => {
+                for action in actions {
+                    result = self.internal_execute_action_by_cache(pool_cache, token_cache, referral_info, action, result);
+                }
+            }
+            Action::SwapByOutput(_) => {
+                let mut prev_action: Option<&Action> = None;
+                for action in actions {
+                    if let Some(U128(amount_out)) = action.get_amount_out() {
+                        self.finalize_prev_swap_chain_by_cache(token_cache, prev_action, &result);
+                        token_cache.add(action.get_token_out(), amount_out);
+                    } else {
+                        assert!(prev_action.unwrap().get_token_in() == action.get_token_out());
+                    }
+                    result = self.internal_execute_action_by_cache(pool_cache, token_cache, referral_info, action, result);
+                    prev_action = Some(action);
+                }
+                self.finalize_prev_swap_chain_by_cache(token_cache, prev_action, &result);
+            }
+        }
+    }
+
+    fn finalize_prev_swap_chain_by_cache(&self, token_cache: &mut TokenCache, prev_action: Option<&Action>, prev_result: &ActionResult){
+        if prev_action.is_some() {
+            token_cache.sub(prev_action.unwrap().get_token_in(), prev_result.to_amount());
         }
     }
 
@@ -809,8 +823,6 @@ impl Contract {
         referral_info: &Option<(AccountId, u32)>,
         action: &Action,
         prev_result: ActionResult,
-        prev_action: Option<&Action>,
-        is_last_action: bool
     ) -> ActionResult {
         match action {
             Action::Swap(swap_action) => {
@@ -845,29 +857,6 @@ impl Contract {
                     swap_by_output_action.max_amount_in.map(|v| v.0),
                     referral_info,
                 );
-                if let Some(Action::SwapByOutput(prev_action)) = prev_action {
-                    if is_last_action {
-                        // last action of actions list
-                        token_cache.sub(&swap_by_output_action.token_in, amount_in);
-                    }
-                    if prev_action.token_in == swap_by_output_action.token_out {
-                        // middle or last action of the swap chain
-                        token_cache.add(&swap_by_output_action.token_out, amount_out - prev_result.to_amount());
-                    } else {
-                        // first action of the new swap chain
-                        token_cache.add(&swap_by_output_action.token_out, amount_out);
-                        token_cache.sub(&prev_action.token_in, prev_result.to_amount());
-                    }
-                } else {
-                    if is_last_action {
-                        // first action of actions list && only one action
-                        token_cache.sub(&swap_by_output_action.token_in, amount_in);
-                        token_cache.add(&swap_by_output_action.token_out, amount_out);
-                    } else {
-                        // first action of actions list
-                        token_cache.add(&swap_by_output_action.token_out, amount_out);
-                    }
-                }
                 ActionResult::Amount(U128(amount_in))
             }
         }

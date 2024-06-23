@@ -58,12 +58,14 @@ impl Contract {
             .map(|fee| (referral_id.unwrap().into(), fee));
 
         account.deposit(&token_in, amount_in);
-        let is_swap_by_output = matches!(actions[0], Action::SwapByOutput(_));
         let _ = self.internal_execute_actions(
             &mut account,
             &referral_info,
             &actions,
-            if is_swap_by_output { ActionResult::None } else { ActionResult::Amount(U128(amount_in)) },
+            match actions[0] { 
+                Action::Swap(_) => ActionResult::Amount(U128(amount_in)),
+                Action::SwapByOutput(_) => ActionResult::None,
+            },
         );
 
         let mut result = vec![];

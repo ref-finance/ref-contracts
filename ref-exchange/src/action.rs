@@ -60,6 +60,37 @@ impl Action {
             }
         }
     }
+
+    pub fn get_token_in(&self) -> &AccountId {
+        match self {
+            Action::Swap(swap_action) => {
+                &swap_action.token_in
+            }
+            Action::SwapByOutput(swap_by_output_action) => {
+                &swap_by_output_action.token_in
+            }
+        }
+    }
+
+    pub fn get_token_out(&self) -> &AccountId {
+        match self {
+            Action::Swap(swap_action) => {
+                &swap_action.token_out
+            }
+            Action::SwapByOutput(swap_by_output_action) => {
+                &swap_by_output_action.token_out
+            }
+        }
+    }
+
+    pub fn get_amount_out(&self) -> Option<U128> {
+        match self {
+            Action::Swap(_) => unimplemented!(),
+            Action::SwapByOutput(swap_by_output_action) => {
+                swap_by_output_action.amount_out
+            }
+        }
+    }
 }
 
 /// Result from action execution.

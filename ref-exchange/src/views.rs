@@ -784,13 +784,15 @@ impl Contract {
             .as_ref().and_then(|rid| self.referrals.get(&rid))
             .map(|fee| (referral_id.unwrap().into(), fee));
 
-        let is_swap_by_output = matches!(hot_zap_actions[0], Action::SwapByOutput(_));
         self.internal_execute_actions_by_cache(
             &mut pool_cache,
             &mut token_cache,
             &referral_info,
             &hot_zap_actions,
-            if is_swap_by_output { ActionResult::None } else { ActionResult::Amount(amount_in) },
+            match hot_zap_actions[0] { 
+                Action::Swap(_) => ActionResult::Amount(amount_in),
+                Action::SwapByOutput(_) => ActionResult::None,
+            },
         );
 
         for add_liquidity_info in add_liquidity_infos {
