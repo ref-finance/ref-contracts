@@ -1,7 +1,7 @@
 use super::global_get_degen_price_oracle_config;
 use super::{degen::DegenTrait, PRECISION};
 use crate::errors::ERR126_FAILED_TO_PARSE_RESULT;
-use crate::utils::{to_nano, u128_ratio, GAS_FOR_BASIC_OP, NO_DEPOSIT};
+use crate::utils::{to_nano, u128_ratio, u64_dec_format, GAS_FOR_BASIC_OP, NO_DEPOSIT};
 use crate::oracle::price_oracle;
 use crate::PriceInfo;
 use near_sdk::serde::{Deserialize, Serialize};
@@ -13,6 +13,7 @@ use near_sdk::{env, serde_json::from_slice, AccountId, Promise};
 #[serde(crate = "near_sdk::serde")]
 pub struct PriceOracleConfig {
     pub oracle_id: AccountId,
+    #[serde(with = "u64_dec_format")]
     pub expire_ts: u64,
     /// The maximum number of seconds expected from the oracle price call.
     pub maximum_recency_duration_sec: u32,

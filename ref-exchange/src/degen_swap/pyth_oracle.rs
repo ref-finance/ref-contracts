@@ -2,7 +2,7 @@ use super::global_get_degen_pyth_oracle_config;
 use super::{degen::DegenTrait, PRECISION};
 use crate::errors::ERR126_FAILED_TO_PARSE_RESULT;
 use crate::{pyth_oracle, PriceInfo};
-use crate::utils::{to_nano, GAS_FOR_BASIC_OP, NO_DEPOSIT, U256};
+use crate::utils::{to_nano, u64_dec_format, GAS_FOR_BASIC_OP, NO_DEPOSIT, U256};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{env, serde_json::from_slice, AccountId, Promise};
@@ -12,6 +12,7 @@ use near_sdk::{env, serde_json::from_slice, AccountId, Promise};
 #[serde(crate = "near_sdk::serde")]
 pub struct PythOracleConfig {
     pub oracle_id: AccountId,
+    #[serde(with = "u64_dec_format")]
     pub expire_ts: u64,
     /// The valid duration to pyth price in seconds.
     pub pyth_price_valid_duration_sec: u32,
