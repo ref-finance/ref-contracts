@@ -170,7 +170,7 @@ fn sim_degen() {
     assert_eq!(balances[&eth()].0, 997499999501274936);
 
     println!("{:?}", view!(pool.list_degen_tokens()).unwrap_json::<HashMap<String, DegenTokenInfo>>());
-    println!("{:?}", view!(pool.list_degen_configs()).unwrap_json::<HashMap<String, DegenOracleConfig>>());
+    println!("{:?}", view!(pool.list_degen_oracle_configs()).unwrap_json::<HashMap<String, DegenOracleConfig>>());
 }
 
 

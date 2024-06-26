@@ -622,7 +622,7 @@ impl Contract {
         .collect()
     }
 
-    pub fn list_degen_configs(&self) -> HashMap<String, DegenOracleConfig> {
+    pub fn list_degen_oracle_configs(&self) -> HashMap<String, DegenOracleConfig> {
         read_degen_oracle_configs_from_storage()
     }
 
