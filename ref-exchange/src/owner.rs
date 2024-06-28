@@ -327,6 +327,9 @@ impl Contract {
             Pool::RatedSwapPool(pool) => {
                 pool.ramp_amplification(future_amp_factor as u128, future_amp_time.0)
             }
+            Pool::DegenSwapPool(pool) => {
+                pool.ramp_amplification(future_amp_factor as u128, future_amp_time.0)
+            }
             _ => env::panic(ERR88_NOT_STABLE_POOL.as_bytes()),
         }
         self.pools.replace(pool_id, &pool);
@@ -340,6 +343,7 @@ impl Contract {
         match &mut pool {
             Pool::StableSwapPool(pool) => pool.stop_ramp_amplification(),
             Pool::RatedSwapPool(pool) => pool.stop_ramp_amplification(),
+            Pool::DegenSwapPool(pool) => pool.stop_ramp_amplification(),
             _ => env::panic(ERR88_NOT_STABLE_POOL.as_bytes()),
         }
         self.pools.replace(pool_id, &pool);
