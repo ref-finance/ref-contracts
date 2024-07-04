@@ -271,7 +271,6 @@ impl Contract {
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
     #[payable]
     pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
-        self.assert_contract_running();
         U128(
             self.execute_actions(
                 actions
@@ -289,7 +288,6 @@ impl Contract {
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
     #[payable]
     pub fn swap_by_output(&mut self, actions: Vec<SwapByOutputAction>, referral_id: Option<ValidAccountId>) -> U128 {
-        self.assert_contract_running();
         U128(
             self.execute_actions(
                 actions
@@ -614,6 +612,16 @@ impl Contract {
         id
     }
 
+    fn get_degen_tokens_in_actions(&self, actions: &[Action]) -> HashSet<AccountId> {
+        let mut degen_tokens = HashSet::new();
+        actions.iter().for_each(|action| {
+            if let Pool::DegenSwapPool(p) = self.pools.get(action.get_pool_id()).expect(ERR85_NO_POOL) {
+                degen_tokens.extend(p.tokens().iter().cloned());
+            }
+        });
+        degen_tokens
+    }
+
     /// Execute sequence of actions on given account. Modifies passed account.
     /// Returns result of the last action.
     fn internal_execute_actions(
@@ -654,6 +662,11 @@ impl Contract {
                 }
                 self.finalize_prev_swap_chain(account, prev_action, &result);
             }
+        }
+        let degen_tokens = self.get_degen_tokens_in_actions(actions);
+        for token_id in degen_tokens {
+            let degen = global_get_degen(&token_id);
+            degen.sync_token_price(&token_id);
         }
         result
     }

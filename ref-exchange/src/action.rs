@@ -61,6 +61,17 @@ impl Action {
         }
     }
 
+    pub fn get_pool_id(&self) -> u64 {
+        match self {
+            Action::Swap(swap_action) => {
+                swap_action.pool_id
+            }
+            Action::SwapByOutput(swap_by_output_action) => {
+                swap_by_output_action.pool_id
+            }
+        }
+    }
+
     pub fn get_token_in(&self) -> &AccountId {
         match self {
             Action::Swap(swap_action) => {

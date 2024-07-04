@@ -1,5 +1,12 @@
 # Release Notes
 
+### Version 1.9.3
+```
+1PW1wtYsciZKsaRNqNMpY3P1W2wD42PjZVraL142VN4
+```
+1. add degen pool
+2. add swap by output for simple pool
+
 ### Version 1.9.2
 ```
 52Fmd38fqZbHoGQGRTmoXxr9xMu8zKQWaGggHSJYi23T

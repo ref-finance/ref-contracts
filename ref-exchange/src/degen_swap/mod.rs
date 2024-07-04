@@ -631,13 +631,6 @@ impl DegenSwapPool {
             }
         }
 
-        if !is_view {
-            for token_id in self.token_account_ids.iter() {
-                let degen = global_get_degen(token_id);
-                degen.sync_token_price(token_id);
-            }
-        }
-
         amount_swapped
     }
 
