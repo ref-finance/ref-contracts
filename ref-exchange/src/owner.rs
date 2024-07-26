@@ -446,6 +446,37 @@ impl Contract {
         }
     }
 
+    #[payable]
+    pub fn add_degen_pool_limit(&mut self, pool_id: u64, degen_pool_limit_info: DegenPoolLimitInfo) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        assert!(self.get_pool(pool_id).pool_kind == "DEGEN_SWAP");
+        let mut pool_limit = read_pool_limit_from_storage();
+        assert!(pool_limit.get(&pool_id).is_none(), "degen pool limit already exist");
+        pool_limit.insert(&pool_id, &VPoolLimitInfo::DegenPoolLimit(degen_pool_limit_info.into()));
+        write_pool_limit_to_storage(pool_limit);
+    }
+
+    #[payable]
+    pub fn update_degen_pool_limit(&mut self, pool_id: u64, degen_pool_limit_info: DegenPoolLimitInfo) {
+        assert_one_yocto();
+        self.assert_owner();
+        assert!(self.get_pool(pool_id).pool_kind == "DEGEN_SWAP");
+        let mut pool_limit = read_pool_limit_from_storage();
+        assert!(pool_limit.get(&pool_id).is_some(), "degen pool limit not exist");
+        pool_limit.insert(&pool_id, &VPoolLimitInfo::DegenPoolLimit(degen_pool_limit_info.into()));
+        write_pool_limit_to_storage(pool_limit);
+    }
+
+    #[payable]
+    pub fn remove_pool_limit(&mut self, pool_id: u64) {
+        assert_one_yocto();
+        self.assert_owner();
+        let mut pool_limit = read_pool_limit_from_storage();
+        assert!(pool_limit.remove(&pool_id).is_some(), "Invalid pool_id");
+        write_pool_limit_to_storage(pool_limit);
+    }
+
     pub(crate) fn assert_owner(&self) {
         assert_eq!(
             env::predecessor_account_id(),

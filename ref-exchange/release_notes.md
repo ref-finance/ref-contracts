@@ -1,5 +1,12 @@
 # Release Notes
 
+### Version 1.9.4
+```
+EcvZHyadAraTekV5isk2yucMFQvpSHG7uciCNuacDiau
+```
+1. add pool limit
+2. add execute_actions_in_va
+
 ### Version 1.9.3
 ```
 1PW1wtYsciZKsaRNqNMpY3P1W2wD42PjZVraL142VN4

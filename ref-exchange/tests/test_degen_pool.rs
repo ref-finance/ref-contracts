@@ -3,7 +3,7 @@ use mock_pyth::PythPrice;
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_sdk::{json_types::U128, AccountId};
 use near_sdk_sim::{call, to_yocto, view};
-use ref_exchange::{DegenOracleConfig, DegenTokenInfo, DegenType, PoolInfo, PriceOracleConfig, PythOracleConfig, SwapAction};
+use ref_exchange::{DegenOracleConfig, DegenPoolLimitInfo, DegenTokenInfo, DegenType, PoolInfo, PriceOracleConfig, PythOracleConfig, SwapAction, VPoolLimitInfo};
 use std::{collections::HashMap, convert::TryInto};
 use crate::common::utils::*;
 pub mod common;
@@ -329,4 +329,120 @@ fn sim_degen1() {
         .unwrap_json::<HashMap<AccountId, U128>>();
     assert_eq!(balances[&btc()].0, 0);
     assert_eq!(balances[&eth()].0, 997499999501274936);
+}
+
+#[test]
+fn degen_limit() {
+    let (root, owner, pool, _tokens) = 
+        setup_degen_pool(
+            vec![eth(), near()],
+            vec![100000*ONE_ETH, 100000*ONE_NEAR],
+            vec![18, 24],
+            25,
+            10000,
+        );
+    let price_oracle_contract = setup_price_oracle(&root);
+    call!(
+        root,
+        price_oracle_contract.set_price_data(eth(), Price {
+            multiplier: 10000,
+            decimals: 22,
+        })
+    ).assert_success();
+    call!(
+        root,
+        price_oracle_contract.set_price_data(near(), Price {
+            multiplier: 10000,
+            decimals: 28,
+        })
+    ).assert_success();
+
+    call!(
+        owner, 
+        pool.register_degen_oracle_config(DegenOracleConfig::PriceOracle(PriceOracleConfig { 
+            oracle_id: price_oracle(), 
+            expire_ts: 3600 * 10u64.pow(9), 
+            maximum_recency_duration_sec: 90, 
+            maximum_staleness_duration_sec: 90
+        })),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        owner, 
+        pool.register_degen_token(to_va(eth()), DegenType::PriceOracle { decimals: 18 }),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        owner, 
+        pool.register_degen_token(to_va(near()), DegenType::PriceOracle { decimals: 24 }),
+        deposit = 1
+    )
+    .assert_success();
+
+    call!(
+        root, 
+        pool.update_degen_token_price(to_va(eth())),
+        deposit = 0
+    )
+    .assert_success();
+
+    call!(
+        root, 
+        pool.update_degen_token_price(to_va(near())),
+        deposit = 0
+    )
+    .assert_success(); 
+
+    println!("{:?}", view!(pool.get_pool_limit_paged(None, None)).unwrap_json::<HashMap<u64, VPoolLimitInfo>>());
+
+    call!(
+        owner,
+        pool.add_degen_pool_limit(0, DegenPoolLimitInfo{
+            tvl_limit: 10u128.pow(4) * 2
+        }),
+        deposit = 1
+    ).assert_success();
+
+    let out_come = call!(
+        root,
+        pool.add_stable_liquidity(0, vec![10000*ONE_ETH, 10000*ONE_NEAR].into_iter().map(|x| U128(x)).collect(), U128(1)),
+        deposit = to_yocto("0.0007")
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+
+    let outcome = call!(
+        root,
+        pool.add_stable_liquidity(0, vec![10000*ONE_ETH, 10000*ONE_NEAR].into_iter().map(|x| U128(x)).collect(), U128(1)),
+        deposit = to_yocto("0.0007")
+    );
+    let exe_status = format!("{:?}", outcome.promise_errors()[0].as_ref().unwrap().status());
+    assert!(exe_status.contains("Exceed Max TVL"));
+
+    println!("{:?}", view!(pool.get_degen_pool_tvl(0)).unwrap_json::<U128>(),);
+    println!("{:?}", view!(pool.get_pool_limit_by_pool_id(0)).unwrap_json::<Option<VPoolLimitInfo>>());
+    call!(
+        owner,
+        pool.update_degen_pool_limit(0, DegenPoolLimitInfo{
+            tvl_limit: 10u128.pow(4) * 5
+        }),
+        deposit = 1
+    ).assert_success();
+    println!("{:?}", view!(pool.get_pool_limit_paged(None, None)).unwrap_json::<HashMap<u64, VPoolLimitInfo>>());
+    call!(
+        owner,
+        pool.remove_pool_limit(0),
+        deposit = 1
+    ).assert_success();
+    println!("{:?}", view!(pool.get_pool_limit_paged(None, None)).unwrap_json::<HashMap<u64, VPoolLimitInfo>>());
+    
+    let out_come = call!(
+        root,
+        pool.add_stable_liquidity(0, vec![10000*ONE_ETH, 10000*ONE_NEAR].into_iter().map(|x| U128(x)).collect(), U128(1)),
+        deposit = to_yocto("0.0007")
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
 }

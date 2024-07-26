@@ -165,6 +165,15 @@ impl Pool {
         }
     }
 
+    pub fn get_tvl(&self) -> u128 {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(_) => unimplemented!(),
+            Pool::DegenSwapPool(pool) => pool.get_tvl(),
+        }
+    }
+
     /// Swaps given number of token_in for token_out and returns received amount.
     pub fn swap(
         &mut self,

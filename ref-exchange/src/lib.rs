@@ -28,11 +28,12 @@ use crate::rated_swap::{RatedSwapPool, rate::{RateTrait, global_get_rate, global
 use crate::utils::{check_token_duplicates, pair_rated_price_to_vec_u8, TokenCache};
 pub use crate::custom_keys::*;
 pub use crate::views::{PoolInfo, ShadowRecordInfo, RatedPoolInfo, StablePoolInfo, ContractMetadata, RatedTokenInfo, DegenTokenInfo, AddLiquidityPrediction, RefStorageState};
-pub use crate::token_receiver::AddLiquidityInfo;
+pub use crate::token_receiver::{AddLiquidityInfo, VIRTUAL_ACC};
 pub use crate::shadow_actions::*;
 pub use crate::unit_lpt_cumulative_infos::*;
 pub use crate::oracle::*;
 pub use crate::degen_swap::*;
+pub use crate::pool_limit_info::*;
 
 mod account_deposit;
 mod action;
@@ -54,6 +55,7 @@ mod views;
 mod custom_keys;
 mod shadow_actions;
 mod unit_lpt_cumulative_infos;
+mod pool_limit_info;
 
 near_sdk::setup_alloc!();
 
@@ -69,6 +71,7 @@ pub(crate) enum StorageKey {
     Referral,
     ShadowRecord {account_id: AccountId},
     UnitShareCumulativeInfo,
+    PoolLimit,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]
@@ -226,6 +229,59 @@ impl Contract {
         )))
     }
 
+    #[payable]
+    pub fn execute_actions_in_va(
+        &mut self,
+        use_tokens: HashMap<AccountId, U128>,
+        actions: Vec<Action>,
+        referral_id: Option<ValidAccountId>,
+    ) -> HashMap<AccountId, U128> {
+        self.assert_contract_running();
+        assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
+        let sender_id = env::predecessor_account_id();
+        let mut account = self.internal_unwrap_account(&sender_id);
+        // Validate that all tokens are whitelisted if no deposit (e.g. trade with access key).
+        if env::attached_deposit() == 0 {
+            for action in &actions {
+                for token in action.tokens() {
+                    assert!(
+                        account.get_balance(&token).is_some() 
+                            || self.is_whitelisted_token(&token),
+                        "{}",
+                        // [AUDIT_05]
+                        ERR27_DEPOSIT_NEEDED
+                    );
+                }
+            }
+        }
+
+        let mut virtual_account: Account = Account::new(&String::from(VIRTUAL_ACC));
+        let referral_info :Option<(AccountId, u32)> = referral_id
+            .as_ref().and_then(|rid| self.referrals.get(rid.as_ref()))
+            .map(|fee| (referral_id.unwrap().into(), fee));
+        for (use_token, use_amount) in use_tokens.iter() {
+            account.withdraw(use_token, use_amount.0);
+            virtual_account.deposit(use_token, use_amount.0);
+        }
+        let _ = self.internal_execute_actions(
+            &mut virtual_account,
+            &referral_info,
+            &actions,
+            ActionResult::None,
+        );
+        let mut result = HashMap::new();
+        for (token, amount) in virtual_account.tokens.to_vec() {
+            if amount > 0 {
+                account.deposit(&token, amount);
+                result.insert(token, amount.into());
+            }
+        }
+        
+        virtual_account.tokens.clear();
+        self.internal_save_account(&sender_id, account);
+        result
+    }
+
     /// [AUDIT_03_reject(NOPE action is allowed by design)]
     /// [AUDIT_04]
     /// Executes generic set of actions.
@@ -377,6 +433,11 @@ impl Contract {
             AdminFees::new(self.admin_fee_bps),
             false
         );
+        if pool.kind() == "DEGEN_SWAP" {
+            if let Some(degen_pool_limit) = read_pool_limit_from_storage().get(&pool_id).map(|v| v.get_degen_pool_limit()) {
+                assert!(pool.get_tvl() <= degen_pool_limit.tvl_limit, "Exceed Max TVL");
+            }
+        }
         // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
         let mut deposits = self.internal_unwrap_account(&sender_id);
         let tokens = pool.tokens();

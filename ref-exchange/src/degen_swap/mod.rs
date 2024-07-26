@@ -201,6 +201,12 @@ impl DegenSwapPool {
             .as_u128()
     }
 
+    pub fn get_tvl(&self) -> u128 {
+        self.get_invariant_with_degens(&self.get_degens())
+            .degen_balances(&self.c_amounts).iter()
+            .map(|v| v / 10u128.pow(TARGET_DECIMAL.into())).sum()
+    }
+
     /// caculate mint share and related fee for adding liquidity
     /// return (share, fee_part)
     fn calc_add_liquidity_with_degens(

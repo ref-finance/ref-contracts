@@ -844,4 +844,25 @@ impl Contract {
         
         Some((add_liquidity_predictions, token_cache.into()))
     }
+
+    pub fn get_degen_pool_tvl(&self, pool_id: u64) -> U128 {
+        self.pools.get(pool_id).expect(ERR85_NO_POOL).get_tvl().into()
+    }
+
+    pub fn get_pool_limit_by_pool_id(&self, pool_id: u64) -> Option<VPoolLimitInfo> {
+        read_pool_limit_from_storage().get(&pool_id)
+    }
+
+    pub fn get_pool_limit_paged(&self, from_index: Option<u64>, limit: Option<u64>) -> HashMap<u64, VPoolLimitInfo> {
+        let pool_limit = read_pool_limit_from_storage();
+        let keys = pool_limit.keys_as_vector();
+        let from_index = from_index.unwrap_or(0);
+        let limit = limit.unwrap_or(keys.len() as u64);
+        (from_index..std::cmp::min(keys.len() as u64, from_index + limit))
+            .map(|idx| {
+                let key = keys.get(idx).unwrap();
+                (key.clone(), pool_limit.get(&key).unwrap())
+            })
+            .collect()
+    }
 }

@@ -134,7 +134,7 @@ impl DegenSwap {
     }
 
     /// *
-    fn degen_balances(&self, amounts: &Vec<Balance>) -> Vec<Balance> {
+    pub fn degen_balances(&self, amounts: &Vec<Balance>) -> Vec<Balance> {
         amounts.iter().zip(self.degens.iter()).map(|(&amount, &degen)| {
             self.mul_degen(amount, degen)
         }).collect()
