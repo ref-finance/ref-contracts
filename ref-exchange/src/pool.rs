@@ -360,3 +360,16 @@ impl Pool {
         }
     }
 }
+
+impl Pool {
+    pub fn assert_tvl_not_exceed_limit(&self, pool_id: u64) {
+        match self {
+            Pool::DegenSwapPool(pool) => {
+                if let Some(degen_pool_limit) = crate::read_pool_limit_from_storage().get(&pool_id).map(|v| v.get_degen_pool_limit()) {
+                    assert!(pool.get_tvl() <= degen_pool_limit.tvl_limit, "Exceed Max TVL");
+                }
+            },
+            _ => {}
+        }
+    }
+}

@@ -190,6 +190,7 @@ impl FungibleTokenReceiver for Contract {
                                 );
                             }
                         };
+                        pool.assert_tvl_not_exceed_limit(add_liquidity_info.pool_id);
 
                         for (cost_token_id, cost_amount) in tokens_in_pool.iter().zip(add_liquidity_amounts.into_iter()) {
                             token_cache.sub(cost_token_id, cost_amount);

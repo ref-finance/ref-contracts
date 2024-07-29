@@ -433,11 +433,7 @@ impl Contract {
             AdminFees::new(self.admin_fee_bps),
             false
         );
-        if pool.kind() == "DEGEN_SWAP" {
-            if let Some(degen_pool_limit) = read_pool_limit_from_storage().get(&pool_id).map(|v| v.get_degen_pool_limit()) {
-                assert!(pool.get_tvl() <= degen_pool_limit.tvl_limit, "Exceed Max TVL");
-            }
-        }
+        pool.assert_tvl_not_exceed_limit(pool_id);
         // [AUDITION_AMENDMENT] 2.3.7 Code Optimization (I)
         let mut deposits = self.internal_unwrap_account(&sender_id);
         let tokens = pool.tokens();
