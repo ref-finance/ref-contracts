@@ -827,6 +827,7 @@ impl Contract {
                     shares
                 }
             };
+            pool.assert_tvl_not_exceed_limit(add_liquidity_info.pool_id);
             
             add_liquidity_predictions.push(
                 AddLiquidityPrediction {
