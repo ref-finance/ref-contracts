@@ -170,7 +170,10 @@ impl Pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(_) => unimplemented!(),
-            Pool::DegenSwapPool(pool) => pool.get_tvl(),
+            Pool::DegenSwapPool(pool) => {
+                pool.assert_degens_valid();
+                pool.get_tvl()
+            },
         }
     }
 

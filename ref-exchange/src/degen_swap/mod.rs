@@ -100,7 +100,7 @@ impl DegenSwapPool {
         .collect()
     }
 
-    fn assert_degens_valid(&self) {
+    pub fn assert_degens_valid(&self) {
         for token_id in &self.token_account_ids {
             assert!(is_global_degen_price_valid(token_id) == true, "{}", ERR129_DEGENS_EXPIRED);
         }
