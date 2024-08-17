@@ -275,6 +275,10 @@ pub fn dai() -> AccountId {
     "dai001".to_string()
 }
 
+pub fn btc() -> AccountId {
+    "btc".to_string()
+}
+
 pub fn eth() -> AccountId {
     "eth002".to_string()
 }
@@ -631,6 +635,83 @@ pub fn setup_rated_pool_with_liquidity(
     .assert_success();
     assert_eq!(100000000, view!(pool.get_pool_share_price(0)).unwrap_json::<U128>().0);
     (root, owner, pool, token_contracts, token_rated_contracts)
+}
+
+pub fn setup_degen_pool(
+    tokens: Vec<String>,
+    amounts: Vec<u128>,
+    decimals: Vec<u8>,
+    pool_fee: u32,
+    amp: u64,
+) -> (
+    UserAccount,
+    UserAccount,
+    ContractAccount<Exchange>,
+    Vec<ContractAccount<TestToken>>,
+) {
+    let root = init_simulator(None);
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let pool = deploy!(
+        contract: Exchange,
+        contract_id: swap(),
+        bytes: &EXCHANGE_WASM_BYTES,
+        signer_account: root,
+        init_method: new(owner.valid_account_id(), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 2000, 0)
+    );
+
+    let mut token_contracts: Vec<ContractAccount<TestToken>> = vec![];
+    for token_name in &tokens {
+        token_contracts.push(test_token(&root, token_name.clone(), vec![swap()]));
+    }
+
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(
+            (&token_contracts).into_iter().map(|x| x.valid_account_id()).collect()
+        ),
+        deposit=1
+    );
+    call!(
+        owner,
+        pool.add_degen_swap_pool(
+            (&token_contracts).into_iter().map(|x| x.valid_account_id()).collect(), 
+            decimals,
+            pool_fee,
+            amp
+        ),
+        deposit = to_yocto("1"))
+    .assert_success();
+
+    call!(
+        root,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    for (idx, amount) in amounts.clone().into_iter().enumerate() {
+        let c = token_contracts.get(idx).unwrap();
+        call!(
+            root,
+            c.ft_transfer_call(
+                pool.valid_account_id(), 
+                U128(amount), 
+                None, 
+                "".to_string()
+            ),
+            deposit = 1
+        )
+        .assert_success();
+    }
+
+    (root, owner, pool, token_contracts)
 }
 
 pub fn setup_rated_pool(

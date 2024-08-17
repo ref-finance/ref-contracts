@@ -1,5 +1,6 @@
 //! Implement all the relevant logic for owner of this contract.
 
+use degen_swap::degen::{global_register_degen, global_register_degen_oracle_config, global_unregister_degen, global_unregister_degen_oracle_config, DegenOracleConfig, DegenType};
 use near_sdk::json_types::WrappedTimestamp;
 use near_contract_standards::fungible_token::core_impl::ext_fungible_token;
 
@@ -326,6 +327,9 @@ impl Contract {
             Pool::RatedSwapPool(pool) => {
                 pool.ramp_amplification(future_amp_factor as u128, future_amp_time.0)
             }
+            Pool::DegenSwapPool(pool) => {
+                pool.ramp_amplification(future_amp_factor as u128, future_amp_time.0)
+            }
             _ => env::panic(ERR88_NOT_STABLE_POOL.as_bytes()),
         }
         self.pools.replace(pool_id, &pool);
@@ -339,6 +343,7 @@ impl Contract {
         match &mut pool {
             Pool::StableSwapPool(pool) => pool.stop_ramp_amplification(),
             Pool::RatedSwapPool(pool) => pool.stop_ramp_amplification(),
+            Pool::DegenSwapPool(pool) => pool.stop_ramp_amplification(),
             _ => env::panic(ERR88_NOT_STABLE_POOL.as_bytes()),
         }
         self.pools.replace(pool_id, &pool);
@@ -357,7 +362,7 @@ impl Contract {
         }
     }
 
-    /// Remove rated token, incase mistaken add operation. Only owner can call.
+    /// Remove rated token. Only owner can call.
     #[payable]
     pub fn unregister_rated_token(&mut self, token_id: ValidAccountId) {
         assert_one_yocto();
@@ -377,6 +382,99 @@ impl Contract {
         let token_id: AccountId = token_id.into();
         global_update_rated_token_extra_info(&token_id, extra_info.clone());
         log!("Update rated token {} extra info: {}", token_id, extra_info);
+    }
+
+    /// Register new degen token.
+    #[payable]
+    pub fn register_degen_token(&mut self, token_id: ValidAccountId, degen_type: DegenType) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        let token_id: AccountId = token_id.into();
+        if global_register_degen(&token_id, degen_type.clone()) {
+            log!("New {:?} typed degen token {} registered by {}", degen_type, token_id, env::predecessor_account_id());
+        } else {
+            env::panic(format!("Degen token {} already exist", token_id).as_bytes());
+        }
+    }
+
+    /// Remove degen token. Only owner can call.
+    #[payable]
+    pub fn unregister_degen_token(&mut self, token_id: ValidAccountId) {
+        assert_one_yocto();
+        self.assert_owner();
+        let token_id: AccountId = token_id.into();
+        if global_unregister_degen(&token_id) {
+            log!("Degen token {} removed.", token_id);
+        } else {
+            log!("Degen token {} not exist in degen list.", token_id);
+        }
+    }
+
+    /// Register new degen oracle config.
+    #[payable]
+    pub fn register_degen_oracle_config(&mut self, degen_oracle_config: DegenOracleConfig) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        if global_register_degen_oracle_config(degen_oracle_config.clone()) {
+            log!("New degen oracle config {} registered by {}", degen_oracle_config.get_key(), env::predecessor_account_id());
+        } else {
+            env::panic(format!("Degen oracle config {} already exist", degen_oracle_config.get_key()).as_bytes());
+        }
+    }
+
+    /// Remove degen oracle config. Only owner can call.
+    #[payable]
+    pub fn unregister_degen_oracle_config(&mut self, degen_oracle_config_key: String) {
+        assert_one_yocto();
+        self.assert_owner();
+        if global_unregister_degen_oracle_config(&degen_oracle_config_key) {
+            log!("Degen oracle config {} removed.", degen_oracle_config_key);
+        } else {
+            log!("Degen oracle config {} not exist in degen list.", degen_oracle_config_key);
+        }
+    }
+
+    /// Update new degen oracle config.
+    #[payable]
+    pub fn update_degen_oracle_config(&mut self, degen_oracle_config: DegenOracleConfig) {
+        assert_one_yocto();
+        self.assert_owner();
+        if global_update_degen_oracle_config(degen_oracle_config.clone()) {
+            log!("Update oracle degen config {} registered by {}", degen_oracle_config.get_key(), env::predecessor_account_id());
+        } else {
+            env::panic(format!("Degen oracle config {} not exist", degen_oracle_config.get_key()).as_bytes());
+        }
+    }
+
+    #[payable]
+    pub fn add_degen_pool_limit(&mut self, pool_id: u64, degen_pool_limit_info: DegenPoolLimitInfo) {
+        assert_one_yocto();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        assert!(self.get_pool(pool_id).pool_kind == "DEGEN_SWAP");
+        let mut pool_limit = read_pool_limit_from_storage();
+        assert!(pool_limit.get(&pool_id).is_none(), "degen pool limit already exist");
+        pool_limit.insert(&pool_id, &VPoolLimitInfo::DegenPoolLimit(degen_pool_limit_info.into()));
+        write_pool_limit_to_storage(pool_limit);
+    }
+
+    #[payable]
+    pub fn update_degen_pool_limit(&mut self, pool_id: u64, degen_pool_limit_info: DegenPoolLimitInfo) {
+        assert_one_yocto();
+        self.assert_owner();
+        assert!(self.get_pool(pool_id).pool_kind == "DEGEN_SWAP");
+        let mut pool_limit = read_pool_limit_from_storage();
+        assert!(pool_limit.get(&pool_id).is_some(), "degen pool limit not exist");
+        pool_limit.insert(&pool_id, &VPoolLimitInfo::DegenPoolLimit(degen_pool_limit_info.into()));
+        write_pool_limit_to_storage(pool_limit);
+    }
+
+    #[payable]
+    pub fn remove_pool_limit(&mut self, pool_id: u64) {
+        assert_one_yocto();
+        self.assert_owner();
+        let mut pool_limit = read_pool_limit_from_storage();
+        assert!(pool_limit.remove(&pool_id).is_some(), "Invalid pool_id");
+        write_pool_limit_to_storage(pool_limit);
     }
 
     pub(crate) fn assert_owner(&self) {

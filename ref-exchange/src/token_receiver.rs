@@ -30,6 +30,7 @@ enum TokenReceiverMessage {
         /// to send token_out back to predecessor with this msg.
         client_echo: Option<String>,
         skip_unwrap_near: Option<bool>,
+        swap_out_recipient: Option<ValidAccountId>
     },
     HotZap {
         referral_id: Option<ValidAccountId>,
@@ -61,7 +62,10 @@ impl Contract {
             &mut account,
             &referral_info,
             &actions,
-            ActionResult::Amount(U128(amount_in)),
+            match actions[0] { 
+                Action::Swap(_) => ActionResult::Amount(U128(amount_in)),
+                Action::SwapByOutput(_) => ActionResult::None,
+            },
         );
 
         let mut result = vec![];
@@ -104,8 +108,11 @@ impl FungibleTokenReceiver for Contract {
                     referral_id,
                     actions,
                     client_echo,
-                    skip_unwrap_near
+                    skip_unwrap_near,
+                    swap_out_recipient,
                 } => {
+                    assert!(!(swap_out_recipient.is_some() && client_echo.is_some()), "client_echo and swap_out_recipient cannot have value at the same time");
+                    assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
                     let referral_id = referral_id.map(|x| x.to_string());
                     let out_amounts = self.internal_direct_actions(
                         token_in,
@@ -120,7 +127,7 @@ impl FungibleTokenReceiver for Contract {
                         if let Some(ref message) = client_echo {
                             self.internal_send_token_with_msg(sender_id.as_ref(), &token_out, amount_out, message.clone());
                         } else {
-                            self.internal_send_tokens(sender_id.as_ref(), &token_out, amount_out, skip_unwrap_near);
+                            self.internal_send_tokens(swap_out_recipient.as_ref().unwrap_or(&sender_id).as_ref(), &token_out, amount_out, skip_unwrap_near);
                         }
                     }
                     // Even if send tokens fails, we don't return funds back to sender.
@@ -154,6 +161,7 @@ impl FungibleTokenReceiver for Contract {
                             Pool::SimplePool(p) => p.token_account_ids.clone(),
                             Pool::RatedSwapPool(p) => p.token_account_ids.clone(),
                             Pool::StableSwapPool(p) => p.token_account_ids.clone(),
+                            Pool::DegenSwapPool(p) => p.token_account_ids.clone(),
                         };
                         
                         let mut add_liquidity_amounts = add_liquidity_info.amounts.iter().map(|v| v.0).collect();
@@ -171,7 +179,7 @@ impl FungibleTokenReceiver for Contract {
                                     assert!(amount >= &min_amount.0, "{}", ERR86_MIN_AMOUNT);
                                 }
                             },
-                            Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) => {
+                            Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) | Pool::DegenSwapPool(_) => {
                                 let min_shares = add_liquidity_info.min_shares.expect("Need input min_shares");
                                 pool.add_stable_liquidity(
                                     &sender_id,
@@ -182,6 +190,7 @@ impl FungibleTokenReceiver for Contract {
                                 );
                             }
                         };
+                        pool.assert_tvl_not_exceed_limit(add_liquidity_info.pool_id);
 
                         for (cost_token_id, cost_amount) in tokens_in_pool.iter().zip(add_liquidity_amounts.into_iter()) {
                             token_cache.sub(cost_token_id, cost_amount);

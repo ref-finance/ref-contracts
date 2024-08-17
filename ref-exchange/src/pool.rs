@@ -2,6 +2,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{AccountId, Balance};
 
 use crate::admin_fee::AdminFees;
+use crate::degen_swap::DegenSwapPool;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
 use crate::rated_swap::RatedSwapPool;
@@ -14,6 +15,7 @@ pub enum Pool {
     SimplePool(SimplePool),
     StableSwapPool(StableSwapPool),
     RatedSwapPool(RatedSwapPool),
+    DegenSwapPool(DegenSwapPool),
 }
 
 impl Pool {
@@ -23,6 +25,7 @@ impl Pool {
             Pool::SimplePool(_) => "SIMPLE_POOL".to_string(),
             Pool::StableSwapPool(_) => "STABLE_SWAP".to_string(),
             Pool::RatedSwapPool(_) => "RATED_SWAP".to_string(),
+            Pool::DegenSwapPool(_) => "DEGEN_SWAP".to_string(),
         }
     }
 
@@ -32,6 +35,7 @@ impl Pool {
             Pool::SimplePool(pool) => pool.tokens(),
             Pool::StableSwapPool(pool) => pool.tokens(),
             Pool::RatedSwapPool(pool) => pool.tokens(),
+            Pool::DegenSwapPool(pool) => pool.tokens(),
         }
     }
 
@@ -40,6 +44,7 @@ impl Pool {
             Pool::SimplePool(pool) => pool.modify_total_fee(total_fee),
             Pool::StableSwapPool(pool) => pool.modify_total_fee(total_fee),
             Pool::RatedSwapPool(pool) => pool.modify_total_fee(total_fee),
+            Pool::DegenSwapPool(pool) => pool.modify_total_fee(total_fee),
         }
     }
 
@@ -55,6 +60,7 @@ impl Pool {
             Pool::SimplePool(pool) => pool.add_liquidity(sender_id, amounts, is_view),
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(_) => unimplemented!(),
+            Pool::DegenSwapPool(_) => unimplemented!(),
         }
     }
 
@@ -70,6 +76,7 @@ impl Pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee, is_view),
             Pool::RatedSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee, is_view),
+            Pool::DegenSwapPool(pool) => pool.add_liquidity(sender_id, amounts, min_shares, &admin_fee, is_view),
         }
     }
 
@@ -87,6 +94,9 @@ impl Pool {
                 pool.remove_liquidity_by_shares(sender_id, shares, min_amounts, is_view)
             },
             Pool::RatedSwapPool(pool) => {
+                pool.remove_liquidity_by_shares(sender_id, shares, min_amounts, is_view)
+            },
+            Pool::DegenSwapPool(pool) => {
                 pool.remove_liquidity_by_shares(sender_id, shares, min_amounts, is_view)
             }
         }
@@ -108,6 +118,9 @@ impl Pool {
             },
             Pool::RatedSwapPool(pool) => {
                 pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee, is_view)
+            },
+            Pool::DegenSwapPool(pool) => {
+                pool.remove_liquidity_by_tokens(sender_id, amounts, max_burn_shares, &admin_fee, is_view)
             }
         }
     }
@@ -118,6 +131,7 @@ impl Pool {
             Pool::SimplePool(_) => 24,
             Pool::StableSwapPool(_) => 18,
             Pool::RatedSwapPool(_) => 24,
+            Pool::DegenSwapPool(_) => 24,
         }
     }
 
@@ -127,6 +141,7 @@ impl Pool {
             Pool::SimplePool(pool) => pool.get_fee(),
             Pool::StableSwapPool(pool) => pool.get_fee(),
             Pool::RatedSwapPool(pool) => pool.get_fee(),
+            Pool::DegenSwapPool(pool) => pool.get_fee(),
         }
     }
 
@@ -136,6 +151,7 @@ impl Pool {
             Pool::SimplePool(pool) => pool.get_volumes(),
             Pool::StableSwapPool(pool) => pool.get_volumes(),
             Pool::RatedSwapPool(pool) => pool.get_volumes(),
+            Pool::DegenSwapPool(pool) => pool.get_volumes(),
         }
     }
 
@@ -145,6 +161,19 @@ impl Pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(pool) => pool.get_share_price(),
             Pool::RatedSwapPool(pool) => pool.get_share_price(),
+            Pool::DegenSwapPool(pool) => pool.get_share_price(),
+        }
+    }
+
+    pub fn get_tvl(&self) -> u128 {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(_) => unimplemented!(),
+            Pool::DegenSwapPool(pool) => {
+                pool.assert_degens_valid();
+                pool.get_tvl()
+            },
         }
     }
 
@@ -168,14 +197,44 @@ impl Pool {
             Pool::RatedSwapPool(pool) => {
                 pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee, is_view)
             }
+            Pool::DegenSwapPool(pool) => {
+                pool.swap(token_in, amount_in, token_out, min_amount_out, &admin_fee, is_view)
+            }
         }
     }
 
+    /// Swaps token_in for a given amount of token_out and returns the amount of token_in spent.
+    pub fn swap_by_output(
+        &mut self,
+        token_in: &AccountId,
+        amount_out: Balance,
+        token_out: &AccountId,
+        max_amount_in: Option<u128>,
+        admin_fee: AdminFees,
+        is_view: bool
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(pool) => {
+                pool.swap_by_output(token_in, amount_out, token_out, max_amount_in, &admin_fee, is_view)
+            }
+            Pool::StableSwapPool(_) => {
+                unimplemented!()
+            }
+            Pool::RatedSwapPool(_) => {
+                unimplemented!()
+            }
+            Pool::DegenSwapPool(_) => {
+                unimplemented!()
+            }
+        }
+    }
+    
     pub fn share_total_balance(&self) -> Balance {
         match self {
             Pool::SimplePool(pool) => pool.share_total_balance(),
             Pool::StableSwapPool(pool) => pool.share_total_balance(),
             Pool::RatedSwapPool(pool) => pool.share_total_balance(),
+            Pool::DegenSwapPool(pool) => pool.share_total_balance(),
         }
     }
 
@@ -184,6 +243,7 @@ impl Pool {
             Pool::SimplePool(pool) => pool.share_balance_of(account_id),
             Pool::StableSwapPool(pool) => pool.share_balance_of(account_id),
             Pool::RatedSwapPool(pool) => pool.share_balance_of(account_id),
+            Pool::DegenSwapPool(pool) => pool.share_balance_of(account_id),
         }
     }
 
@@ -192,6 +252,7 @@ impl Pool {
             Pool::SimplePool(pool) => pool.share_transfer(sender_id, receiver_id, amount),
             Pool::StableSwapPool(pool) => pool.share_transfer(sender_id, receiver_id, amount),
             Pool::RatedSwapPool(pool) => pool.share_transfer(sender_id, receiver_id, amount),
+            Pool::DegenSwapPool(pool) => pool.share_transfer(sender_id, receiver_id, amount),
         }
     }
 
@@ -201,6 +262,7 @@ impl Pool {
             Pool::SimplePool(pool) => pool.share_has_registered(account_id),
             Pool::StableSwapPool(pool) => pool.share_has_registered(account_id),
             Pool::RatedSwapPool(pool) => pool.share_has_registered(account_id),
+            Pool::DegenSwapPool(pool) => pool.share_has_registered(account_id),
         }
     }
 
@@ -209,6 +271,7 @@ impl Pool {
             Pool::SimplePool(pool) => pool.share_register(account_id),
             Pool::StableSwapPool(pool) => pool.share_register(account_id),
             Pool::RatedSwapPool(pool) => pool.share_register(account_id),
+            Pool::DegenSwapPool(pool) => pool.share_register(account_id),
         }
     }
 
@@ -222,6 +285,21 @@ impl Pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(pool) => pool.predict_add_rated_liquidity(amounts, rates, fees),
+            Pool::DegenSwapPool(_) => unimplemented!(),
+        }
+    }
+
+    pub fn predict_add_degen_liquidity(
+        &self,
+        amounts: &Vec<Balance>,
+        degens: &Option<Vec<Balance>>,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(_) => unimplemented!(),
+            Pool::DegenSwapPool(pool) => pool.predict_add_degen_liquidity(amounts, degens, fees),
         }
     }
 
@@ -235,6 +313,21 @@ impl Pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(pool) => pool.predict_remove_rated_liquidity_by_tokens(amounts, rates, fees),
+            Pool::DegenSwapPool(_) => unimplemented!(),
+        }
+    }
+
+    pub fn predict_remove_degen_liquidity_by_tokens(
+        &self,
+        amounts: &Vec<Balance>,
+        degens: &Option<Vec<Balance>>,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(_) => unimplemented!(),
+            Pool::DegenSwapPool(pool) => pool.predict_remove_degen_liquidity_by_tokens(amounts, degens, fees),
         }
     }
 
@@ -250,6 +343,36 @@ impl Pool {
             Pool::SimplePool(_) => unimplemented!(),
             Pool::StableSwapPool(_) => unimplemented!(),
             Pool::RatedSwapPool(pool) => pool.get_rated_return(token_in, amount_in, token_out, rates, fees),
+            Pool::DegenSwapPool(_) => unimplemented!(),
+        }
+    }
+
+    pub fn get_degen_return(
+        &self,
+        token_in: &AccountId,
+        amount_in: Balance,
+        token_out: &AccountId,
+        degens: &Option<Vec<Balance>>,
+        fees: &AdminFees,
+    ) -> Balance {
+        match self {
+            Pool::SimplePool(_) => unimplemented!(),
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(_) => unimplemented!(),
+            Pool::DegenSwapPool(pool) => pool.get_degen_return(token_in, amount_in, token_out, degens, fees),
+        }
+    }
+}
+
+impl Pool {
+    pub fn assert_tvl_not_exceed_limit(&self, pool_id: u64) {
+        match self {
+            Pool::DegenSwapPool(pool) => {
+                if let Some(degen_pool_limit) = crate::read_pool_limit_from_storage().get(&pool_id).map(|v| v.get_degen_pool_limit()) {
+                    assert!(pool.get_tvl() <= degen_pool_limit.tvl_limit, "Exceed Max TVL");
+                }
+            },
+            _ => {}
         }
     }
 }

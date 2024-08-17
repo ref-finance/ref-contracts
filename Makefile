@@ -78,7 +78,7 @@ test-pyth: mock-pyth
 release:
 	$(call docker_build,_rust_setup.sh)
 	mkdir -p res
-	cp target/wasm32-unknown-unknown/release/ref_exchange.wasm res/ref_exchange_release.wasm
+	cp target/wasm32-unknown-unknown/release/ref_exchange_by_wasm_opt.wasm res/ref_exchange_release.wasm
 	cp target/wasm32-unknown-unknown/release/ref_farming.wasm res/ref_farming_release.wasm
 
 clean:

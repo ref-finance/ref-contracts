@@ -61,6 +61,7 @@ pub const ERR72_AT_LEAST_ONE_SWAP: &str = "E72: at least one swap";
 pub const ERR73_SAME_TOKEN: &str = "E73: same token swap";
 pub const ERR75_INVARIANT_REDUCE: &str = "E75: invariant can not reduce ";
 pub const ERR76_INVALID_PARAMS: &str = "E76: invalid params";
+pub const ERR77_INVALID_ACTION_TYPE: &str = "E77: all action types must be the same";
 
 // pool manage
 pub const ERR81_AMP_IN_LOCK: &str = "E81: amp is currently in lock";
@@ -99,6 +100,7 @@ pub const ERR124_CROSS_CALL_FAILED: &str = "E124: Cross-contract call failed";
 pub const ERR126_FAILED_TO_PARSE_RESULT: &str = "E126: Failed to parse cross-contract call result";
 pub const ERR127_INVALID_RATE_TYPE: &str = "E127: Invalid rate type";
 pub const ERR128_INVALID_EXTRA_INFO_MSG_FORMAT: &str = "E128: Invalid extra info message format";
+pub const ERR129_DEGENS_EXPIRED: &str = "E129: Degens expired";
 
 // referrals
 pub const ERR130_REFERRAL_EXIST: &str = "E130: Referral already exist";

@@ -9,9 +9,12 @@ use near_sdk_sim::{
     call, deploy, init_simulator, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
 
-use ref_exchange::{ContractContract as Exchange, PoolInfo, SwapAction};
+use ref_exchange::{Action, ContractContract as Exchange, PoolInfo, SwapAction};
 use test_token::ContractContract as TestToken;
 use mock_wnear::ContractContract as MockWnear;
+
+use crate::common::utils::*;
+pub mod common;
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
@@ -554,4 +557,360 @@ fn test_direct_swap_wnear() {
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("8"));
     assert_eq!(wnear_balance_of(&token2, &new_user.account_id), new_user_wnear_balance);
     assert!(new_user.account().unwrap().amount > new_user_near_balance + to_yocto("1"));
+}
+
+#[test]
+fn test_direct_swap_wnear_by_output() {
+    let root = init_simulator(None);
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let pool = deploy!(
+        contract: Exchange,
+        contract_id: swap(),
+        bytes: &EXCHANGE_WASM_BYTES,
+        signer_account: root,
+        init_method: new(to_va("owner".to_string()), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 5, 0)
+    );
+    call!(
+        owner,
+        pool.modify_wnear_id(wnear()),
+        deposit = 1
+    )
+    .assert_success();
+    let token0 = test_token(&root, eth(), vec![swap()]);
+    let token1 = test_token(&root, dai(), vec![swap()]);
+    let token2 = test_wnear(&root, vec![swap()]);
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(vec![to_va(eth()), to_va(dai()), to_va(wnear())]),
+        deposit=1
+    );
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(dai()), to_va(wnear())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(wnear()), to_va(eth())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        token0.ft_transfer_call(to_va(swap()), to_yocto("105").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        token1.ft_transfer_call(to_va(swap()), to_yocto("105").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        token2.ft_transfer_call(to_va(swap()), to_yocto("110").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_liquidity(0, vec![U128(to_yocto("5")), U128(to_yocto("10"))], None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_liquidity(1, vec![U128(to_yocto("10")), U128(to_yocto("10"))], None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+
+
+    let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
+    call!(
+        new_user,
+        token1.mint(to_va(new_user.account_id.clone()), U128(to_yocto("100")))
+    )
+    .assert_success();
+
+    call!(
+        new_user,
+        token0.mint(to_va(new_user.account_id.clone()), U128(to_yocto("100")))
+    )
+    .assert_success();
+
+    // skip unwrap near
+    call!(
+        new_user,
+        token0.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        new_user,
+        token2.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    let new_user_wnear_balance = wnear_balance_of(&token2, &new_user.account_id);
+    call!(
+        new_user,
+        token1.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("1").into(),
+            None,
+            format!("{{\"actions\": [{{\"pool_id\": 0, \"token_in\": \"dai\", \"amount_out\": \"{}\", \"token_out\": \"wnear\", \"max_amount_in\": \"{}\"}}]}}", "1663192997082117548978741",  to_yocto("1"))
+        ),
+        deposit = 1
+    ).assert_success();
+    assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("99"));
+    assert_eq!(wnear_balance_of(&token2, &new_user.account_id), new_user_wnear_balance + to_yocto("1.663192997082117548978741"));
+
+    let new_user_near_balance = new_user.account().unwrap().amount;
+    let new_user_wnear_balance = wnear_balance_of(&token2, &new_user.account_id);
+    call!(
+        new_user,
+        token1.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("1").into(),
+            None,
+            format!("{{\"skip_unwrap_near\": false, \"actions\": [{{\"pool_id\": 0, \"token_in\": \"dai\", \"amount_out\": \"{}\", \"token_out\": \"wnear\"}}]}}", "1188419433427736726672912")
+        ),
+        deposit = 1
+    ).assert_success();
+    assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("98"));
+    assert_eq!(wnear_balance_of(&token2, &new_user.account_id), new_user_wnear_balance);
+    assert!(new_user.account().unwrap().amount > new_user_near_balance + to_yocto("1"));
+
+    let new_user_wnear_balance = wnear_balance_of(&token2, &new_user.account_id);
+    let outcome = call!(
+        new_user,
+        token1.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("10").into(),
+            None,
+            format!("{{\"skip_unwrap_near\": false, \"actions\": [
+                {{\"pool_id\": 1, \"token_in\": \"wnear\", \"amount_out\": \"{}\", \"token_out\": \"eth\", \"max_amount_in\": \"{}\"}},
+                {{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"wnear\", \"max_amount_in\": \"{}\"}}
+                ]}}", "907024323709934075926346",  to_yocto("10"),  to_yocto("10"))
+        ),
+        deposit = 1
+    );
+    outcome.assert_success();
+    println!("{:#?}", get_logs(&outcome));
+    assert_eq!(balance_of(&token0, &new_user.account_id), to_yocto("100") + 907024323709934075926346);
+    assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("98") - 1141363289209670261579317);
+    assert_eq!(wnear_balance_of(&token2, &new_user.account_id), new_user_wnear_balance);
+    
+    println!("{:?}", view!(pool.get_pool(1)).unwrap_json::<PoolInfo>());
+
+    let new_user_wnear_balance = wnear_balance_of(&token2, &new_user.account_id);
+    let outcome = call!(
+        new_user,
+        token0.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("10").into(),
+            None,
+            format!("{{\"skip_unwrap_near\": true, \"actions\": [
+                {{\"pool_id\": 1, \"token_in\": \"eth\", \"amount_out\": \"{}\", \"token_out\": \"wnear\", \"max_amount_in\": \"{}\"}},
+                {{\"pool_id\": 1, \"token_in\": \"eth\", \"amount_out\": \"{}\", \"token_out\": \"wnear\", \"max_amount_in\": \"{}\"}}
+                ]}}", "1087411570277351408187381", to_yocto("10"), "1087411570277351408187381", to_yocto("10"))
+        ),
+        deposit = 1
+    );
+    outcome.assert_success();
+    println!("{:#?}", get_logs(&outcome));
+    assert_eq!(balance_of(&token0, &new_user.account_id), to_yocto("100") + 907024323709934075926346 - 2246742758532429976723435);
+    assert_eq!(wnear_balance_of(&token2, &new_user.account_id), new_user_wnear_balance + 1087411570277351408187381 * 2);
+
+    let outcome = call!(
+        new_user,
+        token0.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("1").into(),
+            None,
+            format!("{{\"skip_unwrap_near\": true, \"actions\": [
+                {{\"pool_id\": 1, \"token_in\": \"eth\", \"amount_out\": \"{}\", \"token_out\": \"wnear\", \"max_amount_in\": \"{}\"}},
+                {{\"pool_id\": 1, \"token_in\": \"eth\", \"amount_out\": \"{}\", \"token_out\": \"wnear\", \"max_amount_in\": \"{}\"}}
+                ]}}", "1087411570277351408187381", to_yocto("10"), "1087411570277351408187381", to_yocto("10"))
+        ),
+        deposit = 1
+    );
+    let exe_status = format!("{:?}", outcome.promise_errors()[0].as_ref().unwrap().status());
+    assert!(exe_status.contains("E22: not enough tokens in deposit"));
+
+    let outcome = call!(
+        new_user,
+        token1.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("1").into(),
+            None,
+            format!("{{\"skip_unwrap_near\": false, \"actions\": [{{\"pool_id\": 0, \"token_in\": \"dai\", \"amount_out\": \"{}\", \"token_out\": \"wnear\", \"max_amount_in\": \"{}\"}}]}}", "1188419433427736726672912",  1)
+        ),
+        deposit = 1
+    );
+    let exe_status = format!("{:?}", outcome.promise_errors()[0].as_ref().unwrap().status());
+    assert!(exe_status.contains("E68: slippage error"));
+
+    let outcome = call!(
+        new_user,
+        token1.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("1").into(),
+            None,
+            format!("{{\"skip_unwrap_near\": false, \"actions\": [
+                {{\"pool_id\": 0, \"token_in\": \"dai\", \"amount_out\": \"{}\", \"token_out\": \"wnear\", \"max_amount_in\": \"{}\"}},
+                {{\"pool_id\": 0, \"token_in\": \"dai\", \"token_out\": \"wnear\", \"min_amount_out\": \"1\"}}
+                ]}}", "1188419433427736726672912",  to_yocto("1"))
+        ),
+        deposit = 1
+    );
+    let exe_status = format!("{:?}", outcome.promise_errors()[0].as_ref().unwrap().status());
+    assert!(exe_status.contains("E77: all action types must be the same"));
+}
+
+#[test]
+fn test_execute_actions_in_va() {
+    const ONE_USDT: u128 = 10u128.pow(6);
+
+    let root = init_simulator(None);
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let pool = deploy!(
+        contract: Exchange,
+        contract_id: swap(),
+        bytes: &EXCHANGE_WASM_BYTES,
+        signer_account: root,
+        init_method: new(to_va("owner".to_string()), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 30, 0)
+    );
+    call!(
+        owner,
+        pool.modify_wnear_id(wnear()),
+        deposit = 1
+    )
+    .assert_success();
+    let token0 = deploy!(
+        contract: TestToken,
+        contract_id: to_va(eth()),
+        bytes: &TEST_TOKEN_WASM_BYTES,
+        signer_account: root
+    );
+    call!(root, token0.new()).assert_success();
+    call!(
+        root,
+        token0.mint(to_va(root.account_id.clone()), to_yocto("10000000").into())
+    )
+    .assert_success();
+    call!(
+        root,
+        token0.storage_deposit(Some(to_va(swap())), None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+
+    let token1 = deploy!(
+        contract: TestToken,
+        contract_id: usdt(),
+        bytes: &TEST_TOKEN_WASM_BYTES,
+        signer_account: root
+    );
+    call!(root, token1.new()).assert_success();
+    call!(
+        root,
+        token1.mint(to_va(root.account_id.clone()), to_yocto("10000000").into())
+    )
+    .assert_success();
+    call!(
+        root,
+        token1.storage_deposit(Some(to_va(swap())), None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(vec![to_va(eth()), to_va(usdt())]),
+        deposit=1
+    );
+    
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(eth()), to_va(usdt())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        token0.ft_transfer_call(to_va(swap()), (144459999999687970893 * 10).into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        token1.ft_transfer_call(to_va(swap()), (500007198063 * 10).into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+
+
+    let out_come = call!(
+        root,
+        pool.add_liquidity(0, vec![144459999999687970893, 500007198063].into_iter().map(|x| U128(x)).collect(), Some(vec![U128(1), U128(1)])),
+        deposit = to_yocto("0.0007")
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+
+    let max_use_tokens = HashMap::from([(usdt(), U128(ONE_USDT * 4000))]);
+    let out_come = call!(
+        root,
+        pool.execute_actions_in_va(
+            max_use_tokens,
+            vec![Action::Swap(SwapAction {
+                pool_id: 0,
+                token_in: usdt(),
+                amount_in: Some(U128(ONE_USDT * 3000)),
+                token_out: eth(),
+                min_amount_out: U128(1)
+            })],
+            None
+        ),
+        gas = 300000000000000
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+    println!("{:#?}", out_come.unwrap_json::<HashMap<AccountId, U128>>());
 }
