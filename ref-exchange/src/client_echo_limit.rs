@@ -72,7 +72,7 @@ impl Contract {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         let mut client_echo_sender_id_whitelist = read_ce_sw_from_storage();
         for sender_id in sender_ids {
-            assert!(client_echo_sender_id_whitelist.insert(sender_id.as_ref()), "sender_id already exist");
+            assert!(client_echo_sender_id_whitelist.insert(sender_id.as_ref()), "Sender id already exist");
         }
         write_ce_sw_to_storage(client_echo_sender_id_whitelist);
     }
@@ -83,7 +83,7 @@ impl Contract {
         self.assert_owner();
         let mut client_echo_sender_id_whitelist = read_ce_sw_from_storage();
         for sender_id in sender_ids {
-            assert!(client_echo_sender_id_whitelist.remove(sender_id.as_ref()), "Invalid sender_id");
+            assert!(client_echo_sender_id_whitelist.remove(sender_id.as_ref()), "Invalid sender id");
         }
         write_ce_sw_to_storage(client_echo_sender_id_whitelist);
     }
