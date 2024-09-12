@@ -113,6 +113,9 @@ impl FungibleTokenReceiver for Contract {
                 } => {
                     assert!(!(swap_out_recipient.is_some() && client_echo.is_some()), "client_echo and swap_out_recipient cannot have value at the same time");
                     assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
+                    if client_echo.is_some() {
+                        assert_client_echo_valid(&token_in, sender_id.as_ref());
+                    }
                     let referral_id = referral_id.map(|x| x.to_string());
                     let out_amounts = self.internal_direct_actions(
                         token_in,
