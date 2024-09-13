@@ -74,8 +74,8 @@ pub(crate) enum StorageKey {
     ShadowRecord {account_id: AccountId},
     UnitShareCumulativeInfo,
     PoolLimit,
-    ClientEchoTokenIdWhitelist,
-    ClientEchoSenderIdWhitelist,
+    ClientEchoTokenIdWhitelistItem,
+    ClientEchoSenderIdWhitelistItem,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]

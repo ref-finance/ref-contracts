@@ -2,7 +2,7 @@
 
 ### Version 1.9.5
 ```
-Hk44vRVYyGPrRPf7ndcn5m8LAd9YiVBsiKMhXqwfS4B6
+3hF1UzsT5mzxbJLMA8BD7gmCH1BL8cWjvFmSZYREpZXK
 ```
 1. add client echo limit
 

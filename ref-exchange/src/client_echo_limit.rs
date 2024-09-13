@@ -4,7 +4,7 @@ pub fn read_ce_tw_from_storage() -> UnorderedSet<AccountId> {
     if let Some(content) = env::storage_read(CLIENT_ECHO_TOKEN_ID_WHITHELIST.as_bytes()) {
         UnorderedSet::try_from_slice(&content).expect("deserialize client echo token id whitelist failed.")
     } else {
-        UnorderedSet::new(StorageKey::ClientEchoTokenIdWhitelist)
+        UnorderedSet::new(StorageKey::ClientEchoTokenIdWhitelistItem)
     }
 }
 
@@ -19,7 +19,7 @@ pub fn read_ce_sw_from_storage() -> UnorderedSet<AccountId> {
     if let Some(content) = env::storage_read(CLIENT_ECHO_SENDER_ID_WHITHELIST.as_bytes()) {
         UnorderedSet::try_from_slice(&content).expect("deserialize client echo sender id whitelist failed.")
     } else {
-        UnorderedSet::new(StorageKey::ClientEchoSenderIdWhitelist)
+        UnorderedSet::new(StorageKey::ClientEchoSenderIdWhitelistItem)
     }
 }
 
@@ -45,7 +45,8 @@ impl Contract {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         let mut client_echo_token_id_whitelist = read_ce_tw_from_storage();
         for token_id in token_ids {
-            assert!(client_echo_token_id_whitelist.insert(token_id.as_ref()), "Token id already exist");
+            let is_success = client_echo_token_id_whitelist.insert(token_id.as_ref());
+            assert!(is_success, "Token id already exist");
         }
         write_ce_tw_to_storage(client_echo_token_id_whitelist);
     }
@@ -56,7 +57,8 @@ impl Contract {
         self.assert_owner();
         let mut client_echo_token_id_whitelist = read_ce_tw_from_storage();
         for token_id in token_ids {
-            assert!(client_echo_token_id_whitelist.remove(token_id.as_ref()), "Invalid token id");
+            let is_success = client_echo_token_id_whitelist.remove(token_id.as_ref());
+            assert!(is_success, "Invalid token id");
         }
         write_ce_tw_to_storage(client_echo_token_id_whitelist);
     }
@@ -72,7 +74,8 @@ impl Contract {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         let mut client_echo_sender_id_whitelist = read_ce_sw_from_storage();
         for sender_id in sender_ids {
-            assert!(client_echo_sender_id_whitelist.insert(sender_id.as_ref()), "Sender id already exist");
+            let is_success = client_echo_sender_id_whitelist.insert(sender_id.as_ref());
+            assert!(is_success, "Sender id already exist");
         }
         write_ce_sw_to_storage(client_echo_sender_id_whitelist);
     }
@@ -83,7 +86,8 @@ impl Contract {
         self.assert_owner();
         let mut client_echo_sender_id_whitelist = read_ce_sw_from_storage();
         for sender_id in sender_ids {
-            assert!(client_echo_sender_id_whitelist.remove(sender_id.as_ref()), "Invalid sender id");
+            let is_success = client_echo_sender_id_whitelist.remove(sender_id.as_ref());
+            assert!(is_success, "Invalid sender id");
         }
         write_ce_sw_to_storage(client_echo_sender_id_whitelist);
     }
