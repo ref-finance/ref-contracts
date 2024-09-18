@@ -1,7 +1,7 @@
 use crate::*;
 
 pub fn read_ce_tw_from_storage() -> UnorderedSet<AccountId> {
-    if let Some(content) = env::storage_read(CLIENT_ECHO_TOKEN_ID_WHITHELIST.as_bytes()) {
+    if let Some(content) = env::storage_read(CLIENT_ECHO_TOKEN_ID_WHITELIST.as_bytes()) {
         UnorderedSet::try_from_slice(&content).expect("deserialize client echo token id whitelist failed.")
     } else {
         UnorderedSet::new(StorageKey::ClientEchoTokenIdWhitelistItem)
@@ -10,13 +10,13 @@ pub fn read_ce_tw_from_storage() -> UnorderedSet<AccountId> {
 
 pub fn write_ce_tw_to_storage(client_echo_token_id_whitelist: UnorderedSet<AccountId>) {
     env::storage_write(
-        CLIENT_ECHO_TOKEN_ID_WHITHELIST.as_bytes(), 
+        CLIENT_ECHO_TOKEN_ID_WHITELIST.as_bytes(), 
         &client_echo_token_id_whitelist.try_to_vec().unwrap(),
     );
 }
 
 pub fn read_ce_sw_from_storage() -> UnorderedSet<AccountId> {
-    if let Some(content) = env::storage_read(CLIENT_ECHO_SENDER_ID_WHITHELIST.as_bytes()) {
+    if let Some(content) = env::storage_read(CLIENT_ECHO_SENDER_ID_WHITELIST.as_bytes()) {
         UnorderedSet::try_from_slice(&content).expect("deserialize client echo sender id whitelist failed.")
     } else {
         UnorderedSet::new(StorageKey::ClientEchoSenderIdWhitelistItem)
@@ -25,7 +25,7 @@ pub fn read_ce_sw_from_storage() -> UnorderedSet<AccountId> {
 
 pub fn write_ce_sw_to_storage(client_echo_sender_id_whitelist: UnorderedSet<AccountId>) {
     env::storage_write(
-        CLIENT_ECHO_SENDER_ID_WHITHELIST.as_bytes(), 
+        CLIENT_ECHO_SENDER_ID_WHITELIST.as_bytes(), 
         &client_echo_sender_id_whitelist.try_to_vec().unwrap(),
     );
 }
