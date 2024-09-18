@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.9.5
+```
+3hF1UzsT5mzxbJLMA8BD7gmCH1BL8cWjvFmSZYREpZXK
+```
+1. add client echo limit
+
 ### Version 1.9.4
 ```
 DBz69SAuDcvGWrEraoKjNEMiiDxE3PagejSfhYw3SfqH

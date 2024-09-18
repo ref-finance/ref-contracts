@@ -34,6 +34,7 @@ pub use crate::unit_lpt_cumulative_infos::*;
 pub use crate::oracle::*;
 pub use crate::degen_swap::*;
 pub use crate::pool_limit_info::*;
+pub use crate::client_echo_limit::*;
 
 mod account_deposit;
 mod action;
@@ -56,6 +57,7 @@ mod custom_keys;
 mod shadow_actions;
 mod unit_lpt_cumulative_infos;
 mod pool_limit_info;
+mod client_echo_limit;
 
 near_sdk::setup_alloc!();
 
@@ -72,6 +74,8 @@ pub(crate) enum StorageKey {
     ShadowRecord {account_id: AccountId},
     UnitShareCumulativeInfo,
     PoolLimit,
+    ClientEchoTokenIdWhitelistItem,
+    ClientEchoSenderIdWhitelistItem,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]
