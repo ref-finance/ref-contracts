@@ -9,5 +9,5 @@ pub const DEGEN_ORACLE_CONFIG_STORAGE_KEY: &str = "custom_degen_oracle_config_ke
 pub const POOL_LIMIT: &str = "pl";
 
 // Key for client echo limit
-pub const CLIENT_ECHO_TOKEN_ID_WHITHELIST: &str = "ce_tw";
-pub const CLIENT_ECHO_SENDER_ID_WHITHELIST: &str = "ce_sw";
+pub const CLIENT_ECHO_TOKEN_ID_WHITELIST: &str = "ce_tw";
+pub const CLIENT_ECHO_SENDER_ID_WHITELIST: &str = "ce_sw";
