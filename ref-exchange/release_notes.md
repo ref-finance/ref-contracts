@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.9.6
+```
+2Yo8qJ5S3biFJbnBdb4ZNcGhN1RhHJq34cGF4g7Yigcw
+```
+1. add PoolDetailInfo view functions
+
 ### Version 1.9.5
 ```
 3hF1UzsT5mzxbJLMA8BD7gmCH1BL8cWjvFmSZYREpZXK

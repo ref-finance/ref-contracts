@@ -125,6 +125,70 @@ impl From<Pool> for PoolInfo {
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
+pub enum PoolDetailInfo {
+    SimplePoolInfo(SimplePoolInfo),
+    StablePoolInfo(StablePoolInfo),
+    RatedPoolInfo(RatedPoolInfo),
+    DegenPoolInfo(DegenPoolInfo),
+}
+
+impl From<SimplePoolInfo> for PoolDetailInfo {
+    fn from(pool: SimplePoolInfo) -> Self {
+        PoolDetailInfo::SimplePoolInfo(pool)
+    }
+}
+
+impl From<StablePoolInfo> for PoolDetailInfo {
+    fn from(pool: StablePoolInfo) -> Self {
+        PoolDetailInfo::StablePoolInfo(pool)
+    }
+}
+
+impl From<RatedPoolInfo> for PoolDetailInfo {
+    fn from(pool: RatedPoolInfo) -> Self {
+        PoolDetailInfo::RatedPoolInfo(pool)
+    }
+}
+
+impl From<DegenPoolInfo> for PoolDetailInfo {
+    fn from(pool: DegenPoolInfo) -> Self {
+        PoolDetailInfo::DegenPoolInfo(pool)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
+pub struct SimplePoolInfo {
+    /// List of tokens in the pool.
+    pub token_account_ids: Vec<AccountId>,
+    /// How much NEAR this contract has.
+    pub amounts: Vec<U128>,
+    /// Fee charged for swap.
+    pub total_fee: u32,
+    /// Total number of shares.
+    pub shares_total_supply: U128,
+}
+
+impl From<Pool> for SimplePoolInfo {
+    fn from(pool: Pool) -> Self {
+        match pool {
+            Pool::SimplePool(pool) => Self {
+                token_account_ids: pool.token_account_ids,
+                amounts: pool.amounts.into_iter().map(|a| U128(a)).collect(),
+                total_fee: pool.total_fee,
+                shares_total_supply: U128(pool.shares_total_supply),
+            },
+            Pool::StableSwapPool(_) => unimplemented!(),
+            Pool::RatedSwapPool(_) => unimplemented!(),
+            Pool::DegenSwapPool(_) => unimplemented!(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
 pub struct StablePoolInfo {
     /// List of tokens in the pool.
     pub token_account_ids: Vec<AccountId>,
@@ -323,6 +387,31 @@ impl Contract {
     pub fn get_pool_by_ids(&self, pool_ids: Vec<u64>) -> Vec<PoolInfo> {
         pool_ids.iter()
             .map(|index| self.get_pool(*index))
+            .collect()
+    }
+
+    /// Returns list of pool detail infos of given length from given start index.
+    pub fn get_pool_detail_infos(&self, from_index: u64, limit: u64) -> Vec<PoolDetailInfo> {
+        (from_index..std::cmp::min(from_index + limit, self.pools.len()))
+            .map(|index| self.get_pool_detail_info(index))
+            .collect()
+    }
+
+    /// Returns pool detail info about specified pool.
+    pub fn get_pool_detail_info(&self, pool_id: u64) -> PoolDetailInfo {
+        let pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        match &pool {
+            Pool::SimplePool(_) => <Pool as Into<SimplePoolInfo>>::into(pool).into(),
+            Pool::StableSwapPool(_) => <Pool as Into<StablePoolInfo>>::into(pool).into(),
+            Pool::RatedSwapPool(_) => <Pool as Into<RatedPoolInfo>>::into(pool).into(),
+            Pool::DegenSwapPool(_) => <Pool as Into<DegenPoolInfo>>::into(pool).into(),
+        }
+    }
+
+    /// Returns list of pool detail infos of given pool ids.
+    pub fn get_pool_detail_info_by_ids(&self, pool_ids: Vec<u64>) -> Vec<PoolDetailInfo> {
+        pool_ids.into_iter()
+            .map(|index| self.get_pool_detail_info(index))
             .collect()
     }
 
