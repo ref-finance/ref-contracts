@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.9.7
+```
+Cc7rca9tb9CZKQRkm5fqXMErVuCcGr3aeoxNsUgmkVhX
+```
+1. fix identity verification for the whitelisted_postfix related interfaces.
+
 ### Version 1.9.6
 ```
 2Yo8qJ5S3biFJbnBdb4ZNcGhN1RhHJq34cGF4g7Yigcw
