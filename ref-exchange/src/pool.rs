@@ -275,6 +275,15 @@ impl Pool {
         }
     }
 
+    pub fn share_unregister(&mut self, account_id: &AccountId) {
+        match self {
+            Pool::SimplePool(pool) => pool.share_unregister(account_id),
+            Pool::StableSwapPool(pool) => pool.share_unregister(account_id),
+            Pool::RatedSwapPool(pool) => pool.share_unregister(account_id),
+            Pool::DegenSwapPool(pool) => pool.share_unregister(account_id),
+        }
+    }
+
     pub fn predict_add_rated_liquidity(
         &self,
         amounts: &Vec<Balance>,

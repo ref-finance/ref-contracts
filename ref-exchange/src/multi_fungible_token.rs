@@ -185,6 +185,26 @@ impl Contract {
         }
     }
 
+    /// Unregister LP token of given pool for given account.
+    #[payable]
+    pub fn mft_unregister(&mut self, token_id: String) {
+        assert_one_yocto();
+        let account_id = env::predecessor_account_id();
+        let prev_storage = env::storage_usage();
+        match parse_token_id(token_id) {
+            TokenOrPool::Token(_) => env::panic(ERR111_INVALID_UNREGISTER.as_bytes()),
+            TokenOrPool::Pool(pool_id) => {
+                let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+                pool.share_unregister(&account_id);
+                self.pools.replace(pool_id, &pool);
+                if prev_storage > env::storage_usage() {
+                    let refund = (prev_storage - env::storage_usage()) as Balance * env::storage_byte_cost();
+                    Promise::new(account_id).transfer(refund);
+                }
+            }
+        }
+    }
+
     /// Transfer one of internal tokens: LP or balances.
     /// `token_id` can either by account of the token or pool number.
     #[payable]

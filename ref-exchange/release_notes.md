@@ -2,9 +2,11 @@
 
 ### Version 1.9.7
 ```
-Cc7rca9tb9CZKQRkm5fqXMErVuCcGr3aeoxNsUgmkVhX
+B2646W6czcBc6AnZfb4uETrAfcptNicVuYeiraoZFKA8
 ```
-1. fix identity verification for the whitelisted_postfix related interfaces.
+1. fix identity verification for the whitelisted_postfix related functions.
+2. add donation functions.
+3. add mft_unregister.
 
 ### Version 1.9.6
 ```
