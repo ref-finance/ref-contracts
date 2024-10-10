@@ -5,6 +5,7 @@ impl Contract {
     #[payable]
     pub fn donation_share(&mut self, pool_id: u64, amount: Option<U128>, unregister: Option<bool>) {
         assert_one_yocto();
+        self.assert_contract_running();
         let account_id = env::predecessor_account_id();
         let prev_storage = env::storage_usage();
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
@@ -30,6 +31,7 @@ impl Contract {
     #[payable]
     pub fn donation_token(&mut self, token_id: ValidAccountId, amount: Option<U128>, unregister: Option<bool>) {
         assert_one_yocto();
+        self.assert_contract_running();
         let account_id = env::predecessor_account_id();
         let mut account = self.internal_unwrap_account(&account_id);
         let donation_amount = amount.map(|v| v.0).unwrap_or(account.get_balance(token_id.as_ref()).expect("Invalid token_id"));
