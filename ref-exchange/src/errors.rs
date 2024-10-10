@@ -9,6 +9,7 @@ pub const ERR15_NO_STORAGE_CAN_WITHDRAW: &str = "E15: no storage can withdraw";
 pub const ERR16_STORAGE_WITHDRAW_TOO_MUCH: &str = "E16: storage withdraw too much";
 pub const ERR17_DEPOSIT_LESS_THAN_MIN_STORAGE: &str = "E17: deposit less than min storage";
 pub const ERR18_TOKENS_NOT_EMPTY: &str = "E18: storage unregister tokens not empty";
+pub const ERR19_LP_NOT_EMPTY: &str = "E19: LP not empty";
 
 // Accounts.
 
@@ -90,6 +91,7 @@ pub const ERR105_WHITELISTED_POSTFIX_NOT_IN_LIST: &str = "E105: whitelisted post
 
 //mft
 pub const ERR110_INVALID_REGISTER: &str = "E110: Invalid register";
+pub const ERR111_INVALID_UNREGISTER: &str = "E111: Invalid unregister";
 
 // rated pool
 pub const ERR120_RATES_EXPIRED: &str = "E120: Rates expired";

@@ -58,6 +58,8 @@ mod shadow_actions;
 mod unit_lpt_cumulative_infos;
 mod pool_limit_info;
 mod client_echo_limit;
+mod donation;
+mod event;
 
 near_sdk::setup_alloc!();
 

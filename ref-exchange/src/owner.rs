@@ -75,7 +75,7 @@ impl Contract {
     #[payable]
     pub fn extend_auto_whitelisted_postfix(&mut self, postfixes: Vec<String>) {
         assert_one_yocto();
-        self.is_owner_or_guardians();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         for postfix in postfixes {
             self.auto_whitelisted_postfix.insert(postfix.clone());
         }
@@ -84,7 +84,7 @@ impl Contract {
     #[payable]
     pub fn remove_auto_whitelisted_postfix(&mut self, postfixes: Vec<String>) {
         assert_one_yocto();
-        self.is_owner_or_guardians();
+        assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
         for postfix in postfixes {
             let exist = self.auto_whitelisted_postfix.remove(&postfix);
             assert!(exist, "{}", ERR105_WHITELISTED_POSTFIX_NOT_IN_LIST);
@@ -302,7 +302,7 @@ impl Contract {
         let mut account = self.internal_unwrap_account(&owner_id);
         // Note: subtraction and deregistration will be reverted if the promise fails.
         account.withdraw(&token_id, amount);
-        self.internal_save_account(&owner_id, account);
+        self.accounts.insert(&owner_id, &account.into());
         self.internal_send_tokens(&owner_id, &token_id, amount, skip_unwrap_near)
     }
 
