@@ -189,6 +189,7 @@ impl Contract {
     #[payable]
     pub fn mft_unregister(&mut self, token_id: String) {
         assert_one_yocto();
+        self.assert_contract_running();
         let account_id = env::predecessor_account_id();
         let prev_storage = env::storage_usage();
         match parse_token_id(token_id) {
