@@ -9,7 +9,7 @@ pub const ERR15_NO_STORAGE_CAN_WITHDRAW: &str = "E15: no storage can withdraw";
 pub const ERR16_STORAGE_WITHDRAW_TOO_MUCH: &str = "E16: storage withdraw too much";
 pub const ERR17_DEPOSIT_LESS_THAN_MIN_STORAGE: &str = "E17: deposit less than min storage";
 pub const ERR18_TOKENS_NOT_EMPTY: &str = "E18: storage unregister tokens not empty";
-pub const ERR19_LP_NOT_EMPTY: &str = "E19: LP not empty";
+pub const ERR19_NONZERO_LP_SHARES: &str = "E19: Nonzero LP shares";
 
 // Accounts.
 

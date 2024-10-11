@@ -721,7 +721,7 @@ impl DegenSwapPool {
     /// The storage should be refunded to the user.
     pub fn share_unregister(&mut self, account_id: &AccountId) {
         let shares = self.shares.remove(account_id);
-        assert!(shares.expect(ERR13_LP_NOT_REGISTERED) == 0, "{}", ERR19_LP_NOT_EMPTY);
+        assert!(shares.expect(ERR13_LP_NOT_REGISTERED) == 0, "{}", ERR19_NONZERO_LP_SHARES);
     }
 
     /// Transfers shares from predecessor to receiver.

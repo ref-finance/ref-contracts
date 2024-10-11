@@ -300,7 +300,6 @@ impl Contract {
         assert!(amount > 0, "{}", ERR29_ILLEGAL_WITHDRAW_AMOUNT);
         let owner_id = self.owner_id.clone();
         let mut account = self.internal_unwrap_account(&owner_id);
-        // Note: subtraction and deregistration will be reverted if the promise fails.
         account.withdraw(&token_id, amount);
         self.accounts.insert(&owner_id, &account.into());
         self.internal_send_tokens(&owner_id, &token_id, amount, skip_unwrap_near)

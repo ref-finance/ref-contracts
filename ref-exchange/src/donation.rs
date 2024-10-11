@@ -2,6 +2,15 @@ use crate::*;
 
 #[near_bindgen]
 impl Contract {
+    /// The user donates the shares they hold to the protocol.
+    ///
+    /// # Arguments
+    ///
+    /// * `pool_id` - The pool id where the shares are located.
+    /// * `amount` - The donation amount; if it's None, the entire amount will be donated.
+    /// * `unregister` - If `Some(true)`, Will attempt to unregister the shares and refund the user’s storage fees.
+    ///                  The storage fee will be refunded to the user's internal account first; 
+    ///                  if there is no internal account, a transfer will be initiated. 
     #[payable]
     pub fn donation_share(&mut self, pool_id: u64, amount: Option<U128>, unregister: Option<bool>) {
         assert_one_yocto();
@@ -28,6 +37,13 @@ impl Contract {
         event::Event::DonationShare { account_id: &account_id, pool_id, amount: U128(donation_amount) }.emit();
     }
 
+    /// The user donates the tokens they hold to the owner.
+    ///
+    /// # Arguments
+    ///
+    /// * `token_id` - The id of the donated token.
+    /// * `amount` - The donation amount; if it's None, the entire amount will be donated.
+    /// * `unregister` - If `Some(true)`, Will attempt to unregister the tokens.
     #[payable]
     pub fn donation_token(&mut self, token_id: ValidAccountId, amount: Option<U128>, unregister: Option<bool>) {
         assert_one_yocto();

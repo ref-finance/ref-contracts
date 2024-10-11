@@ -2,7 +2,7 @@
 
 ### Version 1.9.7
 ```
-BQRaMGsoRafZXJuSb1X66MuXw9vXvSWb4mHQPeaH9uDq
+CMN4goNWHQjsXevLbqAC9nXKTw1yeJqysEfB647uuyro
 ```
 1. fix identity verification for the whitelisted_postfix related functions.
 2. add donation functions.
