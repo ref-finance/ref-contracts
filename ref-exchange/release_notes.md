@@ -1,5 +1,13 @@
 # Release Notes
 
+### Version 1.9.7
+```
+CMN4goNWHQjsXevLbqAC9nXKTw1yeJqysEfB647uuyro
+```
+1. fix identity verification for the whitelisted_postfix related functions.
+2. add donation functions.
+3. add mft_unregister.
+
 ### Version 1.9.6
 ```
 2Yo8qJ5S3biFJbnBdb4ZNcGhN1RhHJq34cGF4g7Yigcw

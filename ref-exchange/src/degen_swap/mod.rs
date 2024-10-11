@@ -717,6 +717,13 @@ impl DegenSwapPool {
         self.shares.insert(account_id, &0);
     }
 
+    /// Unregister account with shares balance of 0.
+    /// The storage should be refunded to the user.
+    pub fn share_unregister(&mut self, account_id: &AccountId) {
+        let shares = self.shares.remove(account_id);
+        assert!(shares.expect(ERR13_LP_NOT_REGISTERED) == 0, "{}", ERR19_NONZERO_LP_SHARES);
+    }
+
     /// Transfers shares from predecessor to receiver.
     pub fn share_transfer(&mut self, sender_id: &AccountId, receiver_id: &AccountId, amount: u128) {
         let balance = self.shares.get(&sender_id).expect(ERR13_LP_NOT_REGISTERED);
