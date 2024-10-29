@@ -1,4 +1,4 @@
-use crate::utils::{u128_dec_format, u64_dec_format};
+use crate::utils::{u128_dec_format, u64_dec_format, to_nano};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{ext_contract, Balance, Timestamp};
@@ -32,6 +32,23 @@ pub mod price_oracle {
         pub prices: Vec<AssetOptionalPrice>,
     }
 
+    impl PriceData {
+        pub fn assert_valid(&self, timestamp: u64, maximum_recency_duration_sec: u32, maximum_staleness_duration_sec: u32) {
+            assert!(
+                self.recency_duration_sec <= maximum_recency_duration_sec,
+                "Recency duration in the oracle call is larger than allowed maximum"
+            );
+            assert!(
+                self.timestamp <= timestamp,
+                "Price data timestamp is in the future"
+            );
+            assert!(
+                timestamp - self.timestamp <= to_nano(maximum_staleness_duration_sec),
+                "Price data timestamp is too stale"
+            );
+        }
+    }
+
     #[ext_contract(ext_price_oracle)]
     pub trait ExtPriceOracle {
         fn get_price_data(&self, asset_ids: Option<Vec<AssetId>>) -> PriceData;
@@ -53,6 +70,14 @@ pub mod pyth_oracle {
         pub expo: i32,
         /// Unix timestamp of when this price was computed
         pub publish_time: i64,
+    }
+
+    impl Price {
+        pub fn is_valid(&self, timestamp: u64, pyth_price_valid_duration_sec: u32) -> bool {
+            self.price.0 > 0 && 
+            self.publish_time > 0 && 
+            to_nano(self.publish_time as u32 + pyth_price_valid_duration_sec) >= timestamp
+        }
     }
 
     #[derive(BorshDeserialize, BorshSerialize, PartialEq, Eq, Hash, Clone)]
@@ -122,5 +147,6 @@ pub mod pyth_oracle {
     #[ext_contract(ext_pyth_oracle)]
     pub trait ExtPythOracle {
         fn get_price(&self, price_identifier: PriceIdentifier) -> Option<Price>;
+        fn list_prices_no_older_than(&self, price_ids: Vec<PriceIdentifier>, age: u64) -> HashMap<PriceIdentifier, Option<Price>>;
     }
 }

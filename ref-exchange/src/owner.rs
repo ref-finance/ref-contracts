@@ -396,6 +396,19 @@ impl Contract {
         }
     }
 
+    /// Update degen token. Only owner can call.
+    #[payable]
+    pub fn update_degen_token(&mut self, token_id: ValidAccountId, degen_type: DegenType) {
+        assert_one_yocto();
+        self.assert_owner();
+        let token_id: AccountId = token_id.into();
+        if global_update_degen(&token_id, degen_type.clone()) {
+            log!("Update degen token {} to {:?} type", token_id, degen_type);
+        } else {
+            env::panic(format!("Degen token {} not exist", token_id).as_bytes());
+        }
+    }
+
     /// Remove degen token. Only owner can call.
     #[payable]
     pub fn unregister_degen_token(&mut self, token_id: ValidAccountId) {

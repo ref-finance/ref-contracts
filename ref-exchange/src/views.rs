@@ -57,6 +57,27 @@ pub struct DegenTokenInfo {
     pub decimals: Option<u8>
 }
 
+impl From<&Degen> for DegenTokenInfo {
+    fn from(v: &Degen) -> Self {
+        DegenTokenInfo {
+            degen_type: v.get_type(),
+            degen_price: v.get_price_info().stored_degen.into(),
+            last_update_ts: v.get_price_info().degen_updated_at.into(),
+            is_price_valid: v.is_price_valid(),
+            price_identifier: if let Degen::PythOracle(d) = v {
+                Some(d.price_identifier.clone())
+            } else {
+                None
+            },
+            decimals: if let Degen::PriceOracle(d) = v {
+                Some(d.decimals)
+            } else {
+                None
+            },
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
 #[cfg_attr(not(target_arch = "wasm32"), derive(Debug, PartialEq))]
@@ -683,31 +704,27 @@ impl Contract {
         .collect()
     }
 
+    /// Batch retrieve DegenTokenInfo based on the specified token ID list.
+    ///
+    /// # Arguments
+    ///
+    /// * `token_ids` - List of token IDs.
+    pub fn batch_get_degen_tokens(&self, token_ids: Vec<ValidAccountId>) -> HashMap<String, Option<DegenTokenInfo>> {
+        let degens = read_degens_from_storage();
+        token_ids.into_iter().map(|t| {
+            let token_id: AccountId = t.into();
+            (token_id.clone(), degens.get(&token_id).map(|v| v.into()))
+        }).collect()
+    }
+
     pub fn list_degen_tokens(&self) -> HashMap<String, DegenTokenInfo> {
         let degens = read_degens_from_storage();
         degens
         .iter()
-        .map(|(k, v)| {
-            (
-                k.clone(),  
-                DegenTokenInfo {
-                    degen_type: v.get_type(),
-                    degen_price: v.get_price_info().stored_degen.into(),
-                    last_update_ts: v.get_price_info().degen_updated_at.into(),
-                    is_price_valid: v.is_price_valid(),
-                    price_identifier: if let Degen::PythOracle(d) = v {
-                        Some(d.price_identifier.clone())
-                    } else {
-                        None
-                    },
-                    decimals: if let Degen::PriceOracle(d) = v {
-                        Some(d.decimals)
-                    } else {
-                        None
-                    },
-                }
-            )
-        })
+        .map(|(k, v)| (
+            k.clone(),  
+            v.into()
+        ))
         .collect()
     }
 
@@ -854,6 +871,7 @@ impl Contract {
     pub fn predict_hot_zap(
         &self, 
         referral_id: Option<ValidAccountId>,
+        account_id: Option<ValidAccountId>,
         token_in: ValidAccountId,
         amount_in: U128,
         hot_zap_actions: Vec<Action>,
@@ -862,6 +880,27 @@ impl Contract {
         if hot_zap_actions.is_empty() || add_liquidity_infos.is_empty() {
             return None
         }
+        let all_tokens = self.get_hot_zap_tokens(&hot_zap_actions, &add_liquidity_infos);
+        if let Some(account_id) = account_id {
+            let account = self.internal_unwrap_account(&account_id.into());      
+            for token_id in all_tokens.iter() {
+                assert!(
+                    self.is_whitelisted_token(token_id) 
+                        || account.get_balance(token_id).is_some(),
+                    "{}",
+                    ERR12_TOKEN_NOT_WHITELISTED
+                );
+            }
+        } else {
+            for token_id in all_tokens.iter() {
+                assert!(
+                    self.is_whitelisted_token(token_id),
+                    "{}",
+                    ERR12_TOKEN_NOT_WHITELISTED
+                );
+            }
+        }
+        self.assert_no_frozen_tokens(&all_tokens);
         let mut pool_cache = HashMap::new();
         let mut add_liquidity_predictions = vec![];
         let mut token_cache = TokenCache::new();

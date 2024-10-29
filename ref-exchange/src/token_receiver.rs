@@ -143,7 +143,17 @@ impl FungibleTokenReceiver for Contract {
                 } => {
                     assert!(hot_zap_actions.len() > 0 && add_liquidity_infos.len() > 0);
                     let sender_id: AccountId = sender_id.into();
-                    let mut account = self.internal_unwrap_account(&sender_id);                    
+                    let mut account = self.internal_unwrap_account(&sender_id);      
+                    let all_tokens = self.get_hot_zap_tokens(&hot_zap_actions, &add_liquidity_infos);
+                    for token_id in all_tokens.iter() {
+                        assert!(
+                            self.is_whitelisted_token(token_id) 
+                                || account.get_balance(token_id).is_some(),
+                            "{}",
+                            ERR12_TOKEN_NOT_WHITELISTED
+                        );
+                    }
+                    self.assert_no_frozen_tokens(&all_tokens);
                     let referral_id = referral_id.map(|x| x.to_string());
                     let out_amounts = self.internal_direct_actions(
                         token_in,
@@ -225,5 +235,19 @@ impl FungibleTokenReceiver for Contract {
                 }
             }
         }
+    }
+}
+
+impl Contract {
+    pub fn get_hot_zap_tokens(&self, hot_zap_actions: &Vec<Action>, add_liquidity_infos: &Vec<AddLiquidityInfo>) -> Vec<AccountId> {
+        let mut all_tokens = HashSet::new();
+        for action in hot_zap_actions {
+            all_tokens.extend(action.tokens());
+        }
+        for add_liquidity_info in add_liquidity_infos {
+            let pool = self.pools.get(add_liquidity_info.pool_id).expect(ERR85_NO_POOL);
+            all_tokens.extend(pool.tokens().to_vec());
+        }
+        all_tokens.into_iter().collect::<Vec<_>>()
     }
 }

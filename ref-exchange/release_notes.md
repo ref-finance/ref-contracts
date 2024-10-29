@@ -1,5 +1,12 @@
 # Release Notes
 
+### Version 1.9.8
+```
+CNFJRDekcistiyBHyZFif4CupZjND91VAj8hgR1E3Q35
+```
+1. add batch update degen price function
+2. add token check to hotzap.
+
 ### Version 1.9.7
 ```
 CMN4goNWHQjsXevLbqAC9nXKTw1yeJqysEfB647uuyro
