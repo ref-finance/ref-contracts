@@ -95,4 +95,14 @@ impl Contract {
     pub fn get_price(&self, price_identifier: PriceIdentifier) -> Option<PythPrice> {
         self.price_info.get(&price_identifier).cloned()
     }
+
+    pub fn list_prices_no_older_than(&self, price_ids: Vec<PriceIdentifier>, age: u64) -> HashMap<PriceIdentifier, Option<PythPrice>> {
+        let _ = age;
+        let mut res = HashMap::new();
+        for price_id in price_ids {
+            let price = self.price_info.get(&price_id).cloned();
+            res.insert(price_id, price);
+        }
+        res
+    }
 }

@@ -52,6 +52,7 @@ fn test_hotzap_simple_pool() {
 
     println!("predict hot zap: {:?}", view!(pool.predict_hot_zap(
         None,
+        None,
         token_dai.valid_account_id(),
         U128(to_yocto("2")),
         vec![
@@ -196,6 +197,7 @@ fn test_hotzap_simple_pool_add_two() {
     println!("remain usdt : {:?}", out_usdt_amount - add_liquidity_prediction.need_amounts[1].0 - add_liquidity_prediction2.need_amounts[1].0);
 
     println!("predict hot zap: {:?}", view!(pool.predict_hot_zap(
+        None,
         None,
         token_dai.valid_account_id(),
         U128(to_yocto("2")),
@@ -399,6 +401,7 @@ fn test_hotzap_stable_pool() {
     println!("{:?}", view!(pool.predict_add_stable_liquidity(DAI_USDT_USDC, &vec![U128(5*ONE_DAI), U128(4750565), U128(4750565)])).unwrap_json::<U128>().0);
 
     println!("predict hot zap: {:?}", view!(pool.predict_hot_zap(
+        None,
         None,
         token_dai.valid_account_id(),
         U128(15*ONE_DAI),
@@ -610,6 +613,7 @@ fn test_hotzap_stable_pool_add_two() {
 
     println!("predict hot zap: {:?}", view!(pool.predict_hot_zap(
         None,
+        None,
         token_dai.valid_account_id(),
         U128(15*ONE_DAI),
         vec![
@@ -813,6 +817,7 @@ fn test_hotzap_rate_pool() {
 
     println!("predict hot zap: {:?}", view!(pool.predict_hot_zap(
         None,
+        None,
         token_near.valid_account_id(),
         U128(to_yocto("10")),
         vec![
@@ -1008,6 +1013,7 @@ fn test_hotzap_rate_pool_add_two() {
 
     println!("predict hot zap: {:?}", view!(pool.predict_hot_zap(
         None,
+        None,
         token_near.valid_account_id(),
         U128(to_yocto("10")),
         vec![
@@ -1109,4 +1115,120 @@ fn test_hotzap_rate_pool_add_two() {
 
     println!("after mft_transfer_all_call: {:?}", view!(mock_boost_farming.get_seed(seed_id)).unwrap_json::<Value>());
     println!("view new_user deposit: {:?}", view!(pool.get_deposits(new_user.valid_account_id())).unwrap_json::<HashMap<AccountId, U128>>());
+}
+
+#[test]
+fn test_hotzap_simple_pool_frozen_token() {
+    const DAI_ETH: u64 = 0;
+    const ETH_USDT: u64 = 1;
+    const DAI_USDT: u64 = 2;
+    let (root, owner, pool, token_dai, token_eth, token_usdt) = setup_pool_with_liquidity();
+    let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
+    call!(
+        new_user,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        new_user,
+        token_dai.mint(to_va(new_user.account_id.clone()), U128(to_yocto("10")))
+    )
+    .assert_success();
+
+    let out_eth_amount = view!(pool.get_return(DAI_ETH, to_va(token_dai.account_id().clone()), U128(to_yocto("1")), to_va(token_eth.account_id().clone()))).unwrap_json::<U128>().0;
+    let out_usdt_amount = view!(pool.get_return(DAI_USDT, to_va(token_dai.account_id().clone()), U128(to_yocto("1")), to_va(token_usdt.account_id().clone()))).unwrap_json::<U128>().0;
+    let add_liquidity_prediction = view!(pool.predict_add_simple_liquidity(ETH_USDT, &vec![U128(out_eth_amount), U128(out_usdt_amount)])).unwrap_json::<AddLiquidityPrediction>();
+
+    let out_come = call!(
+        owner,
+        pool.extend_frozenlist_tokens(vec![to_va(dai())]),
+        deposit=1
+    );
+    out_come.assert_success();
+
+    let outcome = call!(
+        new_user,
+        token_dai.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("2").into(),
+            None,
+            json!({
+                "hot_zap_actions": [
+                    {"pool_id": 0, "token_in": "dai001", "amount_in":"1000000000000000000000000", "token_out":"eth002", "min_amount_out":"1"},
+                    {"pool_id": 2, "token_in": "dai001", "amount_in":"1000000000000000000000000", "token_out":"usdt", "min_amount_out":"1"}
+                ],
+                "add_liquidity_infos": vec![
+                    AddLiquidityInfo {
+                        pool_id: 1,
+                        amounts: add_liquidity_prediction.need_amounts.clone(),
+                        min_amounts: Some(vec![U128(1814048647419868151852681u128), U128(907024323709934075926341u128)]),
+                        min_shares: None
+                    }
+                ],
+            }).to_string()
+        ),
+        1,
+        near_sdk_sim::DEFAULT_GAS
+    );
+    let exe_status = format!("{:?}", outcome.promise_errors()[0].as_ref().unwrap().status());
+    assert!(exe_status.contains("E52: token frozen"));
+}
+
+#[test]
+fn test_hotzap_simple_pool_not_whitelisted_token() {
+    const DAI_ETH: u64 = 0;
+    const ETH_USDT: u64 = 1;
+    const DAI_USDT: u64 = 2;
+    let (root, owner, pool, token_dai, token_eth, token_usdt) = setup_pool_with_liquidity();
+    let new_user = root.create_user("new_user".to_string(), to_yocto("100"));
+    call!(
+        new_user,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        new_user,
+        token_dai.mint(to_va(new_user.account_id.clone()), U128(to_yocto("10")))
+    )
+    .assert_success();
+
+    let out_eth_amount = view!(pool.get_return(DAI_ETH, to_va(token_dai.account_id().clone()), U128(to_yocto("1")), to_va(token_eth.account_id().clone()))).unwrap_json::<U128>().0;
+    let out_usdt_amount = view!(pool.get_return(DAI_USDT, to_va(token_dai.account_id().clone()), U128(to_yocto("1")), to_va(token_usdt.account_id().clone()))).unwrap_json::<U128>().0;
+    let add_liquidity_prediction = view!(pool.predict_add_simple_liquidity(ETH_USDT, &vec![U128(out_eth_amount), U128(out_usdt_amount)])).unwrap_json::<AddLiquidityPrediction>();
+
+    let out_come = call!(
+        owner,
+        pool.remove_whitelisted_tokens(vec![to_va(dai())]),
+        deposit = 1
+    );
+    out_come.assert_success();
+
+    let outcome = call!(
+        new_user,
+        token_dai.ft_transfer_call(
+            to_va(swap()),
+            to_yocto("2").into(),
+            None,
+            json!({
+                "hot_zap_actions": [
+                    {"pool_id": 0, "token_in": "dai001", "amount_in":"1000000000000000000000000", "token_out":"eth002", "min_amount_out":"1"},
+                    {"pool_id": 2, "token_in": "dai001", "amount_in":"1000000000000000000000000", "token_out":"usdt", "min_amount_out":"1"}
+                ],
+                "add_liquidity_infos": vec![
+                    AddLiquidityInfo {
+                        pool_id: 1,
+                        amounts: add_liquidity_prediction.need_amounts.clone(),
+                        min_amounts: Some(vec![U128(1814048647419868151852681u128), U128(907024323709934075926341u128)]),
+                        min_shares: None
+                    }
+                ],
+            }).to_string()
+        ),
+        1,
+        near_sdk_sim::DEFAULT_GAS
+    );
+    let exe_status = format!("{:?}", outcome.promise_errors()[0].as_ref().unwrap().status());
+    assert!(exe_status.contains("E12: token not whitelisted"));
 }

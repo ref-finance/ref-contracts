@@ -1,5 +1,5 @@
-use super::price_oracle::{PriceOracleConfig, PriceOracleDegen};
-use super::pyth_oracle::{PythOracleConfig, PythOracleDegen};
+use super::price_oracle::{PriceOracleConfig, PriceOracleDegen, batch_update_degen_token_by_price_oracle};
+use super::pyth_oracle::{PythOracleConfig, PythOracleDegen, batch_update_degen_token_by_pyth_oracle};
 
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
@@ -94,6 +94,13 @@ impl Degen {
         match self {
             Degen::PriceOracle(_) => "PriceOracle".to_string(),
             Degen::PythOracle(_) => "PythOracle".to_string(),
+        }
+    }
+
+    pub fn update_price_info(&mut self, price_info: PriceInfo) {
+        match self {
+            Degen::PriceOracle(t) => t.price_info = Some(price_info),
+            Degen::PythOracle(t) => t.price_info = Some(price_info),
         }
     }
 }
@@ -222,6 +229,18 @@ pub fn global_unregister_degen_oracle_config(config_key: &String) -> bool {
     }
 }
 
+pub fn global_update_degen(token_id: &AccountId, degen_type: DegenType) -> bool {
+    let mut degens = read_degens_from_storage();
+
+    if degens.contains_key(token_id) {
+        degens.insert(token_id.clone(), Degen::new(token_id.clone(), degen_type));
+        write_degens_to_storage(degens);
+        true
+    } else {
+        false
+    }
+}
+
 pub fn global_update_degen_oracle_config(config: DegenOracleConfig) -> bool {
     let mut degen_oracle_configs = read_degen_oracle_configs_from_storage();
 
@@ -271,4 +290,27 @@ pub fn global_set_degen(token_id: &AccountId, degen: &Degen) {
 pub fn is_global_degen_price_valid(token_id: &AccountId) -> bool {
     init_degens_cache();
     DEGENS.lock().unwrap().get(token_id).expect(format!("{} is not degen token", token_id).as_str()).is_price_valid()
+}
+
+// Both types of oracle-configured degen tokens can be updated simultaneously.
+pub fn internal_batch_update_degen_token_price(token_ids: Vec<AccountId>) {
+    let mut token_id_decimals_map = HashMap::new();
+    let mut price_id_token_id_map = HashMap::new();
+    for token_id in token_ids {
+        let degen = global_get_degen(&token_id);
+        match degen {
+            Degen::PriceOracle(t) => {
+                token_id_decimals_map.insert(token_id, t.decimals);
+            },
+            Degen::PythOracle(t) => {
+                price_id_token_id_map.insert(t.price_identifier.clone(), token_id);
+            },
+        }
+    }
+    if !token_id_decimals_map.is_empty() {
+        batch_update_degen_token_by_price_oracle(token_id_decimals_map);
+    }
+    if !price_id_token_id_map.is_empty() {
+        batch_update_degen_token_by_pyth_oracle(price_id_token_id_map);
+    }
 }

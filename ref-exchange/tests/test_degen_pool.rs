@@ -446,3 +446,100 @@ fn degen_limit() {
     out_come.assert_success();
     println!("{:#?}", get_logs(&out_come));
 }
+
+#[test]
+fn batch_update_degen_token() {
+    let (root, owner, pool, _) = 
+        setup_degen_pool(
+            vec![eth(), btc()],
+            vec![100000*ONE_ETH, 100000*ONE_BTC],
+            vec![18, 8],
+            25,
+            10000,
+        );
+    let pyth_contract = setup_pyth_oracle(&root);
+    let block_timestamp = root.borrow_runtime().current_block().block_timestamp;
+    call!(
+        root,
+        pyth_contract.set_price(mock_pyth::PriceIdentifier(hex::decode("27e867f0f4f61076456d1a73b14c7edc1cf5cef4f4d6193a33424288f11bd0f4").unwrap().try_into().unwrap()), PythPrice {
+            price: 100000000.into(),
+            conf: 397570.into(),
+            expo: -8,
+            publish_time: nano_to_sec(block_timestamp) as i64,
+        })
+    ).assert_success();
+    let price_oracle_contract = setup_price_oracle(&root);
+    call!(
+        root,
+        price_oracle_contract.set_price_data(eth(), Price {
+            multiplier: 20000,
+            decimals: 22,
+        })
+    ).assert_success();
+
+    call!(
+        owner, 
+        pool.register_degen_oracle_config(DegenOracleConfig::PriceOracle(PriceOracleConfig { 
+            oracle_id: price_oracle(), 
+            expire_ts: 3600 * 10u64.pow(9), 
+            maximum_recency_duration_sec: 90, 
+            maximum_staleness_duration_sec: 90
+        })),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        owner, 
+        pool.register_degen_oracle_config(DegenOracleConfig::PythOracle(PythOracleConfig { 
+            oracle_id: pyth_oracle(), 
+            expire_ts: 3600 * 10u64.pow(9), 
+            pyth_price_valid_duration_sec: 60
+        })),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        owner, 
+        pool.register_degen_token(to_va(eth()), DegenType::PriceOracle { decimals: 18 }),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        owner, 
+        pool.register_degen_token(to_va(btc()), DegenType::PythOracle { price_identifier: ref_exchange::pyth_oracle::PriceIdentifier(hex::decode("27e867f0f4f61076456d1a73b14c7edc1cf5cef4f4d6193a33424288f11bd0f4").unwrap().try_into().unwrap()) }),
+        deposit = 1
+    )
+    .assert_success();
+
+    call!(
+        root, 
+        pool.batch_update_degen_token_price(vec![to_va(btc()), to_va(eth())]),
+        deposit = 0
+    )
+    .assert_success();
+
+    println!("{:?}",  view!(pool.list_degen_tokens()).unwrap_json::<HashMap<String, DegenTokenInfo>>());
+    println!("{:?}",  view!(pool.batch_get_degen_tokens(vec![to_va(btc())])).unwrap_json::<HashMap<String, DegenTokenInfo>>());
+    
+    call!(
+        owner, 
+        pool.update_degen_token(to_va(btc()), DegenType::PriceOracle { decimals: 8 }),
+        deposit = 1
+    )
+    .assert_success();
+
+    call!(
+        root,
+        price_oracle_contract.set_price_data(btc(), Price {
+            multiplier: 100,
+            decimals: 10,
+        })
+    ).assert_success();
+    call!(
+        root, 
+        pool.batch_update_degen_token_price(vec![to_va(btc()), to_va(eth())]),
+        deposit = 0
+    )
+    .assert_success();
+    println!("{:?}",  view!(pool.batch_get_degen_tokens(vec![to_va(btc())])).unwrap_json::<HashMap<String, DegenTokenInfo>>());
+}

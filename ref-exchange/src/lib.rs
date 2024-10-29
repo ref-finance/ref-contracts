@@ -100,6 +100,8 @@ impl fmt::Display for RunningState {
 pub trait SelfCallbacks {
     fn update_token_rate_callback(&mut self, token_id: AccountId);
     fn update_degen_token_price_callback(&mut self, token_id: AccountId);
+    fn batch_update_degen_token_by_price_oracle_callback(&mut self, token_id_decimals_map: HashMap<AccountId, u8>);
+    fn batch_update_degen_token_by_pyth_oracle_callback(&mut self, price_id_token_id_map: HashMap<pyth_oracle::PriceIdentifier, AccountId>);
 }
 
 #[near_bindgen]
@@ -593,6 +595,15 @@ impl Contract {
         }
     }
 
+    /// anyone can trigger a batch update for degen tokens
+    ///
+    /// # Arguments
+    ///
+    /// * `token_ids` - List of token IDs.
+    pub fn batch_update_degen_token_price(&self, token_ids: Vec<ValidAccountId>) {
+        internal_batch_update_degen_token_price(token_ids.into_iter().map(|v| v.into()).collect());
+    } 
+
     /// anyone can trigger an update for some degen token
     pub fn update_degen_token_price(& self, token_id: ValidAccountId) {
         let caller = env::predecessor_account_id();
@@ -726,11 +737,8 @@ impl Contract {
                 self.finalize_prev_swap_chain(account, prev_action, &result);
             }
         }
-        let degen_tokens = self.get_degen_tokens_in_actions(actions);
-        for token_id in degen_tokens {
-            let degen = global_get_degen(&token_id);
-            degen.sync_token_price(&token_id);
-        }
+        let degen_token_ids = self.get_degen_tokens_in_actions(actions).into_iter().collect::<Vec<_>>();
+        internal_batch_update_degen_token_price(degen_token_ids);
         result
     }
 

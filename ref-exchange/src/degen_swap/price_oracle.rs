@@ -1,7 +1,8 @@
+use crate::*;
 use super::global_get_degen_price_oracle_config;
 use super::{degen::DegenTrait, PRECISION};
 use crate::errors::ERR126_FAILED_TO_PARSE_RESULT;
-use crate::utils::{to_nano, u128_ratio, u64_dec_format, GAS_FOR_BASIC_OP, NO_DEPOSIT};
+use crate::utils::{u128_ratio, u64_dec_format, GAS_FOR_BASIC_OP, NO_DEPOSIT};
 use crate::oracle::price_oracle;
 use crate::PriceInfo;
 use near_sdk::serde::{Deserialize, Serialize};
@@ -57,18 +58,7 @@ impl DegenTrait for PriceOracleDegen {
         let prices = from_slice::<price_oracle::PriceData>(cross_call_result).expect(ERR126_FAILED_TO_PARSE_RESULT);
         let timestamp = env::block_timestamp();
         let config = global_get_degen_price_oracle_config();
-        assert!(
-            prices.recency_duration_sec <= config.maximum_recency_duration_sec,
-            "Recency duration in the oracle call is larger than allowed maximum"
-        );
-        assert!(
-            prices.timestamp <= timestamp,
-            "Price data timestamp is in the future"
-        );
-        assert!(
-            timestamp - prices.timestamp <= to_nano(config.maximum_staleness_duration_sec),
-            "Price data timestamp is too stale"
-        );
+        prices.assert_valid(timestamp, config.maximum_recency_duration_sec, config.maximum_staleness_duration_sec);
         assert!(prices.prices[0].asset_id == self.token_id, "Invalid price data");
         let token_price = prices.prices[0].price.as_ref().expect("Missing token price");
 
@@ -80,5 +70,54 @@ impl DegenTrait for PriceOracleDegen {
             degen_updated_at: timestamp
         });
         price
+    }
+}
+
+pub const GAS_FOR_BATCH_UPDATE_DEGEN_TOKEN_BY_PRICE_ORACLE_OP: Gas = 10_000_000_000_000;
+pub const GAS_FOR_BATCH_UPDATE_DEGEN_TOKEN_BY_PRICE_ORACLE_CALLBACK: Gas = 10_000_000_000_000;
+
+// Batch retrieve the price oracle prices for degen tokens.
+pub fn batch_update_degen_token_by_price_oracle(token_id_decimals_map: HashMap<AccountId, u8>) {
+    let token_ids = token_id_decimals_map.keys().cloned().collect::<Vec<_>>();
+    let config = global_get_degen_price_oracle_config();
+    price_oracle::ext_price_oracle::get_price_data(
+        Some(token_ids.clone()), 
+        &config.oracle_id,
+        NO_DEPOSIT, 
+        GAS_FOR_BATCH_UPDATE_DEGEN_TOKEN_BY_PRICE_ORACLE_OP
+    ).then(ext_self::batch_update_degen_token_by_price_oracle_callback(
+            token_id_decimals_map,
+            &env::current_account_id(),
+            NO_DEPOSIT,
+            GAS_FOR_BATCH_UPDATE_DEGEN_TOKEN_BY_PRICE_ORACLE_CALLBACK,
+        ));
+}
+
+#[near_bindgen]
+impl Contract {
+    // Invalid tokens do not affect the synchronization of valid tokens, and panic will not impact the swap.
+    #[private]
+    pub fn batch_update_degen_token_by_price_oracle_callback(&mut self, token_id_decimals_map: HashMap<AccountId, u8>) {
+        if let Some(cross_call_result) = near_sdk::promise_result_as_success() {
+            let prices = from_slice::<price_oracle::PriceData>(&cross_call_result).expect(ERR126_FAILED_TO_PARSE_RESULT);
+            let timestamp = env::block_timestamp();
+            let config = global_get_degen_price_oracle_config();
+            prices.assert_valid(timestamp, config.maximum_recency_duration_sec, config.maximum_staleness_duration_sec);
+            for price_info in prices.prices {
+                if let Some(token_price) = price_info.price {
+                    let token_id = price_info.asset_id;
+                    if let Some(decimals) = token_id_decimals_map.get(&token_id) {
+                        let mut degen = global_get_degen(&token_id);
+                        let fraction_digits = 10u128.pow((token_price.decimals - decimals) as u32);
+                        let price = u128_ratio(PRECISION, token_price.multiplier, fraction_digits as u128);
+                        degen.update_price_info(PriceInfo {
+                            stored_degen: price,
+                            degen_updated_at: timestamp
+                        });
+                        global_set_degen(&token_id, &degen);
+                    }
+                }
+            }
+        }
     }
 }
