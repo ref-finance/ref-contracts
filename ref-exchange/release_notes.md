@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.9.9
+```
+
+```
+1. Reorg stable/rated/degen pool MIN_RESERVE to inner_precision / 1000;
+
 ### Version 1.9.8
 ```
 CNFJRDekcistiyBHyZFif4CupZjND91VAj8hgR1E3Q35

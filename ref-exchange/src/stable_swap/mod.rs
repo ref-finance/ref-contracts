@@ -16,7 +16,7 @@ mod math;
 pub const MIN_DECIMAL: u8 = 1;
 pub const MAX_DECIMAL: u8 = 24;
 pub const TARGET_DECIMAL: u8 = 18;
-pub const MIN_RESERVE: u128 = 1_000_000_000_000_000;
+pub const MIN_RESERVE: u128 = 1 * 10u128.pow(TARGET_DECIMAL as u32) / 1_000_u128;
 
 #[derive(BorshSerialize, BorshDeserialize)]
 pub struct StableSwapPool {
