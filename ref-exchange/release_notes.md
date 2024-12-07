@@ -2,7 +2,7 @@
 
 ### Version 1.9.9
 ```
-
+2VqDt4y5CYDi1FCKu5LLVCTXNzh3kEvXpjfSe1XbDJcG
 ```
 1. Reorg stable/rated/degen pool MIN_RESERVE to inner_precision / 1000;
 
