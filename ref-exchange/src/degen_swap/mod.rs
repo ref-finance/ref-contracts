@@ -25,7 +25,7 @@ pub const TARGET_DECIMAL: u8 = 24;
 pub const MIN_DECIMAL: u8 = 1;
 pub const MAX_DECIMAL: u8 = TARGET_DECIMAL;
 pub const PRECISION: u128 = 10u128.pow(TARGET_DECIMAL as u32); 
-pub const MIN_RESERVE: u128 = 1 * PRECISION;
+pub const MIN_RESERVE: u128 = 1 * PRECISION / 1_000_u128;
 
 
 #[derive(BorshSerialize, BorshDeserialize)]
