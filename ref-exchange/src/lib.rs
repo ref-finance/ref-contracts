@@ -188,6 +188,7 @@ impl Contract {
         amp_factor: u64,
     ) -> u64 {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        assert!(tokens.len() == decimals.len(), "The number of tokens is inconsistent with the number of decimals.");
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::StableSwapPool(StableSwapPool::new(
             self.pools.len() as u32,
@@ -208,6 +209,7 @@ impl Contract {
         amp_factor: u64,
     ) -> u64 {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        assert!(tokens.len() == decimals.len(), "The number of tokens is inconsistent with the number of decimals.");
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::RatedSwapPool(RatedSwapPool::new(
             self.pools.len() as u32,
@@ -227,6 +229,7 @@ impl Contract {
         amp_factor: u64,
     ) -> u64 {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        assert!(tokens.len() == decimals.len(), "The number of tokens is inconsistent with the number of decimals.");
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::DegenSwapPool(DegenSwapPool::new(
             self.pools.len() as u32,
@@ -921,7 +924,7 @@ impl Contract {
                     &swap_action.token_in,
                     amount_in,
                     &swap_action.token_out,
-                    0,
+                    swap_action.min_amount_out.0,
                     referral_info,
                 );
                 token_cache.add(&swap_action.token_out, amount_out);
@@ -994,7 +997,7 @@ impl Contract {
                 exchange_id: env::current_account_id(),
                 referral_info: referral_info.clone(),
             },
-            false
+            true
         );
         pool_cache.insert(pool_id, pool);
         amount_in

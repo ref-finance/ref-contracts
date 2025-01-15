@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.9.10
+```
+sPdFeh779Vy7PrdCXjiF6S8fWRQvuvfUG2cymW4Cirz
+```
+1. amendments according to audition recommendations.
+
 ### Version 1.9.9
 ```
 2VqDt4y5CYDi1FCKu5LLVCTXNzh3kEvXpjfSe1XbDJcG
