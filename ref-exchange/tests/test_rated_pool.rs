@@ -357,6 +357,7 @@ fn sim_rated_swap_two_no_rated() {
                 token_out: stnear(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -463,6 +464,7 @@ fn sim_rated_swap_rate_one_with_fee() {
                 token_out: stnear(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -570,6 +572,7 @@ fn sim_rated_swap_rate_one_no_fee() {
                 token_out: stnear(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -654,6 +657,7 @@ fn sim_rated_swap_three_no_rated() {
                 token_out: stnear(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -671,6 +675,7 @@ fn sim_rated_swap_three_no_rated() {
                 token_out: linear(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -792,6 +797,7 @@ fn sim_rated_swap() {
                 token_out: linear(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -819,6 +825,7 @@ fn sim_rated_swap() {
                 token_out: linear(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -1017,6 +1024,7 @@ fn sim_rated_swap_out_zero() {
                 token_out: stnear(),
                 min_amount_out: U128(0)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -1034,6 +1042,7 @@ fn sim_rated_swap_out_zero() {
                 token_out: stnear(),
                 min_amount_out: U128(0)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -1524,6 +1533,7 @@ fn sim_rated_swap_two_no_rated_with_nearx() {
                 token_out: nearx(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -1630,6 +1640,7 @@ fn sim_rated_swap_rate_one_with_fee_with_nearx() {
                 token_out: nearx(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -1736,6 +1747,7 @@ fn sim_rated_swap_rate_one_no_fee_with_nearx() {
                 token_out: nearx(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -1987,6 +1999,7 @@ fn sim_sfrax_rated_swap_rate_one_price_oracle() {
                 token_out: sfrax(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -2236,6 +2249,7 @@ fn sim_sfrax_rated_swap_rate_one_pyth() {
                 token_out: sfrax(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1

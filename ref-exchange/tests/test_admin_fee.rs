@@ -62,6 +62,7 @@ fn modify_admin_fee() {
                 token_out: eth(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -110,6 +111,7 @@ fn modify_admin_fee() {
                 token_out: eth(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -221,7 +223,8 @@ fn referral_fee() {
                 token_out: eth(),
                 min_amount_out: U128(1)
             }],
-            Some(referral1.valid_account_id())
+            Some(referral1.valid_account_id()),
+            None
         ),
         deposit = 1
     );

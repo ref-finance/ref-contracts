@@ -1115,6 +1115,7 @@ mod tests {
                     min_amount_out: U128(1),
                 }],
                 None,
+                None,
             )
             .0
     }
@@ -1370,6 +1371,7 @@ mod tests {
                 min_amount_out: U128(0),
             }],
             None,
+            None,
         );
     }
 
@@ -1483,7 +1485,7 @@ mod tests {
         testing_env!(context
             .predecessor_account_id(acc.clone())
             .build());
-        contract.execute_actions(actions, None);
+        contract.execute_actions(actions, None, None);
     }
 
     #[test]
@@ -1543,6 +1545,7 @@ mod tests {
                 min_amount_out: U128(1_000_000),
             }],
             None,
+            None,
         );
     }
 
@@ -1562,7 +1565,7 @@ mod tests {
         testing_env!(context.attached_deposit(to_yocto("1")).build());
         contract.storage_deposit(None, None);
         testing_env!(context.attached_deposit(1).build());
-        contract.swap(vec![], None);
+        contract.swap(vec![], None, None);
     }
 
     /// Check that can not swap non whitelisted tokens when attaching 0 deposit (access key).
@@ -1627,6 +1630,7 @@ mod tests {
                     min_amount_out: U128(1),
                 },
             ],
+            None,
             None,
         );
         // Roundtrip returns almost everything except 0.25% fee.

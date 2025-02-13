@@ -157,6 +157,7 @@ fn sim_degen() {
                 token_out: eth(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         gas = 300000000000000
@@ -318,6 +319,7 @@ fn sim_degen1() {
                 token_out: eth(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         gas = 300000000000000
