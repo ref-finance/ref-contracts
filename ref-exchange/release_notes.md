@@ -2,9 +2,10 @@
 
 ### Version 1.9.10
 ```
-sPdFeh779Vy7PrdCXjiF6S8fWRQvuvfUG2cymW4Cirz
+H2sfzjphuQSTzrQByyPXoAnQnkYFejWCNsT9uwq51XnS
 ```
 1. amendments according to audition recommendations.
+2. add skip_degen_price_sync param.
 
 ### Version 1.9.9
 ```

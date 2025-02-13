@@ -246,6 +246,7 @@ impl Contract {
         use_tokens: HashMap<AccountId, U128>,
         actions: Vec<Action>,
         referral_id: Option<ValidAccountId>,
+        skip_degen_price_sync: Option<bool>,
     ) -> HashMap<AccountId, U128> {
         self.assert_contract_running();
         assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
@@ -279,6 +280,7 @@ impl Contract {
             &referral_info,
             &actions,
             ActionResult::None,
+            skip_degen_price_sync.unwrap_or(false)
         );
         let mut result = HashMap::new();
         for (token, amount) in virtual_account.tokens.to_vec() {
@@ -303,6 +305,7 @@ impl Contract {
         &mut self,
         actions: Vec<Action>,
         referral_id: Option<ValidAccountId>,
+        skip_degen_price_sync: Option<bool>,
     ) -> ActionResult {
         self.assert_contract_running();
         assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
@@ -328,7 +331,7 @@ impl Contract {
             .map(|fee| (referral_id.unwrap().into(), fee));
         
         let result =
-            self.internal_execute_actions(&mut account, &referral_info, &actions, ActionResult::None);
+            self.internal_execute_actions(&mut account, &referral_info, &actions, ActionResult::None, skip_degen_price_sync.unwrap_or(false));
         self.internal_save_account(&sender_id, account);
         result
     }
@@ -337,7 +340,7 @@ impl Contract {
     /// If referrer provided, pays referral_fee to it.
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
     #[payable]
-    pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
+    pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>, skip_degen_price_sync: Option<bool>) -> U128 {
         U128(
             self.execute_actions(
                 actions
@@ -345,6 +348,7 @@ impl Contract {
                     .map(|swap_action| Action::Swap(swap_action))
                     .collect(),
                 referral_id,
+                skip_degen_price_sync
             )
             .to_amount(),
         )
@@ -354,7 +358,7 @@ impl Contract {
     /// If referrer provided, pays referral_fee to it.
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
     #[payable]
-    pub fn swap_by_output(&mut self, actions: Vec<SwapByOutputAction>, referral_id: Option<ValidAccountId>) -> U128 {
+    pub fn swap_by_output(&mut self, actions: Vec<SwapByOutputAction>, referral_id: Option<ValidAccountId>, skip_degen_price_sync: Option<bool>) -> U128 {
         U128(
             self.execute_actions(
                 actions
@@ -362,6 +366,7 @@ impl Contract {
                     .map(|swap_by_output_action| Action::SwapByOutput(swap_by_output_action))
                     .collect(),
                 referral_id,
+                skip_degen_price_sync,
             )
             .to_amount(),
         )
@@ -707,6 +712,7 @@ impl Contract {
         referral_info: &Option<(AccountId, u32)>,
         actions: &[Action],
         prev_result: ActionResult,
+        skip_degen_price_sync: bool,
     ) -> ActionResult {
         assert_all_same_action_type(actions);
         // fronzen token feature
@@ -740,8 +746,10 @@ impl Contract {
                 self.finalize_prev_swap_chain(account, prev_action, &result);
             }
         }
-        let degen_token_ids = self.get_degen_tokens_in_actions(actions).into_iter().collect::<Vec<_>>();
-        internal_batch_update_degen_token_price(degen_token_ids);
+        if !skip_degen_price_sync {
+            let degen_token_ids = self.get_degen_tokens_in_actions(actions).into_iter().collect::<Vec<_>>();
+            internal_batch_update_degen_token_price(degen_token_ids);
+        }
         result
     }
 
