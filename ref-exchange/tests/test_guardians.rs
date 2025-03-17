@@ -213,6 +213,7 @@ fn guardians_scenario_01() {
                 token_out: eth(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -323,6 +324,7 @@ fn guardians_scenario_02() {
                 token_out: eth(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1

@@ -27,6 +27,7 @@ pub fn swap_action(pool :&ContractAccount<Exchange>, operator: &Operator, token_
                 token_out: token_out,
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -225,6 +226,7 @@ pub fn do_stable_pool_swap(token_contracts: &Vec<ContractAccount<TestToken>>, rn
                 token_out: token_out.clone(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1

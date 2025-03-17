@@ -76,6 +76,7 @@ fn sim_stable_swap() {
                 token_out: usdc(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -93,6 +94,7 @@ fn sim_stable_swap() {
                 token_out: usdt(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1

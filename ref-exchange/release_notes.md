@@ -1,5 +1,12 @@
 # Release Notes
 
+### Version 1.9.10
+```
+H2sfzjphuQSTzrQByyPXoAnQnkYFejWCNsT9uwq51XnS
+```
+1. amendments according to audition recommendations.
+2. add skip_degen_price_sync param.
+
 ### Version 1.9.9
 ```
 2VqDt4y5CYDi1FCKu5LLVCTXNzh3kEvXpjfSe1XbDJcG

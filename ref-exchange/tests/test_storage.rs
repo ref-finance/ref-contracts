@@ -201,6 +201,7 @@ fn storage_scenario_02() {
                 token_out: usdc(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -234,6 +235,7 @@ fn storage_scenario_02() {
                 token_out: usdc(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -263,6 +265,7 @@ fn storage_scenario_02() {
                 token_out: usdc(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1

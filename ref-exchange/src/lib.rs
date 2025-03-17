@@ -188,6 +188,7 @@ impl Contract {
         amp_factor: u64,
     ) -> u64 {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        assert!(tokens.len() == decimals.len(), "The number of tokens is inconsistent with the number of decimals.");
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::StableSwapPool(StableSwapPool::new(
             self.pools.len() as u32,
@@ -208,6 +209,7 @@ impl Contract {
         amp_factor: u64,
     ) -> u64 {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        assert!(tokens.len() == decimals.len(), "The number of tokens is inconsistent with the number of decimals.");
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::RatedSwapPool(RatedSwapPool::new(
             self.pools.len() as u32,
@@ -227,6 +229,7 @@ impl Contract {
         amp_factor: u64,
     ) -> u64 {
         assert!(self.is_owner_or_guardians(), "{}", ERR100_NOT_ALLOWED);
+        assert!(tokens.len() == decimals.len(), "The number of tokens is inconsistent with the number of decimals.");
         check_token_duplicates(&tokens);
         self.internal_add_pool(Pool::DegenSwapPool(DegenSwapPool::new(
             self.pools.len() as u32,
@@ -243,6 +246,7 @@ impl Contract {
         use_tokens: HashMap<AccountId, U128>,
         actions: Vec<Action>,
         referral_id: Option<ValidAccountId>,
+        skip_degen_price_sync: Option<bool>,
     ) -> HashMap<AccountId, U128> {
         self.assert_contract_running();
         assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
@@ -276,6 +280,7 @@ impl Contract {
             &referral_info,
             &actions,
             ActionResult::None,
+            skip_degen_price_sync.unwrap_or(false)
         );
         let mut result = HashMap::new();
         for (token, amount) in virtual_account.tokens.to_vec() {
@@ -300,6 +305,7 @@ impl Contract {
         &mut self,
         actions: Vec<Action>,
         referral_id: Option<ValidAccountId>,
+        skip_degen_price_sync: Option<bool>,
     ) -> ActionResult {
         self.assert_contract_running();
         assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
@@ -325,7 +331,7 @@ impl Contract {
             .map(|fee| (referral_id.unwrap().into(), fee));
         
         let result =
-            self.internal_execute_actions(&mut account, &referral_info, &actions, ActionResult::None);
+            self.internal_execute_actions(&mut account, &referral_info, &actions, ActionResult::None, skip_degen_price_sync.unwrap_or(false));
         self.internal_save_account(&sender_id, account);
         result
     }
@@ -334,7 +340,7 @@ impl Contract {
     /// If referrer provided, pays referral_fee to it.
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
     #[payable]
-    pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>) -> U128 {
+    pub fn swap(&mut self, actions: Vec<SwapAction>, referral_id: Option<ValidAccountId>, skip_degen_price_sync: Option<bool>) -> U128 {
         U128(
             self.execute_actions(
                 actions
@@ -342,6 +348,7 @@ impl Contract {
                     .map(|swap_action| Action::Swap(swap_action))
                     .collect(),
                 referral_id,
+                skip_degen_price_sync
             )
             .to_amount(),
         )
@@ -351,7 +358,7 @@ impl Contract {
     /// If referrer provided, pays referral_fee to it.
     /// If no attached deposit, outgoing tokens used in swaps must be whitelisted.
     #[payable]
-    pub fn swap_by_output(&mut self, actions: Vec<SwapByOutputAction>, referral_id: Option<ValidAccountId>) -> U128 {
+    pub fn swap_by_output(&mut self, actions: Vec<SwapByOutputAction>, referral_id: Option<ValidAccountId>, skip_degen_price_sync: Option<bool>) -> U128 {
         U128(
             self.execute_actions(
                 actions
@@ -359,6 +366,7 @@ impl Contract {
                     .map(|swap_by_output_action| Action::SwapByOutput(swap_by_output_action))
                     .collect(),
                 referral_id,
+                skip_degen_price_sync,
             )
             .to_amount(),
         )
@@ -704,6 +712,7 @@ impl Contract {
         referral_info: &Option<(AccountId, u32)>,
         actions: &[Action],
         prev_result: ActionResult,
+        skip_degen_price_sync: bool,
     ) -> ActionResult {
         assert_all_same_action_type(actions);
         // fronzen token feature
@@ -737,8 +746,10 @@ impl Contract {
                 self.finalize_prev_swap_chain(account, prev_action, &result);
             }
         }
-        let degen_token_ids = self.get_degen_tokens_in_actions(actions).into_iter().collect::<Vec<_>>();
-        internal_batch_update_degen_token_price(degen_token_ids);
+        if !skip_degen_price_sync {
+            let degen_token_ids = self.get_degen_tokens_in_actions(actions).into_iter().collect::<Vec<_>>();
+            internal_batch_update_degen_token_price(degen_token_ids);
+        }
         result
     }
 
@@ -921,7 +932,7 @@ impl Contract {
                     &swap_action.token_in,
                     amount_in,
                     &swap_action.token_out,
-                    0,
+                    swap_action.min_amount_out.0,
                     referral_info,
                 );
                 token_cache.add(&swap_action.token_out, amount_out);
@@ -994,7 +1005,7 @@ impl Contract {
                 exchange_id: env::current_account_id(),
                 referral_info: referral_info.clone(),
             },
-            false
+            true
         );
         pool_cache.insert(pool_id, pool);
         amount_in
@@ -1103,6 +1114,7 @@ mod tests {
                     token_out: token_out.into(),
                     min_amount_out: U128(1),
                 }],
+                None,
                 None,
             )
             .0
@@ -1359,6 +1371,7 @@ mod tests {
                 min_amount_out: U128(0),
             }],
             None,
+            None,
         );
     }
 
@@ -1472,7 +1485,7 @@ mod tests {
         testing_env!(context
             .predecessor_account_id(acc.clone())
             .build());
-        contract.execute_actions(actions, None);
+        contract.execute_actions(actions, None, None);
     }
 
     #[test]
@@ -1532,6 +1545,7 @@ mod tests {
                 min_amount_out: U128(1_000_000),
             }],
             None,
+            None,
         );
     }
 
@@ -1551,7 +1565,7 @@ mod tests {
         testing_env!(context.attached_deposit(to_yocto("1")).build());
         contract.storage_deposit(None, None);
         testing_env!(context.attached_deposit(1).build());
-        contract.swap(vec![], None);
+        contract.swap(vec![], None, None);
     }
 
     /// Check that can not swap non whitelisted tokens when attaching 0 deposit (access key).
@@ -1616,6 +1630,7 @@ mod tests {
                     min_amount_out: U128(1),
                 },
             ],
+            None,
             None,
         );
         // Roundtrip returns almost everything except 0.25% fee.

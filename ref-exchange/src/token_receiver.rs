@@ -30,12 +30,14 @@ enum TokenReceiverMessage {
         /// to send token_out back to predecessor with this msg.
         client_echo: Option<String>,
         skip_unwrap_near: Option<bool>,
-        swap_out_recipient: Option<ValidAccountId>
+        swap_out_recipient: Option<ValidAccountId>,
+        skip_degen_price_sync: Option<bool>,
     },
     HotZap {
         referral_id: Option<ValidAccountId>,
         hot_zap_actions: Vec<Action>,
-        add_liquidity_infos: Vec<AddLiquidityInfo>
+        add_liquidity_infos: Vec<AddLiquidityInfo>,
+        skip_degen_price_sync: Option<bool>,
     },
 }
 
@@ -48,6 +50,7 @@ impl Contract {
         amount_in: Balance,
         referral_id: Option<AccountId>,
         actions: &[Action],
+        skip_degen_price_sync: bool,
     ) -> Vec<(AccountId, Balance)> {
 
         // let @ be the virtual account
@@ -66,6 +69,7 @@ impl Contract {
                 Action::Swap(_) => ActionResult::Amount(U128(amount_in)),
                 Action::SwapByOutput(_) => ActionResult::None,
             },
+            skip_degen_price_sync
         );
 
         let mut result = vec![];
@@ -110,6 +114,7 @@ impl FungibleTokenReceiver for Contract {
                     client_echo,
                     skip_unwrap_near,
                     swap_out_recipient,
+                    skip_degen_price_sync,
                 } => {
                     assert!(!(swap_out_recipient.is_some() && client_echo.is_some()), "client_echo and swap_out_recipient cannot have value at the same time");
                     assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
@@ -122,6 +127,7 @@ impl FungibleTokenReceiver for Contract {
                         amount.0,
                         referral_id,
                         &actions,
+                        skip_degen_price_sync.unwrap_or(false),
                     );
                     if client_echo.is_some() && sender_id.to_string() == self.burrowland_id {
                         assert!(out_amounts.len() == 1, "Invalid actions, only one out token is allowed");
@@ -139,7 +145,8 @@ impl FungibleTokenReceiver for Contract {
                 TokenReceiverMessage::HotZap { 
                     referral_id, 
                     hot_zap_actions, 
-                    add_liquidity_infos
+                    add_liquidity_infos,
+                    skip_degen_price_sync,
                 } => {
                     assert!(hot_zap_actions.len() > 0 && add_liquidity_infos.len() > 0);
                     let sender_id: AccountId = sender_id.into();
@@ -160,6 +167,7 @@ impl FungibleTokenReceiver for Contract {
                         amount.0,
                         referral_id,
                         &hot_zap_actions,
+                        skip_degen_price_sync.unwrap_or(false)
                     );
 
                     let mut token_cache = TokenCache::new();

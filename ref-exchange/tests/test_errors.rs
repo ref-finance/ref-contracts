@@ -150,6 +150,7 @@ fn sim_stable_e63 () {
                 token_out: usdt(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -424,6 +425,7 @@ fn sim_stable_e68 () {
                 token_out: usdt(),
                 min_amount_out: U128(2 * ONE_USDT)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -489,6 +491,7 @@ fn sim_stable_e69 () {
                 token_out: dai(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -503,6 +506,7 @@ fn sim_stable_e69 () {
                 token_out: dai(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -546,6 +550,7 @@ fn sim_stable_e71 () {
                 token_out: dai(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1

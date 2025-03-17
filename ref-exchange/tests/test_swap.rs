@@ -240,6 +240,7 @@ fn test_swap() {
                 token_out: eth(),
                 min_amount_out: U128(1)
             }],
+            None,
             None
         ),
         deposit = 1
@@ -906,6 +907,7 @@ fn test_execute_actions_in_va() {
                 token_out: eth(),
                 min_amount_out: U128(1)
             })],
+            None,
             None
         ),
         gas = 300000000000000
