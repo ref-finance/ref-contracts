@@ -25,7 +25,7 @@ use crate::pool::Pool;
 use crate::simple_pool::SimplePool;
 use crate::stable_swap::StableSwapPool;
 use crate::rated_swap::{RatedSwapPool, rate::{RateTrait, global_get_rate, global_set_rate}};
-use crate::utils::{check_token_duplicates, pair_rated_price_to_vec_u8, TokenCache};
+pub use crate::utils::{check_token_duplicates, pair_rated_price_to_vec_u8, TokenCache, SwapVolume};
 pub use crate::custom_keys::*;
 pub use crate::views::{PoolInfo, ShadowRecordInfo, RatedPoolInfo, StablePoolInfo, ContractMetadata, RatedTokenInfo, DegenTokenInfo, AddLiquidityPrediction, RefStorageState};
 pub use crate::token_receiver::{AddLiquidityInfo, VIRTUAL_ACC};
@@ -35,6 +35,7 @@ pub use crate::oracle::*;
 pub use crate::degen_swap::*;
 pub use crate::pool_limit_info::*;
 pub use crate::client_echo_limit::*;
+pub use crate::swap_volume::*;
 
 mod account_deposit;
 mod action;
@@ -60,6 +61,7 @@ mod pool_limit_info;
 mod client_echo_limit;
 mod donation;
 mod event;
+mod swap_volume;
 
 near_sdk::setup_alloc!();
 
@@ -690,6 +692,7 @@ impl Contract {
         // exchange share was registered at creation time
         pool.share_register(&env::current_account_id());
         self.pools.push(&pool);
+        internal_set_swap_volume_u256_vec(id, vec![SwapVolumeU256::default(); pool.tokens().len()]);
         self.internal_check_storage(prev_storage);
         id
     }
@@ -817,6 +820,7 @@ impl Contract {
     ) -> u128 {
         self.internal_update_unit_share_cumulative_info(pool_id);
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let sv_u256s = internal_get_swap_volume_u256_vec_or_default(pool_id, &pool.get_volumes());
         let amount_out = pool.swap(
             token_in,
             amount_in,
@@ -828,6 +832,21 @@ impl Contract {
                 referral_info: referral_info.clone(),
             },
             false
+        );
+        let update_input_idx = match &pool {
+            Pool::SimplePool(_) | Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) | Pool::DegenSwapPool(_) => pool.tokens().iter().position(|id| id == token_in).expect(ERR63_MISSING_TOKEN),
+        };
+        let update_output_idx = match &pool {
+            Pool::SimplePool(_) => update_input_idx,
+            Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) | Pool::DegenSwapPool(_) => pool.tokens().iter().position(|id| id == token_out).expect(ERR63_MISSING_TOKEN),
+        };
+        internal_update_swap_volume_u256_vec(
+            pool_id,
+            update_input_idx,
+            update_output_idx,
+            amount_in,
+            amount_out,
+            sv_u256s,
         );
         self.pools.replace(pool_id, &pool);
         amount_out
@@ -846,6 +865,7 @@ impl Contract {
     ) -> u128 {
         self.internal_update_unit_share_cumulative_info(pool_id);
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        let sv_u256s = internal_get_swap_volume_u256_vec_or_default(pool_id, &pool.get_volumes());
         let amount_in = pool.swap_by_output(
             token_in,
             amount_out,
@@ -857,6 +877,21 @@ impl Contract {
                 referral_info: referral_info.clone(),
             },
             false
+        );
+        let update_input_idx = match &pool {
+            Pool::SimplePool(_) | Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) | Pool::DegenSwapPool(_) => pool.tokens().iter().position(|id| id == token_in).expect(ERR63_MISSING_TOKEN),
+        };
+        let update_output_idx = match &pool {
+            Pool::SimplePool(_) => update_input_idx,
+            Pool::StableSwapPool(_) | Pool::RatedSwapPool(_) | Pool::DegenSwapPool(_) => pool.tokens().iter().position(|id| id == token_out).expect(ERR63_MISSING_TOKEN),
+        };
+        internal_update_swap_volume_u256_vec(
+            pool_id,
+            update_input_idx,
+            update_output_idx,
+            amount_in,
+            amount_out,
+            sv_u256s,
         );
         self.pools.replace(pool_id, &pool);
         amount_in

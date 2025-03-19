@@ -9,7 +9,7 @@ use near_sdk_sim::{
     call, deploy, init_simulator, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
 
-use ref_exchange::{Action, ContractContract as Exchange, PoolInfo, SwapAction};
+use ref_exchange::{Action, ContractContract as Exchange, PoolInfo, SwapAction, SwapVolume, SwapVolumeU256View};
 use test_token::ContractContract as TestToken;
 use mock_wnear::ContractContract as MockWnear;
 
@@ -915,4 +915,160 @@ fn test_execute_actions_in_va() {
     out_come.assert_success();
     println!("{:#?}", get_logs(&out_come));
     println!("{:#?}", out_come.unwrap_json::<HashMap<AccountId, U128>>());
+}
+
+#[test]
+fn test_simple_swap_volume() {
+    let root = init_simulator(None);
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let pool = deploy!(
+        contract: Exchange,
+        contract_id: swap(),
+        bytes: &EXCHANGE_WASM_BYTES,
+        signer_account: root,
+        init_method: new(to_va("owner".to_string()), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 30, 0)
+    );
+    call!(
+        owner,
+        pool.modify_wnear_id(wnear()),
+        deposit = 1
+    )
+    .assert_success();
+    let token0 = deploy!(
+        contract: TestToken,
+        contract_id: to_va(eth()),
+        bytes: &TEST_TOKEN_WASM_BYTES,
+        signer_account: root
+    );
+    call!(root, token0.new()).assert_success();
+    call!(
+        root,
+        token0.mint(to_va(root.account_id.clone()), u128::MAX.into())
+    )
+    .assert_success();
+    call!(
+        root,
+        token0.storage_deposit(Some(to_va(swap())), None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+
+    let token1 = deploy!(
+        contract: TestToken,
+        contract_id: usdt(),
+        bytes: &TEST_TOKEN_WASM_BYTES,
+        signer_account: root
+    );
+    call!(root, token1.new()).assert_success();
+    call!(
+        root,
+        token1.mint(to_va(root.account_id.clone()), u128::MAX.into())
+    )
+    .assert_success();
+    call!(
+        root,
+        token1.storage_deposit(Some(to_va(swap())), None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(vec![to_va(eth()), to_va(usdt())]),
+        deposit=1
+    );
+    
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(eth()), to_va(usdt())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        token0.ft_transfer_call(to_va(swap()), (u128::MAX / 2).into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        token1.ft_transfer_call(to_va(swap()), (u128::MAX / 2).into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+
+
+    let out_come = call!(
+        root,
+        pool.add_liquidity(0, vec![u128::MAX / 2, u128::MAX / 2].into_iter().map(|x| U128(x)).collect(), Some(vec![U128(1), U128(1)])),
+        deposit = to_yocto("0.0007")
+    );
+    out_come.assert_success();
+    println!("{:#?}", get_logs(&out_come));
+
+    let outcome = call!(
+        root,
+        token0.ft_transfer_call(
+            to_va(swap()),
+            (100).into(),
+            None,
+            format!("{{\"actions\": [
+                {{\"pool_id\": 0, \"token_in\": \"eth\", \"amount_in\": \"{}\", \"token_out\": \"usdt\", \"min_amount_out\": \"{}\"}}
+                ]}}", 100, 0)
+        ),
+        deposit = 1
+    );
+    outcome.assert_success();
+
+    let sv = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolume>>();
+    assert_eq!(100, sv[0].input.0);
+    assert_eq!(99, sv[0].output.0);
+    assert_eq!(0, sv[1].input.0);
+    assert_eq!(0, sv[1].output.0);
+    let sv_u256 = view!(pool.get_pool_u256_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
+    assert_eq!("100".to_string(), sv_u256[0].input);
+    assert_eq!("99".to_string(), sv_u256[0].output);
+    assert_eq!("0".to_string(), sv_u256[1].input);
+    assert_eq!("0".to_string(), sv_u256[1].output);
+
+    let outcome = call!(
+        root,
+        token0.ft_transfer_call(
+            to_va(swap()),
+            (100).into(),
+            None,
+            format!("{{\"actions\": [
+                {{\"pool_id\": 0, \"token_in\": \"eth\", \"amount_in\": \"{}\", \"token_out\": \"usdt\", \"min_amount_out\": \"{}\"}}
+                ]}}", 100, 0)
+        ),
+        deposit = 1
+    );
+    outcome.assert_success();
+
+    let sv = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolume>>();
+    assert_eq!(200, sv[0].input.0);
+    assert_eq!(198, sv[0].output.0);
+    assert_eq!(0, sv[1].input.0);
+    assert_eq!(0, sv[1].output.0);
+    let sv_u256 = view!(pool.get_pool_u256_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
+    assert_eq!("200".to_string(), sv_u256[0].input);
+    assert_eq!("198".to_string(), sv_u256[0].output);
+    assert_eq!("0".to_string(), sv_u256[1].input);
+    assert_eq!("0".to_string(), sv_u256[1].output);
 }

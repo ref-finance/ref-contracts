@@ -426,8 +426,8 @@ impl SimplePool {
 
         // Keeping track of volume per each input traded separately.
         // Reported volume with fees will be sum of `input`, without fees will be sum of `output`.
-        self.volumes[in_idx].input.0 += amount_in;
-        self.volumes[in_idx].output.0 += amount_out;
+        self.volumes[in_idx].input.0 = self.volumes[in_idx].input.0.wrapping_add(amount_in);
+        self.volumes[in_idx].output.0 = self.volumes[in_idx].output.0.wrapping_add(amount_out);
     }
 }
 

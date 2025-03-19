@@ -601,8 +601,8 @@ impl DegenSwapPool {
         self.assert_min_reserve(self.c_amounts[out_idx]);
 
         // Keeping track of volume per each input traded separately.
-        self.volumes[in_idx].input.0 += amount_in;
-        self.volumes[out_idx].output.0 += amount_swapped;
+        self.volumes[in_idx].input.0 = self.volumes[in_idx].input.0.wrapping_add(amount_in);
+        self.volumes[out_idx].output.0 = self.volumes[out_idx].output.0.wrapping_add(amount_swapped);
 
         // handle admin fee.
         if fees.admin_fee_bps > 0 && result.admin_fee > 0 {
