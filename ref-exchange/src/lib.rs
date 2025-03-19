@@ -1112,7 +1112,7 @@ mod tests {
         contract.extend_whitelisted_tokens(tokens.clone());
         testing_env!(context
             .predecessor_account_id(account_id.clone())
-            .attached_deposit(env::storage_byte_cost() * 300)
+            .attached_deposit(env::storage_byte_cost() * 466)
             .build());
         let pool_id = contract.add_simple_pool(tokens, 25);
         testing_env!(context
@@ -1992,7 +1992,7 @@ mod tests {
         assert_eq!(0, contract.get_user_whitelisted_tokens(accounts(3)).len());
         testing_env!(context
             .predecessor_account_id(accounts(0))
-            .attached_deposit(env::storage_byte_cost() * 334)
+            .attached_deposit(env::storage_byte_cost() * 512)
             .build());
         let pool_id = contract.add_stable_swap_pool(tokens, vec![18, 18], 25, 240);
         println!("{:?}", contract.version());
@@ -2090,7 +2090,7 @@ mod tests {
         assert_eq!(0, contract.get_user_whitelisted_tokens(accounts(3)).len());
         testing_env!(context
             .predecessor_account_id(accounts(0))
-            .attached_deposit(env::storage_byte_cost() * 389) // required storage depends on contract_id length
+            .attached_deposit(env::storage_byte_cost() * 512) // required storage depends on contract_id length
             .build());
         let pool_id = contract.add_rated_swap_pool(tokens, vec![18, 18], 25, 240);
         println!("{:?}", contract.version());
@@ -2219,12 +2219,12 @@ mod tests {
         );
         testing_env!(context
             .predecessor_account_id(accounts(0))
-            .attached_deposit(env::storage_byte_cost() * 335)
+            .attached_deposit(env::storage_byte_cost() * 513)
             .build());
         contract.add_stable_swap_pool(vec![accounts(4), accounts(5)], vec![18, 18], 25, 240);
         testing_env!(context
             .predecessor_account_id(accounts(0))
-            .attached_deposit(env::storage_byte_cost() * 389) // required storage depends on contract_id length
+            .attached_deposit(env::storage_byte_cost() * 513) // required storage depends on contract_id length
             .build());
         contract.add_rated_swap_pool(vec![accounts(4), accounts(5)], vec![18, 18], 25, 240);
 
@@ -2247,7 +2247,7 @@ mod tests {
         assert_eq!(0, contract.get_user_whitelisted_tokens(accounts(3)).len());
         testing_env!(context
             .predecessor_account_id(accounts(0))
-            .attached_deposit(env::storage_byte_cost() * 334)
+            .attached_deposit(env::storage_byte_cost() * 512)
             .build());
         let pool_id = contract.add_stable_swap_pool(tokens, vec![18, 18], 25, 240);
         
