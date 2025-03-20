@@ -33,6 +33,8 @@ pub const INIT_SHARES_SUPPLY: u128 = 1_000_000_000_000_000_000_000_000;
 
 construct_uint! {
     /// 256-bit unsigned integer.
+    #[derive(BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
+    #[serde(crate = "near_sdk::serde")]
     pub struct U256(4);
 }
 
@@ -44,6 +46,7 @@ construct_uint! {
 /// Volume of swap on the given token.
 #[derive(Clone, BorshSerialize, BorshDeserialize, Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
+#[cfg_attr(not(target_arch = "wasm32"), derive(Debug))]
 pub struct SwapVolume {
     pub input: U128,
     pub output: U128,

@@ -11,3 +11,6 @@ pub const POOL_LIMIT: &str = "pl";
 // Key for client echo limit
 pub const CLIENT_ECHO_TOKEN_ID_WHITELIST: &str = "ce_tw";
 pub const CLIENT_ECHO_SENDER_ID_WHITELIST: &str = "ce_sw";
+
+// Key for swap volume
+pub const SWAP_VOLUME_KEY: &str = "sv";

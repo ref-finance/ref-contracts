@@ -23,6 +23,11 @@ near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     PYTH_WASM_BYTES => "../res/mock_pyth.wasm"
 }
 
+use uint::construct_uint;
+construct_uint! {
+    pub struct U256(4);
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub struct RefStorageState {

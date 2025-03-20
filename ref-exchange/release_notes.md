@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.9.11
+```
+GKNsi9JsTWKHbAjxUPpT2rArVUuHsgf9NxA6TtPejTEd
+```
+1. add SwapVolumeU256.
+
 ### Version 1.9.10
 ```
 H2sfzjphuQSTzrQByyPXoAnQnkYFejWCNsT9uwq51XnS
