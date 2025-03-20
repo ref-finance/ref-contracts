@@ -9,7 +9,7 @@ use near_sdk_sim::{
     call, deploy, init_simulator, to_yocto, view, ContractAccount, ExecutionResult, UserAccount,
 };
 
-use ref_exchange::{Action, ContractContract as Exchange, PoolInfo, SwapAction, SwapVolume, SwapVolumeU256View};
+use ref_exchange::{Action, ContractContract as Exchange, PoolInfo, SwapAction, SwapVolumeU256View};
 use test_token::ContractContract as TestToken;
 use mock_wnear::ContractContract as MockWnear;
 
@@ -1036,12 +1036,7 @@ fn test_simple_swap_volume() {
     );
     outcome.assert_success();
 
-    let sv = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolume>>();
-    assert_eq!(100, sv[0].input.0);
-    assert_eq!(99, sv[0].output.0);
-    assert_eq!(0, sv[1].input.0);
-    assert_eq!(0, sv[1].output.0);
-    let sv_u256 = view!(pool.get_pool_u256_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
+    let sv_u256 = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
     assert_eq!("100".to_string(), sv_u256[0].input);
     assert_eq!("99".to_string(), sv_u256[0].output);
     assert_eq!("0".to_string(), sv_u256[1].input);
@@ -1061,12 +1056,7 @@ fn test_simple_swap_volume() {
     );
     outcome.assert_success();
 
-    let sv = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolume>>();
-    assert_eq!(200, sv[0].input.0);
-    assert_eq!(198, sv[0].output.0);
-    assert_eq!(0, sv[1].input.0);
-    assert_eq!(0, sv[1].output.0);
-    let sv_u256 = view!(pool.get_pool_u256_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
+    let sv_u256 = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
     assert_eq!("200".to_string(), sv_u256[0].input);
     assert_eq!("198".to_string(), sv_u256[0].output);
     assert_eq!("0".to_string(), sv_u256[1].input);
@@ -1192,12 +1182,7 @@ fn test_simple_swap_volume_overflow() {
     );
     outcome.assert_success();
 
-    let sv = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolume>>();
-    assert_eq!(1000, sv[0].input.0);
-    assert_eq!(169928240802821585634401086815113287072, sv[0].output.0);
-    assert_eq!(0, sv[1].input.0);
-    assert_eq!(0, sv[1].output.0);
-    let sv_u256 = view!(pool.get_pool_u256_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
+    let sv_u256 = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
     assert_eq!("1000".to_string(), sv_u256[0].input);
     assert_eq!("169928240802821585634401086815113287072".to_string(), sv_u256[0].output);
     assert_eq!("0".to_string(), sv_u256[1].input);
@@ -1217,12 +1202,7 @@ fn test_simple_swap_volume_overflow() {
     );
     outcome.assert_success();
 
-    let sv = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolume>>();
-    assert_eq!(1000, sv[0].input.0);
-    assert_eq!(169928240802821585634401086815113287072, sv[0].output.0);
-    assert_eq!(169928240802821585634401086815113287072, sv[1].input.0);
-    assert_eq!(997, sv[1].output.0);
-    let sv_u256 = view!(pool.get_pool_u256_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
+    let sv_u256 = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
     assert_eq!("1000".to_string(), sv_u256[0].input);
     assert_eq!("169928240802821585634401086815113287072".to_string(), sv_u256[0].output);
     assert_eq!("169928240802821585634401086815113287072".to_string(), sv_u256[1].input);
@@ -1242,12 +1222,7 @@ fn test_simple_swap_volume_overflow() {
     );
     outcome.assert_success();
 
-    let sv = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolume>>();
-    assert_eq!(2000, sv[0].input.0);
-    assert_eq!(339601652951602449070900047531528578712, sv[0].output.0);
-    assert_eq!(169928240802821585634401086815113287072, sv[1].input.0);
-    assert_eq!(997, sv[1].output.0);
-    let sv_u256 = view!(pool.get_pool_u256_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
+    let sv_u256 = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
     assert_eq!("2000".to_string(), sv_u256[0].input);
     assert_eq!("339601652951602449070900047531528578712".to_string(), sv_u256[0].output);
     assert_eq!("169928240802821585634401086815113287072".to_string(), sv_u256[1].input);
@@ -1267,12 +1242,7 @@ fn test_simple_swap_volume_overflow() {
     );
     outcome.assert_success();
 
-    let sv = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolume>>();
-    assert_eq!(2000, sv[0].input.0);
-    assert_eq!(339601652951602449070900047531528578712, sv[0].output.0);
-    assert_eq!(339601652951602449070900047531528578712, sv[1].input.0);
-    assert_eq!(1994, sv[1].output.0);
-    let sv_u256 = view!(pool.get_pool_u256_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
+    let sv_u256 = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
     assert_eq!("2000".to_string(), sv_u256[0].input);
     assert_eq!("339601652951602449070900047531528578712".to_string(), sv_u256[0].output);
     assert_eq!("339601652951602449070900047531528578712".to_string(), sv_u256[1].input);
@@ -1292,16 +1262,9 @@ fn test_simple_swap_volume_overflow() {
     );
     outcome.assert_success();
 
-    let sv = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolume>>();
-    assert_eq!(3000, sv[0].input.0);
-    assert_eq!(168738632675852963548486843101102414137, sv[0].output.0);
-    assert_eq!(339601652951602449070900047531528578712, sv[1].input.0);
-    assert_eq!(1994, sv[1].output.0);
-    let sv_u256 = view!(pool.get_pool_u256_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
+    let sv_u256 = view!(pool.get_pool_volumes(0)).unwrap_json::<Vec<SwapVolumeU256View>>();
     assert_eq!("3000".to_string(), sv_u256[0].input);
     assert_eq!("509020999596791427011861450532870625593".to_string(), sv_u256[0].output);
     assert_eq!("339601652951602449070900047531528578712".to_string(), sv_u256[1].input);
     assert_eq!("1994".to_string(), sv_u256[1].output);
-
-    assert_eq!(U256::from(u128::MAX).checked_add((1 + sv[0].output.0).into()).unwrap().to_string(), sv_u256[0].output)
 }

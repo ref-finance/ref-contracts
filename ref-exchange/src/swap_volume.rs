@@ -90,27 +90,3 @@ pub fn internal_update_swap_volume_u256_vec(
         );
     internal_set_swap_volume_u256_vec(pool_id, sv_u256s);
 }
-
-#[near_bindgen]
-impl Contract {
-    pub fn get_pool_u256_volumes(&self, pool_id: u64) -> Vec<SwapVolumeU256View> {
-        let svs = self.pools.get(pool_id).expect(ERR85_NO_POOL).get_volumes();
-        internal_get_swap_volume_u256_vec_or_default(pool_id, &svs)
-            .into_iter()
-            .map(|v| v.into())
-            .collect()
-    }
-
-    pub fn get_pool_u256_volumes_by_ids(&self, pool_ids: Vec<u64>) -> Vec<Vec<SwapVolumeU256View>> {
-        pool_ids
-            .into_iter()
-            .map(|pool_id| {
-                let svs = self.pools.get(pool_id).expect(ERR85_NO_POOL).get_volumes();
-                internal_get_swap_volume_u256_vec_or_default(pool_id, &svs)
-                    .into_iter()
-                    .map(|v| v.into())
-                    .collect()
-            })
-            .collect()
-    }
-}

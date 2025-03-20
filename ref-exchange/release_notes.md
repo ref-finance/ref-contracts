@@ -2,7 +2,7 @@
 
 ### Version 1.9.11
 ```
-CwXYiGDrkggpuq1q9kKsJAB9cDKgXZqVxuW1PwD77X27
+GKNsi9JsTWKHbAjxUPpT2rArVUuHsgf9NxA6TtPejTEd
 ```
 1. add SwapVolumeU256.
 

@@ -820,6 +820,7 @@ impl Contract {
     ) -> u128 {
         self.internal_update_unit_share_cumulative_info(pool_id);
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        // Replace pool.volumes for recording.
         let sv_u256s = internal_get_swap_volume_u256_vec_or_default(pool_id, &pool.get_volumes());
         let amount_out = pool.swap(
             token_in,
@@ -865,6 +866,7 @@ impl Contract {
     ) -> u128 {
         self.internal_update_unit_share_cumulative_info(pool_id);
         let mut pool = self.pools.get(pool_id).expect(ERR85_NO_POOL);
+        // Replace pool.volumes for recording.
         let sv_u256s = internal_get_swap_volume_u256_vec_or_default(pool_id, &pool.get_volumes());
         let amount_in = pool.swap_by_output(
             token_in,

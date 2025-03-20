@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use near_sdk::json_types::{ValidAccountId, U128, U64};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{near_bindgen, AccountId};
-use crate::utils::{SwapVolume, TokenCache};
+use crate::utils::TokenCache;
 use crate::rated_swap::rate::Rate;
 use crate::*;
 
@@ -457,19 +457,24 @@ impl Contract {
     }
 
     /// Return volumes of the given pool.
-    pub fn get_pool_volumes(&self, pool_id: u64) -> Vec<SwapVolume> {
-        self.pools.get(pool_id).expect(ERR85_NO_POOL).get_volumes()
-    }
-
-    pub fn get_pool_volumes_by_ids(&self, pool_ids: Vec<u64>) -> Vec<Vec<SwapVolume>> {
-        pool_ids.iter()
-            .map(|index| self.pools.get(*index).expect(ERR85_NO_POOL).get_volumes())
+    pub fn get_pool_volumes(&self, pool_id: u64) -> Vec<SwapVolumeU256View> {
+        let svs = self.pools.get(pool_id).expect(ERR85_NO_POOL).get_volumes();
+        internal_get_swap_volume_u256_vec_or_default(pool_id, &svs)
+            .into_iter()
+            .map(|v| v.into())
             .collect()
     }
 
-    pub fn list_pool_volumes(&self, from_index: u64, limit: u64) -> Vec<Vec<SwapVolume>> {
+    pub fn get_pool_volumes_by_ids(&self, pool_ids: Vec<u64>) -> Vec<Vec<SwapVolumeU256View>> {
+        pool_ids
+            .into_iter()
+            .map(|pool_id| self.get_pool_volumes(pool_id))
+            .collect()
+    }
+
+    pub fn list_pool_volumes(&self, from_index: u64, limit: u64) -> Vec<Vec<SwapVolumeU256View>> {
         (from_index..std::cmp::min(from_index + limit, self.pools.len()))
-            .map(|index| self.pools.get(index).expect(ERR85_NO_POOL).get_volumes())
+            .map(|pool_id| self.get_pool_volumes(pool_id))
             .collect()
     }
 
