@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.9.12
+```
+68GhAQax4ndABL7Ks1sVncmJDuendk6hDETCq4dqS5rJ
+```
+1. add get_pool_shares_batch.
+
 ### Version 1.9.11
 ```
 GKNsi9JsTWKHbAjxUPpT2rArVUuHsgf9NxA6TtPejTEd

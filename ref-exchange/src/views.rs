@@ -491,6 +491,14 @@ impl Contract {
             .into()
     }
 
+    pub fn get_pool_shares_batch(&self, pool_ids: Vec<u64>, account_id: ValidAccountId) -> Vec<U128> {
+        pool_ids.into_iter().map(|pool_id| self.pools
+            .get(pool_id)
+            .expect(ERR85_NO_POOL)
+            .share_balances(account_id.as_ref())
+            .into()).collect()
+    }
+
     /// Returns total number of shares in the given pool.
     pub fn get_pool_total_shares(&self, pool_id: u64) -> U128 {
         self.pools
