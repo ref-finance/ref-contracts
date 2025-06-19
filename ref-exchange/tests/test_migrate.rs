@@ -51,7 +51,7 @@ fn test_upgrade() {
     .assert_success();
     let metadata = get_metadata(&pool);
     // println!("{:#?}", metadata);
-    assert_eq!(metadata.version, "1.9.11".to_string());
+    assert_eq!(metadata.version, "1.9.12".to_string());
     assert_eq!(metadata.admin_fee_bps, 5);
     assert_eq!(metadata.boost_farm_id, "boost_farm".to_string());
     assert_eq!(metadata.burrowland_id, "burrowland".to_string());
