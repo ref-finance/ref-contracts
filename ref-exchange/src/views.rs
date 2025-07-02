@@ -1007,4 +1007,19 @@ impl Contract {
             })
             .collect()
     }
+
+    pub fn batch_views(
+        &self,
+        account_id: Option<ValidAccountId>,
+        pool_ids: Option<Vec<u64>>,
+    ) -> (
+        Option<HashMap<u64, ShadowRecordInfo>>,
+        Option<HashMap<String, UnitShareTokens>>,
+        Option<Vec<U128>>,
+    ) {
+        let shadow_records = account_id.as_ref().map(|v| self.get_shadow_records(v.clone()));
+        let unit_lpt_assets = pool_ids.as_ref().map(|v| self.get_unit_lpt_assets(v.clone()));
+        let pool_shares = account_id.zip(pool_ids).map(|(aid, pids)| self.get_pool_shares_batch(pids, aid));
+        (shadow_records, unit_lpt_assets, pool_shares)
+    }
 }
