@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.9.13
+```
+4izBbspd1Uiu1vjYcWpkebzoVxqmiZK7ZXSn4b2fAF2D
+```
+1. add batch_views.
+
 ### Version 1.9.12
 ```
 68GhAQax4ndABL7Ks1sVncmJDuendk6hDETCq4dqS5rJ
