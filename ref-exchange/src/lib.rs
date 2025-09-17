@@ -80,6 +80,7 @@ pub(crate) enum StorageKey {
     PoolLimit,
     ClientEchoTokenIdWhitelistItem,
     ClientEchoSenderIdWhitelistItem,
+    SecureSenderWhitelistItem,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]

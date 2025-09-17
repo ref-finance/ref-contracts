@@ -26,3 +26,6 @@ res/*
 # res/ref_farming.wasm
 # res/ref_exchange.wasm
 # res/ref_exchange_release.wasm
+
+CLAUDE.md
+CLAUDE.local.md
