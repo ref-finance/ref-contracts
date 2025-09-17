@@ -2,7 +2,7 @@
 
 ### Version 1.9.14
 ```
-DvQfDT6QnvSnKJmsb2jAfpTSMEJLKSkF1QiiohvfRYPS
+G1mrfT8dceTrrjn95LeCq6HS2LbFktd9XWp49oXZAdXH
 ```
 1. add secure_sender_whitelist in client echo feature, if a sender falls in ssw, client_echo_token whitelist would be ignored.
 2. add prefix wildcard '\*' support in client_echo whitelists. In practise, it always starts with '\*.' to indicate sub-accounts.

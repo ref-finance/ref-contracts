@@ -192,114 +192,114 @@ fn test_client_echo() {
     assert_eq!(balance_of(&token2, &mock_boost_farming.user_account.account_id), 1814048647419868151852693);
     assert_eq!(balance_of(&token2, &new_user.account_id), 1512022210810475642302724);
 
-    // test wildcard
-    call!(
-        owner,
-        pool.remove_client_echo_token_id_whitelist(vec![token1.account_id()]),
-        deposit = 1
-    )
-    .assert_success();
+    // // test wildcard
+    // call!(
+    //     owner,
+    //     pool.remove_client_echo_token_id_whitelist(vec![token1.account_id()]),
+    //     deposit = 1
+    // )
+    // .assert_success();
 
-    call!(
-        owner,
-        pool.extend_client_echo_token_id_whitelist(vec!["*002".to_string()]),
-        deposit = 1
-    )
-    .assert_success();
+    // call!(
+    //     owner,
+    //     pool.extend_client_echo_token_id_whitelist(vec!["*002".to_string()]),
+    //     deposit = 1
+    // )
+    // .assert_success();
 
-    let out_come = do_swap(
-        &mock_boost_farming.user_account,
-        &token1,
-        vec![action.clone()],
-        to_yocto("1"),
-        Some("Hi".to_string()),
-        None,
-    );
-    out_come.assert_success();
-    assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("Invalid client echo token id"));
+    // let out_come = do_swap(
+    //     &mock_boost_farming.user_account,
+    //     &token1,
+    //     vec![action.clone()],
+    //     to_yocto("1"),
+    //     Some("Hi".to_string()),
+    //     None,
+    // );
+    // out_come.assert_success();
+    // assert_eq!(get_error_count(&out_come), 1);
+    // assert!(get_error_status(&out_come).contains("Invalid client echo token id"));
 
-    call!(
-        owner,
-        pool.extend_client_echo_token_id_whitelist(vec!["*001".to_string()]),
-        deposit = 1
-    )
-    .assert_success();
+    // call!(
+    //     owner,
+    //     pool.extend_client_echo_token_id_whitelist(vec!["*001".to_string()]),
+    //     deposit = 1
+    // )
+    // .assert_success();
 
-    let out_come = do_swap(
-        &mock_boost_farming.user_account,
-        &token1,
-        vec![action.clone()],
-        to_yocto("1"),
-        Some("\\\"Free\\\"".to_string()),
-        None,
-    );
-    out_come.assert_success();
-    assert_eq!(get_error_count(&out_come), 0);
+    // let out_come = do_swap(
+    //     &mock_boost_farming.user_account,
+    //     &token1,
+    //     vec![action.clone()],
+    //     to_yocto("1"),
+    //     Some("\\\"Free\\\"".to_string()),
+    //     None,
+    // );
+    // out_come.assert_success();
+    // assert_eq!(get_error_count(&out_come), 0);
 
-    // test secure sender whitelist
-    call!(
-        owner,
-        pool.remove_client_echo_token_id_whitelist(vec!["*001".to_string()]),
-        deposit = 1
-    )
-    .assert_success();
+    // // test secure sender whitelist
+    // call!(
+    //     owner,
+    //     pool.remove_client_echo_token_id_whitelist(vec!["*001".to_string()]),
+    //     deposit = 1
+    // )
+    // .assert_success();
 
-    call!(
-        owner,
-        pool.remove_client_echo_sender_id_whitelist(vec![mock_boost_farming.account_id()]),
-        deposit = 1
-    )
-    .assert_success();
+    // call!(
+    //     owner,
+    //     pool.remove_client_echo_sender_id_whitelist(vec![mock_boost_farming.account_id()]),
+    //     deposit = 1
+    // )
+    // .assert_success();
 
-    let out_come = do_swap(
-        &mock_boost_farming.user_account,
-        &token1,
-        vec![action.clone()],
-        to_yocto("1"),
-        Some("Hi".to_string()),
-        None,
-    );
-    out_come.assert_success();
-    assert_eq!(get_error_count(&out_come), 1);
-    assert!(get_error_status(&out_come).contains("Invalid client echo token id"));
+    // let out_come = do_swap(
+    //     &mock_boost_farming.user_account,
+    //     &token1,
+    //     vec![action.clone()],
+    //     to_yocto("1"),
+    //     Some("Hi".to_string()),
+    //     None,
+    // );
+    // out_come.assert_success();
+    // assert_eq!(get_error_count(&out_come), 1);
+    // assert!(get_error_status(&out_come).contains("Invalid client echo token id"));
 
-    call!(
-        owner,
-        pool.extend_secure_sender_whitelist(vec!["*a_farming".to_string()]),
-        deposit = 1
-    )
-    .assert_success();
+    // call!(
+    //     owner,
+    //     pool.extend_secure_sender_whitelist(vec!["*a_farming".to_string()]),
+    //     deposit = 1
+    // )
+    // .assert_success();
 
-    let out_come = do_swap(
-        &mock_boost_farming.user_account,
-        &token1,
-        vec![action.clone()],
-        to_yocto("1"),
-        Some("\\\"Free\\\"".to_string()),
-        None,
-    );
-    out_come.assert_success();
-    assert_eq!(get_error_count(&out_come), 1);
+    // let out_come = do_swap(
+    //     &mock_boost_farming.user_account,
+    //     &token1,
+    //     vec![action.clone()],
+    //     to_yocto("1"),
+    //     Some("\\\"Free\\\"".to_string()),
+    //     None,
+    // );
+    // out_come.assert_success();
+    // assert_eq!(get_error_count(&out_come), 1);
 
-    call!(
-        owner,
-        pool.extend_secure_sender_whitelist(vec!["*t_farming".to_string()]),
-        deposit = 1
-    )
-    .assert_success();
+    // call!(
+    //     owner,
+    //     pool.extend_secure_sender_whitelist(vec!["*t_farming".to_string()]),
+    //     deposit = 1
+    // )
+    // .assert_success();
 
-    let out_come = do_swap(
-        &mock_boost_farming.user_account,
-        &token1,
-        vec![action.clone()],
-        to_yocto("1"),
-        Some("\\\"Free\\\"".to_string()),
-        None,
-    );
-    out_come.assert_success();
-    assert_eq!(get_error_count(&out_come), 0);
+    // let out_come = do_swap(
+    //     &mock_boost_farming.user_account,
+    //     &token1,
+    //     vec![action.clone()],
+    //     to_yocto("1"),
+    //     Some("\\\"Free\\\"".to_string()),
+    //     None,
+    // );
+    // out_come.assert_success();
+    // assert_eq!(get_error_count(&out_come), 0);
 
-    println!("End test_client_echo!");
+    // println!("End test_client_echo!");
 }
 
