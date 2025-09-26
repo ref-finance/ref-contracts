@@ -136,7 +136,7 @@ fn test_client_echo() {
 
     call!(
         owner,
-        pool.extend_client_echo_token_id_whitelist(vec![to_va(token1.account_id())]),
+        pool.extend_client_echo_token_id_whitelist(vec![token1.account_id()]),
         deposit = 1
     )
     .assert_success();
@@ -158,7 +158,7 @@ fn test_client_echo() {
 
     call!(
         owner,
-        pool.extend_client_echo_sender_id_whitelist(vec![to_va(mock_boost_farming.account_id())]),
+        pool.extend_client_echo_sender_id_whitelist(vec![mock_boost_farming.account_id()]),
         deposit = 1
     )
     .assert_success();
