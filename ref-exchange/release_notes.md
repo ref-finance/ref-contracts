@@ -12,7 +12,23 @@
 G1mrfT8dceTrrjn95LeCq6HS2LbFktd9XWp49oXZAdXH
 ```
 1. add secure_sender_whitelist in client echo feature, if a sender falls in ssw, client_echo_token whitelist would be ignored.
-2. add a new optional arg 'extra_tgas_for_client_echo' for client_echo action. The default value of this arg is 15, means an extra 15T gas will be passed to the token contract beyond the 30T gas requried by NEP-141 'ft_transfer_call'. The client echo sender can set a small number to save gas, for example:  
+2. add a new optional arg 'extra_tgas_for_client_echo' for client_echo action.   
+```rust
+Execute {
+    referral_id: Option<ValidAccountId>,
+    /// List of sequential actions.
+    actions: Vec<Action>,
+    /// If not None, use ft_transfer_call
+    /// to send token_out back to predecessor with this msg.
+    client_echo: Option<String>,
+    skip_unwrap_near: Option<bool>,
+    swap_out_recipient: Option<ValidAccountId>,
+    skip_degen_price_sync: Option<bool>,
+    /// extra Tgas for ft_on_transfer
+    extra_tgas_for_client_echo: Option<u32>,
+},
+```
+The default value of this arg is 15, means an extra 15T gas will be passed to the token contract beyond the 30T gas requried by NEP-141 'ft_transfer_call'. The client echo sender can set a small number to save gas, for example:  
 ```bash
 # manually set extra gas to 7T, so the token_out.near contract would be guaranteed to have at least 37Tgas as prepaid gas in its 'ft_transfer_call'.
 { "msg": "{\"force\":0,\"actions\":[{\"pool_id\":0,\"token_in\":\"token_in.near\",\"token_out\":\"token_out.near\",\"min_amount_out\":\"1\"}],\"client_echo\":\"{\"receiver_id\":\"echo_receiver.near\"}\",\"extra_tgas_for_client_echo\":7}", "amount": "1000", "sender_id": "echo_sender.near" }
