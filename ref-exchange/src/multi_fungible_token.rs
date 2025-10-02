@@ -2,7 +2,7 @@ use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{ext_contract, near_bindgen, Balance, PromiseOrValue};
 
-use crate::utils::{GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_RESOLVE_TRANSFER, NO_DEPOSIT};
+use crate::utils::{GAS_FOR_MFT_TRANSFER_CALL, GAS_FOR_MFT_RESOLVE_TRANSFER, NO_DEPOSIT};
 use crate::*;
 
 #[ext_contract(ext_self)]
@@ -253,7 +253,7 @@ impl Contract {
             msg,
             receiver_id.as_ref(),
             NO_DEPOSIT,
-            env::prepaid_gas() - GAS_FOR_FT_TRANSFER_CALL,
+            env::prepaid_gas() - GAS_FOR_MFT_TRANSFER_CALL - GAS_FOR_MFT_RESOLVE_TRANSFER,
         )
         .then(ext_self::mft_resolve_transfer(
             token_id,
@@ -262,7 +262,7 @@ impl Contract {
             amount,
             &env::current_account_id(),
             NO_DEPOSIT,
-            GAS_FOR_RESOLVE_TRANSFER,
+            GAS_FOR_MFT_RESOLVE_TRANSFER,
         ))
         .into()
     }
@@ -292,7 +292,7 @@ impl Contract {
             msg,
             receiver_id.as_ref(),
             NO_DEPOSIT,
-            env::prepaid_gas() - GAS_FOR_FT_TRANSFER_CALL,
+            env::prepaid_gas() - GAS_FOR_MFT_TRANSFER_CALL - GAS_FOR_MFT_RESOLVE_TRANSFER,
         )
         .then(ext_self::mft_resolve_transfer(
             token_id,
@@ -301,7 +301,7 @@ impl Contract {
             U128(transfer_amount),
             &env::current_account_id(),
             NO_DEPOSIT,
-            GAS_FOR_RESOLVE_TRANSFER,
+            GAS_FOR_MFT_RESOLVE_TRANSFER,
         ))
         .into()
     }

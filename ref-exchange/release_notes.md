@@ -1,11 +1,22 @@
 # Release Notes
 
+### Version 1.9.15
+```
+6VT8PzHwyphkL64Gi7GLS8YyBqmeVU8y8xjSd5ej53sF
+```
+1. reduce gas for callback of client_echo ft_transfer_call from 20T to 5T.
+2. add prefix wildcard '\*' support in client_echo whitelists. In practise, it always starts with '\*.' to indicate sub-accounts.
+
 ### Version 1.9.14
 ```
 G1mrfT8dceTrrjn95LeCq6HS2LbFktd9XWp49oXZAdXH
 ```
 1. add secure_sender_whitelist in client echo feature, if a sender falls in ssw, client_echo_token whitelist would be ignored.
-2. add prefix wildcard '\*' support in client_echo whitelists. In practise, it always starts with '\*.' to indicate sub-accounts.
+2. add a new optional arg 'extra_tgas_for_client_echo' for client_echo action. The default value of this arg is 15, means an extra 15T gas will be passed to the token contract beyond the 30T gas requried by NEP-141 'ft_transfer_call'. The client echo sender can set a small number to save gas, for example:  
+```bash
+# manually set extra gas to 7T, so the token_out.near contract would be guaranteed to have at least 37Tgas as prepaid gas in its 'ft_transfer_call'.
+{ "msg": "{\"force\":0,\"actions\":[{\"pool_id\":0,\"token_in\":\"token_in.near\",\"token_out\":\"token_out.near\",\"min_amount_out\":\"1\"}],\"client_echo\":\"{\"receiver_id\":\"echo_receiver.near\"}\",\"extra_tgas_for_client_echo\":7}", "amount": "1000", "sender_id": "echo_sender.near" }
+```
 
 ### Version 1.9.13
 ```
