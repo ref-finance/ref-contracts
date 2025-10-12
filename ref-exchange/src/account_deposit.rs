@@ -11,7 +11,7 @@ use near_sdk::{
     AccountId, Balance, PromiseResult, StorageUsage,
 };
 use crate::legacy::{AccountV1, AccountV2};
-use crate::utils::{ext_self, ext_wrap_near, GAS_FOR_FT_TRANSFER, GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_RESOLVE_TRANSFER, GAS_FOR_NEAR_WITHDRAW};
+use crate::utils::{ext_self, ext_wrap_near, GAS_FOR_FT_TRANSFER, GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_NEAR_WITHDRAW, GAS_FOR_CB_FT_TRANSFER};
 use crate::*;
 
 // [AUDIT_01]
@@ -609,7 +609,7 @@ impl Contract {
                 U128(amount),
                 &env::current_account_id(),
                 0,
-                GAS_FOR_RESOLVE_TRANSFER,
+                GAS_FOR_CB_FT_TRANSFER,
             ))
         } else {
             ext_fungible_token::ft_transfer(
@@ -626,7 +626,7 @@ impl Contract {
                 U128(amount),
                 &env::current_account_id(),
                 0,
-                GAS_FOR_RESOLVE_TRANSFER,
+                GAS_FOR_CB_FT_TRANSFER,
             ))
         }
     }
@@ -636,7 +636,8 @@ impl Contract {
         sender_id: &AccountId,
         token_id: &AccountId,
         amount: Balance,
-        msg: String
+        msg: String,
+        extra_gas: Gas,
     ) -> Promise {
         ext_fungible_token::ft_transfer_call(
             sender_id.clone(),
@@ -645,7 +646,7 @@ impl Contract {
             msg,
             token_id,
             1,
-            GAS_FOR_FT_TRANSFER_CALL,
+            GAS_FOR_FT_TRANSFER_CALL + extra_gas,
         )
         .then(ext_self::exchange_callback_post_withdraw(
             token_id.clone(),
@@ -653,7 +654,7 @@ impl Contract {
             U128(amount),
             &env::current_account_id(),
             0,
-            GAS_FOR_RESOLVE_TRANSFER,
+            GAS_FOR_CB_FT_TRANSFER,
         ))
     }
 }

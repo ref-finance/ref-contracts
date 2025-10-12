@@ -4,6 +4,7 @@ use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{serde_json, PromiseOrValue};
 
 use crate::*;
+use crate::utils::DEFAULT_EXTRA_TGAS;
 
 pub const VIRTUAL_ACC: &str = "@";
 
@@ -32,6 +33,8 @@ enum TokenReceiverMessage {
         skip_unwrap_near: Option<bool>,
         swap_out_recipient: Option<ValidAccountId>,
         skip_degen_price_sync: Option<bool>,
+        /// extra Tgas for ft_on_transfer
+        extra_tgas_for_client_echo: Option<u32>,
     },
     HotZap {
         referral_id: Option<ValidAccountId>,
@@ -115,7 +118,9 @@ impl FungibleTokenReceiver for Contract {
                     skip_unwrap_near,
                     swap_out_recipient,
                     skip_degen_price_sync,
+                    extra_tgas_for_client_echo,
                 } => {
+                    let extra_tgas: Gas = extra_tgas_for_client_echo.unwrap_or(DEFAULT_EXTRA_TGAS) as Gas * 1_000_000_000_000 as Gas;
                     assert!(!(swap_out_recipient.is_some() && client_echo.is_some()), "client_echo and swap_out_recipient cannot have value at the same time");
                     assert_ne!(actions.len(), 0, "{}", ERR72_AT_LEAST_ONE_SWAP);
                     if client_echo.is_some() {
@@ -134,7 +139,7 @@ impl FungibleTokenReceiver for Contract {
                     }
                     for (token_out, amount_out) in out_amounts.into_iter() {
                         if let Some(ref message) = client_echo {
-                            self.internal_send_token_with_msg(sender_id.as_ref(), &token_out, amount_out, message.clone());
+                            self.internal_send_token_with_msg(sender_id.as_ref(), &token_out, amount_out, message.clone(), extra_tgas);
                         } else {
                             self.internal_send_tokens(swap_out_recipient.as_ref().unwrap_or(&sender_id).as_ref(), &token_out, amount_out, skip_unwrap_near);
                         }

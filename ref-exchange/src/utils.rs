@@ -16,13 +16,17 @@ pub const NO_DEPOSIT: u128 = 0;
 pub const GAS_FOR_BASIC_OP: Gas = 10_000_000_000_000;
 
 /// hotfix_insuffient_gas_for_mft_resolve_transfer.
-pub const GAS_FOR_RESOLVE_TRANSFER: Gas = 20_000_000_000_000;
+pub const GAS_FOR_MFT_TRANSFER_CALL: Gas = 25_000_000_000_000;
+pub const GAS_FOR_MFT_RESOLVE_TRANSFER: Gas = 20_000_000_000_000;
 
-pub const GAS_FOR_FT_TRANSFER_CALL: Gas = 25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER;
+pub const GAS_FOR_FT_TRANSFER_CALL: Gas = 30_000_000_000_000;
+pub const DEFAULT_EXTRA_TGAS: u32 = 15;
 
 /// Amount of gas for fungible token transfers, increased to 20T to support AS token contracts.
 pub const GAS_FOR_FT_TRANSFER: Gas = 20_000_000_000_000;
 pub const GAS_FOR_NEAR_WITHDRAW: Gas = 20_000_000_000_000;
+
+pub const GAS_FOR_CB_FT_TRANSFER: Gas = 5_000_000_000_000;
 
 /// Fee divisor, allowing to provide fee in bps.
 pub const FEE_DIVISOR: u32 = 10_000;

@@ -20,6 +20,7 @@ impl FungibleTokenReceiver for Contract {
         msg: String,
     ) -> PromiseOrValue<U128> {
         assert!(self.data().state == RunningState::Running, "{}", E004_CONTRACT_PAUSED);
+        log!("prepaid gas: {}", env::prepaid_gas());
 
         let amount: u128 = amount.into();
         let token_id = env::predecessor_account_id();
