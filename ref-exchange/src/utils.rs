@@ -26,7 +26,8 @@ pub const DEFAULT_EXTRA_TGAS: u32 = 15;
 pub const GAS_FOR_FT_TRANSFER: Gas = 20_000_000_000_000;
 pub const GAS_FOR_NEAR_WITHDRAW: Gas = 20_000_000_000_000;
 
-pub const GAS_FOR_CB_FT_TRANSFER: Gas = 5_000_000_000_000;
+/// increase from 5T gas to 7T gas for possible implicit account issue.
+pub const GAS_FOR_CB_FT_TRANSFER: Gas = 7_000_000_000_000;
 
 /// Fee divisor, allowing to provide fee in bps.
 pub const FEE_DIVISOR: u32 = 10_000;
