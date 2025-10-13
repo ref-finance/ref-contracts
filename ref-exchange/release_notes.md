@@ -1,5 +1,11 @@
 # Release Notes
 
+### Version 1.9.16
+```
+HkvsCm49ufRUTVMJ1uVmSJPYXFEAHkt2pFrsmJQSjxG4
+```
+1. increase GAS_FOR_CB_FT_TRANSFER from 5T to 7T for possible implicit account issue.
+
 ### Version 1.9.15
 ```
 6VT8PzHwyphkL64Gi7GLS8YyBqmeVU8y8xjSd5ej53sF
