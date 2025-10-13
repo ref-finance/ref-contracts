@@ -11,7 +11,7 @@ use near_sdk::{
     AccountId, Balance, PromiseResult, StorageUsage,
 };
 use crate::legacy::{AccountV1, AccountV2};
-use crate::utils::{ext_self, ext_wrap_near, GAS_FOR_FT_TRANSFER, GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_NEAR_WITHDRAW, GAS_FOR_CB_FT_TRANSFER};
+use crate::utils::{ext_self, ext_wrap_near, GAS_FOR_FT_TRANSFER, GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_NEAR_WITHDRAW, GAS_FOR_CB_NEAR_TRANSFER, GAS_FOR_CB_FT_TRANSFER};
 use crate::*;
 
 // [AUDIT_01]
@@ -609,7 +609,7 @@ impl Contract {
                 U128(amount),
                 &env::current_account_id(),
                 0,
-                GAS_FOR_CB_FT_TRANSFER,
+                GAS_FOR_CB_NEAR_TRANSFER,
             ))
         } else {
             ext_fungible_token::ft_transfer(

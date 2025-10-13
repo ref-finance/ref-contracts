@@ -2,9 +2,9 @@
 
 ### Version 1.9.16
 ```
-HkvsCm49ufRUTVMJ1uVmSJPYXFEAHkt2pFrsmJQSjxG4
+BXSNfiJC2LbVUgRTpHxAYfLiPYDwAn7cXLKJeTsVHRkG
 ```
-1. increase GAS_FOR_CB_FT_TRANSFER from 5T to 7T for possible implicit account issue.
+1. use 10Tgas for transfer near call back.
 
 ### Version 1.9.15
 ```
