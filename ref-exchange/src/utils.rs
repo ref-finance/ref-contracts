@@ -26,6 +26,8 @@ pub const DEFAULT_EXTRA_TGAS: u32 = 15;
 pub const GAS_FOR_FT_TRANSFER: Gas = 20_000_000_000_000;
 pub const GAS_FOR_NEAR_WITHDRAW: Gas = 20_000_000_000_000;
 
+/// Call back for Near transfer need extra gas
+pub const GAS_FOR_CB_NEAR_TRANSFER: Gas = 10_000_000_000_000;
 pub const GAS_FOR_CB_FT_TRANSFER: Gas = 5_000_000_000_000;
 
 /// Fee divisor, allowing to provide fee in bps.
