@@ -38,6 +38,7 @@ pub use crate::client_echo_limit::*;
 pub use crate::swap_volume::*;
 
 mod account_deposit;
+mod account_lostfound;
 mod action;
 mod errors;
 mod admin_fee;
@@ -81,6 +82,8 @@ pub(crate) enum StorageKey {
     ClientEchoTokenIdWhitelistItem,
     ClientEchoSenderIdWhitelistItem,
     SecureSenderWhitelistItem,
+    LostfoundAccounts,
+    LostfoundAccountTokens {account_id: AccountId},
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Deserialize, Eq, PartialEq, Clone)]

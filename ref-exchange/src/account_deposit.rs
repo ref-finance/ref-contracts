@@ -11,7 +11,11 @@ use near_sdk::{
     AccountId, Balance, PromiseResult, StorageUsage,
 };
 use crate::legacy::{AccountV1, AccountV2};
-use crate::utils::{ext_self, ext_wrap_near, GAS_FOR_FT_TRANSFER, GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_NEAR_WITHDRAW, GAS_FOR_CB_NEAR_TRANSFER, GAS_FOR_CB_FT_TRANSFER};
+use crate::utils::{
+    ext_self, ext_wrap_near, ONE_NEAR, MIN_CONTRACT_FREE_BALANCE, 
+    GAS_FOR_FT_TRANSFER, GAS_FOR_FT_TRANSFER_CALL, GAS_FOR_NEAR_WITHDRAW, 
+    GAS_FOR_CB_NEAR_TRANSFER, GAS_FOR_CB_FT_TRANSFER
+};
 use crate::*;
 
 // [AUDIT_01]
@@ -469,7 +473,7 @@ impl Contract {
                         // so, here we can just leave it without insert, won't cause storage collection inconsistency.
                         env::log(
                             format!(
-                                "Account {} has not enough storage. Depositing to owner.",
+                                "Account {} has not enough storage. Depositing to owner or user lostfound account.",
                                 sender_id
                             )
                             .as_bytes(),
@@ -479,7 +483,7 @@ impl Contract {
                 } else {
                     env::log(
                         format!(
-                            "Account {} is not registered. Depositing to owner.",
+                            "Account {} is not registered. Depositing to owner or user lostfound account.",
                             sender_id
                         )
                         .as_bytes(),
@@ -487,7 +491,25 @@ impl Contract {
                     failed = true;
                 }
                 if failed {
-                    self.internal_lostfound(&token_id, amount.0);
+                    let used_storage = env::storage_usage();
+                    let locked_near = env::storage_byte_cost() * used_storage as u128;
+                    let total_near = env::account_balance();
+                    if  total_near > locked_near + MIN_CONTRACT_FREE_BALANCE {
+                        // If contract holds enough free NEAR, deposit to user's lostfound account.
+                        env::log(format!("Depositing to user lostfound account.").as_bytes());
+                        self.insert_lostfound_token(&sender_id, &token_id, amount.0);
+                    } else {
+                        // else, send to owner as central lostfound.
+                        env::log(
+                            format!(
+                                "Not enough free NEAR for user lostfound. Total: {}, Storage locked: {}. Depositing to owner.", 
+                                total_near/ONE_NEAR, 
+                                locked_near/ONE_NEAR
+                            )
+                            .as_bytes()
+                        );
+                        self.internal_lostfound(&token_id, amount.0);
+                    }
                 }
                 0.into()
             }
