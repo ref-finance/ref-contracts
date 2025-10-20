@@ -107,7 +107,7 @@ pub trait SelfCallbacks {
     fn update_token_rate_callback(&mut self, token_id: AccountId);
     fn update_degen_token_price_callback(&mut self, token_id: AccountId);
     fn batch_update_degen_token_by_price_oracle_callback(&mut self, token_id_decimals_map: HashMap<AccountId, u8>);
-    fn batch_update_degen_token_by_pyth_oracle_callback(&mut self, price_id_token_id_map: HashMap<pyth_oracle::PriceIdentifier, AccountId>);
+    fn batch_update_degen_token_by_pyth_oracle_callback(&mut self, price_id_token_id_map: HashMap<pyth_oracle::PriceIdentifier, Vec<AccountId>>);
 }
 
 #[near_bindgen]
