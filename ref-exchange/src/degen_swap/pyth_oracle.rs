@@ -100,13 +100,13 @@ impl Contract {
             for (price_id, token_ids) in price_id_token_id_map {
                 if let Some(Some(price)) = prices.get(&price_id) {
                     if price.is_valid(timestamp, config.pyth_price_valid_duration_sec) {
+                        let price = if price.expo > 0 {
+                            U256::from(PRECISION) * U256::from(price.price.0) * U256::from(10u128.pow(price.expo.abs() as u32))
+                        } else {
+                            U256::from(PRECISION) * U256::from(price.price.0) / U256::from(10u128.pow(price.expo.abs() as u32))
+                        }.as_u128();
                         for token_id in token_ids {
-                            let mut degen = global_get_degen(&token_id);
-                            let price = if price.expo > 0 {
-                                U256::from(PRECISION) * U256::from(price.price.0) * U256::from(10u128.pow(price.expo.abs() as u32))
-                            } else {
-                                U256::from(PRECISION) * U256::from(price.price.0) / U256::from(10u128.pow(price.expo.abs() as u32))
-                            }.as_u128();
+                            let mut degen = global_get_degen(&token_id);  
                             degen.update_price_info(PriceInfo {
                                 stored_degen: price,
                                 degen_updated_at: timestamp
