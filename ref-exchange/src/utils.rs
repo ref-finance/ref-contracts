@@ -32,8 +32,8 @@ pub const GAS_FOR_NEAR_WITHDRAW: Gas = 20_000_000_000_000;
 
 /// Call back for Near transfer needs extra gas
 pub const GAS_FOR_CB_NEAR_TRANSFER: Gas = 10_000_000_000_000;
-/// Possible user lostfound account operation needs extra gas
-pub const GAS_FOR_CB_FT_TRANSFER: Gas = 10_000_000_000_000;
+/// Possible user lostfound account operation won't cost beyond 5Tgas
+pub const GAS_FOR_CB_FT_TRANSFER: Gas = 5_000_000_000_000;
 
 /// Fee divisor, allowing to provide fee in bps.
 pub const FEE_DIVISOR: u32 = 10_000;
