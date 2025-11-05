@@ -404,40 +404,8 @@ impl Contract {
                 amount
             },
             PromiseResult::Failed => {
-                // This reverts the changes from withdraw function.
-                // If account doesn't exit, deposits to the owner's account as lostfound.
-                let mut failed = false;
                 let token_id = self.wnear_id.as_ref().unwrap().clone();
-                if let Some(mut account) = self.internal_get_account(&sender_id) {
-                    if account.deposit_with_storage_check(&token_id, amount.0) {
-                        // cause storage already checked, here can directly save
-                        self.accounts.insert(&sender_id, &account.into());
-                    } else {
-                        // we can ensure that internal_get_account here would NOT cause a version upgrade, 
-                        // cause it is callback, the account must be the current version or non-exist,
-                        // so, here we can just leave it without insert, won't cause storage collection inconsistency.
-                        env::log(
-                            format!(
-                                "Account {} has not enough storage. Depositing to owner.",
-                                sender_id
-                            )
-                            .as_bytes(),
-                        );
-                        failed = true;
-                    }
-                } else {
-                    env::log(
-                        format!(
-                            "Account {} is not registered. Depositing to owner.",
-                            sender_id
-                        )
-                        .as_bytes(),
-                    );
-                    failed = true;
-                }
-                if failed {
-                    self.internal_lostfound(&token_id, amount.0);
-                }
+                self.internal_handle_fail_in_withdraw_callback(&sender_id, &token_id, amount.0);
                 0.into()
             }
         }
@@ -460,57 +428,7 @@ impl Contract {
             PromiseResult::NotReady => unreachable!(),
             PromiseResult::Successful(_) => amount,
             PromiseResult::Failed => {
-                // This reverts the changes from withdraw function.
-                // If account doesn't exit, deposits to the owner's account as lostfound.
-                let mut failed = false;
-                if let Some(mut account) = self.internal_get_account(&sender_id) {
-                    if account.deposit_with_storage_check(&token_id, amount.0) {
-                        // cause storage already checked, here can directly save
-                        self.accounts.insert(&sender_id, &account.into());
-                    } else {
-                        // we can ensure that internal_get_account here would NOT cause a version upgrade, 
-                        // cause it is callback, the account must be the current version or non-exist,
-                        // so, here we can just leave it without insert, won't cause storage collection inconsistency.
-                        env::log(
-                            format!(
-                                "Account {} has not enough storage. Depositing to owner or user lostfound account.",
-                                sender_id
-                            )
-                            .as_bytes(),
-                        );
-                        failed = true;
-                    }
-                } else {
-                    env::log(
-                        format!(
-                            "Account {} is not registered. Depositing to owner or user lostfound account.",
-                            sender_id
-                        )
-                        .as_bytes(),
-                    );
-                    failed = true;
-                }
-                if failed {
-                    let used_storage = env::storage_usage();
-                    let locked_near = env::storage_byte_cost() * used_storage as u128;
-                    let total_near = env::account_balance();
-                    if  total_near > locked_near + MIN_CONTRACT_FREE_BALANCE {
-                        // If contract holds enough free NEAR, deposit to user's lostfound account.
-                        env::log(format!("Depositing to user lostfound account.").as_bytes());
-                        self.insert_lostfound_token(&sender_id, &token_id, amount.0);
-                    } else {
-                        // else, send to owner as central lostfound.
-                        env::log(
-                            format!(
-                                "Not enough free NEAR for user lostfound. Total: {}, Storage locked: {}. Depositing to owner.", 
-                                total_near/ONE_NEAR, 
-                                locked_near/ONE_NEAR
-                            )
-                            .as_bytes()
-                        );
-                        self.internal_lostfound(&token_id, amount.0);
-                    }
-                }
+                self.internal_handle_fail_in_withdraw_callback(&sender_id, &token_id, amount.0);
                 0.into()
             }
         }
@@ -518,6 +436,60 @@ impl Contract {
 }
 
 impl Contract {
+
+    pub(crate) fn internal_handle_fail_in_withdraw_callback(&mut self, sender_id: &AccountId, token_id: &AccountId, amount: u128) {
+        // This reverts the changes from withdraw function.
+        // If account doesn't exit, deposits to the owner's account as lostfound.
+        let mut failed = false;
+        if let Some(mut account) = self.internal_get_account(sender_id) {
+            if account.deposit_with_storage_check(token_id, amount) {
+                // cause storage already checked, here can directly save
+                self.accounts.insert(sender_id, &account.into());
+            } else {
+                // we can ensure that internal_get_account here would NOT cause a version upgrade, 
+                // cause it is callback, the account must be the current version or non-exist,
+                // so, here we can just leave it without insert, won't cause storage collection inconsistency.
+                env::log(
+                    format!(
+                        "Account {} has not enough storage. Depositing to owner or user lostfound account.",
+                        sender_id
+                    )
+                    .as_bytes(),
+                );
+                failed = true;
+            }
+        } else {
+            env::log(
+                format!(
+                    "Account {} is not registered. Depositing to owner or user lostfound account.",
+                    sender_id
+                )
+                .as_bytes(),
+            );
+            failed = true;
+        }
+        if failed {
+            let used_storage = env::storage_usage();
+            let locked_near = env::storage_byte_cost() * used_storage as u128;
+            let total_near = env::account_balance();
+            if  total_near > locked_near + MIN_CONTRACT_FREE_BALANCE {
+                // If contract holds enough free NEAR, deposit to user's lostfound account.
+                env::log(format!("Depositing to user lostfound account.").as_bytes());
+                self.insert_lostfound_token(sender_id, token_id, amount);
+            } else {
+                // else, send to owner as central lostfound.
+                env::log(
+                    format!(
+                        "Not enough free NEAR for user lostfound. Total: {}, Storage locked: {}. Depositing to owner.", 
+                        total_near/ONE_NEAR, 
+                        locked_near/ONE_NEAR
+                    )
+                    .as_bytes()
+                );
+                self.internal_lostfound(token_id, amount);
+            }
+        }
+    }
 
     /// Checks that account has enough storage to be stored and saves it into collection.
     /// This should be only place to directly use `self.accounts`.
