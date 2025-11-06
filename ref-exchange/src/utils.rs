@@ -12,6 +12,10 @@ use crate::errors::*;
 /// Attach no deposit.
 pub const NO_DEPOSIT: u128 = 0;
 
+/// the minimum free yocto NEAR amount left for contract, 100 Near.
+pub const MIN_CONTRACT_FREE_BALANCE: u128 = 100_000_000_000_000_000_000_000_000;
+pub const ONE_NEAR: u128 = 1_000_000_000_000_000_000_000_000;
+
 /// 10T gas for basic operation
 pub const GAS_FOR_BASIC_OP: Gas = 10_000_000_000_000;
 
@@ -26,8 +30,9 @@ pub const DEFAULT_EXTRA_TGAS: u32 = 15;
 pub const GAS_FOR_FT_TRANSFER: Gas = 20_000_000_000_000;
 pub const GAS_FOR_NEAR_WITHDRAW: Gas = 20_000_000_000_000;
 
-/// Call back for Near transfer need extra gas
+/// Call back for Near transfer needs extra gas
 pub const GAS_FOR_CB_NEAR_TRANSFER: Gas = 10_000_000_000_000;
+/// Possible user lostfound account operation won't cost beyond 5Tgas
 pub const GAS_FOR_CB_FT_TRANSFER: Gas = 5_000_000_000_000;
 
 /// Fee divisor, allowing to provide fee in bps.

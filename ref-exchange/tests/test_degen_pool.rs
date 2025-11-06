@@ -538,10 +538,101 @@ fn batch_update_degen_token() {
         })
     ).assert_success();
     call!(
-        root, 
+        root,
         pool.batch_update_degen_token_price(vec![to_va(btc()), to_va(eth())]),
         deposit = 0
     )
     .assert_success();
     println!("{:?}",  view!(pool.batch_get_degen_tokens(vec![to_va(btc())])).unwrap_json::<HashMap<String, DegenTokenInfo>>());
+}
+
+#[test]
+fn batch_update_degen_token_same_price_id() {
+    // Test that multiple tokens with the same price_id are all properly updated
+    let (root, owner, pool, _tokens) =
+        setup_degen_pool(
+            vec![eth(), usdt()],
+            vec![100000*ONE_ETH, 100000*ONE_ETH],  // Same amounts for simplicity
+            vec![18, 6],
+            25,
+            10000,
+        );
+    let pyth_contract = setup_pyth_oracle(&root);
+    let block_timestamp = root.borrow_runtime().current_block().block_timestamp;
+
+    // Create a single price_id that will be used for both usdt() and usdc()
+    let shared_price_id = ref_exchange::pyth_oracle::PriceIdentifier(hex::decode("27e867f0f4f61076456d1a73b14c7edc1cf5cef4f4d6193a33424288f11bd0f4").unwrap().try_into().unwrap());
+
+    // Set the price for the shared price_id
+    call!(
+        root,
+        pyth_contract.set_price(mock_pyth::PriceIdentifier(hex::decode("27e867f0f4f61076456d1a73b14c7edc1cf5cef4f4d6193a33424288f11bd0f4").unwrap().try_into().unwrap()), PythPrice {
+            price: 110000000.into(),
+            conf: 397570.into(),
+            expo: -8,
+            publish_time: nano_to_sec(block_timestamp) as i64,
+        })
+    ).assert_success();
+
+    // Register pyth oracle config
+    call!(
+        owner,
+        pool.register_degen_oracle_config(DegenOracleConfig::PythOracle(PythOracleConfig {
+            oracle_id: pyth_oracle(),
+            expire_ts: 3600 * 10u64.pow(9),
+            pyth_price_valid_duration_sec: 60
+        })),
+        deposit = 1
+    )
+    .assert_success();
+
+    // Register usdt() with the shared price_id
+    call!(
+        owner,
+        pool.register_degen_token(to_va(usdt()), DegenType::PythOracle { price_identifier: shared_price_id.clone() }),
+        deposit = 1
+    )
+    .assert_success();
+
+    // Register usdc() with the SAME price_id
+    call!(
+        owner,
+        pool.register_degen_token(to_va(usdc()), DegenType::PythOracle { price_identifier: shared_price_id.clone() }),
+        deposit = 1
+    )
+    .assert_success();
+
+    // Update prices for both tokens in batch
+    call!(
+        root,
+        pool.batch_update_degen_token_price(vec![to_va(usdt()), to_va(usdc())]),
+        deposit = 0
+    )
+    .assert_success();
+
+    // Get the degen token info for both tokens
+    let degen_infos = view!(pool.batch_get_degen_tokens(vec![to_va(usdt()), to_va(usdc())]))
+        .unwrap_json::<HashMap<String, DegenTokenInfo>>();
+
+    println!("Degen infos: {:#?}", degen_infos);
+
+    let usdt_info = degen_infos.get(&usdt().to_string()).expect("usdt() not found");
+    let usdc_info = degen_infos.get(&usdc().to_string()).expect("usdc() not found");
+
+    // Both should have a valid price
+    assert!(usdt_info.is_price_valid, "usdt() should have a valid price");
+    assert!(usdc_info.is_price_valid, "usdc() should have a valid price");
+
+    // Both should have the same price since they share the same price_id
+    let usdt_price = usdt_info.degen_price;
+    let usdc_price = usdc_info.degen_price;
+
+    println!("USDT price: {:?}", usdt_price);
+    println!("USDC price: {:?}", usdc_price);
+
+    assert_eq!(
+        usdt_price, usdc_price,
+        "Tokens with the same price_id should have the same price. \
+         This test verifies the fix for the issue where only one token was updated."
+    );
 }

@@ -161,7 +161,7 @@ fn instant_swap_scenario_02() {
     assert!(get_error_status(&out_come)
         .contains("Smart contract panicked: The account new_user is not registered"));
     // println!("total logs: {:#?}", get_logs(&out_come));
-    assert!(get_logs(&out_come)[3].contains("Account new_user has not enough storage. Depositing to owner."));
+    assert!(get_logs(&out_come)[3].contains("Account new_user has not enough storage. Depositing to owner or user lostfound account."));
     assert_eq!(
         get_storage_balance(&pool, new_user.valid_account_id())
             .unwrap()
@@ -177,13 +177,20 @@ fn instant_swap_scenario_02() {
         to_yocto("0.00102")
     );
     assert_eq!(balance_of(&token1, &new_user.account_id), to_yocto("9"));
-    assert!(
-        get_deposits(&pool, owner.valid_account_id())
-            .get(&token2.account_id())
-            .unwrap()
-            .0
-            > to_yocto("1.8")
-    );
+    // Token should go to user's lostfound account if contract has enough free NEAR
+    let lostfound_balance = get_lostfound_token(&pool, new_user.valid_account_id(), token2.valid_account_id());
+    if lostfound_balance > 0 {
+        assert!(lostfound_balance > to_yocto("1.8"));
+    } else {
+        // Otherwise it goes to owner's deposits
+        assert!(
+            get_deposits(&pool, owner.valid_account_id())
+                .get(&token2.account_id())
+                .unwrap()
+                .0
+                > to_yocto("1.8")
+        );
+    }
     assert!(get_deposits(&pool, new_user.valid_account_id())
         .get(&token1.account_id())
         .is_none());

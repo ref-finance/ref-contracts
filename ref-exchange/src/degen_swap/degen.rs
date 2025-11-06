@@ -295,7 +295,7 @@ pub fn is_global_degen_price_valid(token_id: &AccountId) -> bool {
 // Both types of oracle-configured degen tokens can be updated simultaneously.
 pub fn internal_batch_update_degen_token_price(token_ids: Vec<AccountId>) {
     let mut token_id_decimals_map = HashMap::new();
-    let mut price_id_token_id_map = HashMap::new();
+    let mut price_id_token_id_map: HashMap<PriceIdentifier, Vec<AccountId>> = HashMap::new();
     for token_id in token_ids {
         let degen = global_get_degen(&token_id);
         match degen {
@@ -303,7 +303,10 @@ pub fn internal_batch_update_degen_token_price(token_ids: Vec<AccountId>) {
                 token_id_decimals_map.insert(token_id, t.decimals);
             },
             Degen::PythOracle(t) => {
-                price_id_token_id_map.insert(t.price_identifier.clone(), token_id);
+                price_id_token_id_map
+                    .entry(t.price_identifier.clone())
+                    .or_insert_with(Vec::new)
+                    .push(token_id);
             },
         }
     }

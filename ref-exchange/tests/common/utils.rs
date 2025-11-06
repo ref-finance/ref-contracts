@@ -185,10 +185,18 @@ pub fn get_pool(pool: &ContractAccount<Exchange>, pool_id: u64) -> PoolInfo {
 }
 
 pub fn get_deposits(
-    pool: &ContractAccount<Exchange>, 
+    pool: &ContractAccount<Exchange>,
     account_id: ValidAccountId
 ) -> HashMap<String, U128> {
     view!(pool.get_deposits(account_id)).unwrap_json::<HashMap<String, U128>>()
+}
+
+pub fn get_lostfound_token(
+    pool: &ContractAccount<Exchange>,
+    account_id: ValidAccountId,
+    token_id: ValidAccountId,
+) -> u128 {
+    view!(pool.get_lostfound_token(account_id, token_id)).unwrap_json::<U128>().0
 }
 
 pub fn list_referrals(pool: &ContractAccount<Exchange>) -> HashMap<String, u32> {
@@ -346,6 +354,215 @@ pub fn setup_pool_with_liquidity() -> (
 ) {
     let root = init_simulator(None);
     let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let pool = deploy!(
+        contract: Exchange,
+        contract_id: swap(),
+        bytes: &EXCHANGE_WASM_BYTES,
+        signer_account: root,
+        init_method: new(to_va("owner".to_string()), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 5, 0)
+    );
+    let token1 = test_token(&root, dai(), vec![swap()]);
+    let token2 = test_token(&root, eth(), vec![swap()]);
+    let token3 = test_token(&root, usdt(), vec![swap()]);
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth()), to_va(usdt())]),
+        deposit = 1
+    );
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(eth()), to_va(usdt())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(usdt()), to_va(dai())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        token1.ft_transfer_call(to_va(swap()), to_yocto("105").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        token2.ft_transfer_call(to_va(swap()), to_yocto("110").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        token3.ft_transfer_call(to_va(swap()), to_yocto("110").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_liquidity(0, vec![U128(to_yocto("10")), U128(to_yocto("20"))], None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_liquidity(1, vec![U128(to_yocto("20")), U128(to_yocto("10"))], None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_liquidity(2, vec![U128(to_yocto("10")), U128(to_yocto("10"))], None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+    (root, owner, pool, token1, token2, token3)
+}
+
+pub fn setup_pool_with_liquidity_high_near() -> (
+    UserAccount,
+    UserAccount,
+    ContractAccount<Exchange>,
+    ContractAccount<TestToken>,
+    ContractAccount<TestToken>,
+    ContractAccount<TestToken>,
+) {
+    // Same as setup_pool_with_liquidity but with explicit high NEAR
+    // for testing Tier 2 (user lostfound) where contract has enough free NEAR
+    let root = init_simulator(None);
+    let owner = root.create_user("owner".to_string(), to_yocto("100"));
+    let pool = deploy!(
+        contract: Exchange,
+        contract_id: swap(),
+        bytes: &EXCHANGE_WASM_BYTES,
+        signer_account: root,
+        init_method: new(to_va("owner".to_string()), to_va("boost_farm".to_string()), to_va("burrowland".to_string()), 5, 0)
+    );
+    let token1 = test_token(&root, dai(), vec![swap()]);
+    let token2 = test_token(&root, eth(), vec![swap()]);
+    let token3 = test_token(&root, usdt(), vec![swap()]);
+    call!(
+        owner,
+        pool.extend_whitelisted_tokens(vec![to_va(dai()), to_va(eth()), to_va(usdt())]),
+        deposit = 1
+    );
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(dai()), to_va(eth())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(eth()), to_va(usdt())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_simple_pool(vec![to_va(usdt()), to_va(dai())], 25),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    call!(
+        owner,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("1")
+    )
+    .assert_success();
+
+    // Fund the contract account with enough NEAR for Tier 2 lostfound
+    // (need >100 NEAR free after storage usage)
+    call!(
+        root,
+        pool.storage_deposit(None, None),
+        deposit = to_yocto("150")
+    )
+    .assert_success();
+
+    call!(
+        root,
+        token1.ft_transfer_call(to_va(swap()), to_yocto("105").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        token2.ft_transfer_call(to_va(swap()), to_yocto("110").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        token3.ft_transfer_call(to_va(swap()), to_yocto("110").into(), None, "".to_string()),
+        deposit = 1
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_liquidity(0, vec![U128(to_yocto("10")), U128(to_yocto("20"))], None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_liquidity(1, vec![U128(to_yocto("20")), U128(to_yocto("10"))], None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+    call!(
+        root,
+        pool.add_liquidity(2, vec![U128(to_yocto("10")), U128(to_yocto("10"))], None),
+        deposit = to_yocto("0.0007")
+    )
+    .assert_success();
+    (root, owner, pool, token1, token2, token3)
+}
+
+pub fn setup_pool_with_liquidity_low_near() -> (
+    UserAccount,
+    UserAccount,
+    ContractAccount<Exchange>,
+    ContractAccount<TestToken>,
+    ContractAccount<TestToken>,
+    ContractAccount<TestToken>,
+) {
+    // Pool setup with low NEAR balance in contract
+    // for testing Tier 3 (owner fallback) where contract has insufficient free NEAR
+    // Root is created with limited NEAR so contract ends up with <100 NEAR free
+    let root = init_simulator(None);
+    // Owner gets limited NEAR (10 NEAR instead of 100)
+    let owner = root.create_user("owner".to_string(), to_yocto("10"));
     let pool = deploy!(
         contract: Exchange,
         contract_id: swap(),

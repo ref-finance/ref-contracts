@@ -71,14 +71,14 @@ pub const GAS_FOR_BATCH_UPDATE_DEGEN_TOKEN_BY_PYTH_ORACLE_OP: Gas = 15_000_000_0
 pub const GAS_FOR_BATCH_UPDATE_DEGEN_TOKEN_BY_PYTH_ORACLE_CALLBACK: Gas = 10_000_000_000_000;
 
 // Batch retrieve the pyth oracle prices for degen tokens.
-pub fn batch_update_degen_token_by_pyth_oracle(price_id_token_id_map: HashMap<pyth_oracle::PriceIdentifier, AccountId>) {
+pub fn batch_update_degen_token_by_pyth_oracle(price_id_token_id_map: HashMap<pyth_oracle::PriceIdentifier, Vec<AccountId>>) {
     let price_ids = price_id_token_id_map.keys().cloned().collect::<Vec<_>>();
     let config = global_get_degen_pyth_oracle_config();
     pyth_oracle::ext_pyth_oracle::list_prices_no_older_than(
         price_ids,
         config.pyth_price_valid_duration_sec as u64,
         &config.oracle_id,
-        NO_DEPOSIT, 
+        NO_DEPOSIT,
         GAS_FOR_BATCH_UPDATE_DEGEN_TOKEN_BY_PYTH_ORACLE_OP
     ).then(ext_self::batch_update_degen_token_by_pyth_oracle_callback(
             price_id_token_id_map,
@@ -92,25 +92,27 @@ pub fn batch_update_degen_token_by_pyth_oracle(price_id_token_id_map: HashMap<py
 impl Contract {
     // Invalid tokens do not affect the synchronization of valid tokens, and panic will not impact the swap.
     #[private]
-    pub fn batch_update_degen_token_by_pyth_oracle_callback(&mut self, price_id_token_id_map: HashMap<pyth_oracle::PriceIdentifier, AccountId>) {
-        if let Some(cross_call_result) = near_sdk::promise_result_as_success() { 
+    pub fn batch_update_degen_token_by_pyth_oracle_callback(&mut self, price_id_token_id_map: HashMap<pyth_oracle::PriceIdentifier, Vec<AccountId>>) {
+        if let Some(cross_call_result) = near_sdk::promise_result_as_success() {
             let prices = from_slice::<HashMap<pyth_oracle::PriceIdentifier, Option<pyth_oracle::Price>>>(&cross_call_result).expect(ERR126_FAILED_TO_PARSE_RESULT);
             let timestamp = env::block_timestamp();
             let config = global_get_degen_pyth_oracle_config();
-            for (price_id, token_id) in price_id_token_id_map {
+            for (price_id, token_ids) in price_id_token_id_map {
                 if let Some(Some(price)) = prices.get(&price_id) {
                     if price.is_valid(timestamp, config.pyth_price_valid_duration_sec) {
-                        let mut degen = global_get_degen(&token_id);
                         let price = if price.expo > 0 {
                             U256::from(PRECISION) * U256::from(price.price.0) * U256::from(10u128.pow(price.expo.abs() as u32))
                         } else {
                             U256::from(PRECISION) * U256::from(price.price.0) / U256::from(10u128.pow(price.expo.abs() as u32))
                         }.as_u128();
-                        degen.update_price_info(PriceInfo {
-                            stored_degen: price,
-                            degen_updated_at: timestamp
-                        });
-                        global_set_degen(&token_id, &degen);
+                        for token_id in token_ids {
+                            let mut degen = global_get_degen(&token_id);  
+                            degen.update_price_info(PriceInfo {
+                                stored_degen: price,
+                                degen_updated_at: timestamp
+                            });
+                            global_set_degen(&token_id, &degen);
+                        }
                     }
                 }
             }
